@@ -1,0 +1,12 @@
+# AIC USERCONFIG 2021/0529/2107
+enable=1
+dsss=9
+ofdmlowrate_2g4=8
+ofdmhighrate_2g4=8
+ofdm1024qam_2g4=8
+ofdmlowrate_5g=11
+ofdmhighrate_5g=10
+ofdm1024qam_5g=9
+
+
+

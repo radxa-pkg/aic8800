@@ -1,0 +1,153 @@
+#
+# Wireless LAN device configuration
+#
+
+menuconfig WLAN
+	bool "Wireless LAN"
+	depends on !S390
+	depends on NET
+	select WIRELESS
+	default y
+	---help---
+	  This section contains all the pre 802.11 and 802.11 wireless
+	  device drivers. For a complete list of drivers and documentation
+	  on them refer to the wireless wiki:
+
+	  http://wireless.kernel.org/en/users/Drivers
+
+if WLAN
+
+#	config RDA5990
+#	  depends on WLAN_80211 && MMC
+#	  select WIRELESS_EXT
+#	  select WEXT_PRIV
+#	  select IEEE80211
+#	  bool "rda 5990p"
+#	  ---help---
+#	    rda5990P fm bt wifi
+
+config WIFI_LOAD_DRIVER_WHEN_KERNEL_BOOTUP
+	bool "Wifi load driver when kernel bootup"
+	default n
+	---help---
+	 Wifi driver will be load (use late_initcall) when kernel bootup
+
+config WIFI_BUILD_MODULE
+	bool "build wifi ko modules"
+	default n
+	---help---
+	 wifi drivers will compile as ko module
+
+menuconfig RTL_WIRELESS_SOLUTION
+	bool "Realtek Wireless Device Driver Support"
+	default y
+
+if RTL_WIRELESS_SOLUTION
+source "drivers/net/wireless/rockchip_wlan/rtl8188eu/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8189es/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8192cu/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8192du/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8723au/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8723bu/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8723bs/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8723bs-vq0/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8723cs/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8723ds/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8812au/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8189fs/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8188fu/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8822bs/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rtl8822bu/Kconfig"
+endif
+source "drivers/net/wireless/rockchip_wlan/esp8089/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/rkwifi/Kconfig"
+source "drivers/net/wireless/rockchip_wlan/ssv6xxx/Kconfig"
+
+choice
+	depends on RKWIFI
+	prompt "Select the wifi module"
+	default RK903
+
+	config BCM4330
+		bool "BCM4330"
+		depends on RKWIFI
+
+	config RK903
+		bool "RK903"
+		depends on RKWIFI
+
+	config RK901
+		bool "RK901"
+		depends on RKWIFI
+
+	config AP6181
+		bool "AP6181"
+		depends on RKWIFI
+
+	config AP6210
+		bool "AP6210"
+		depends on RKWIFI
+
+	config AP6234
+		bool "AP6234"
+		depends on RKWIFI
+
+	config AP6330
+		bool "AP6330"
+		depends on RKWIFI
+
+	config AP6335
+		bool "AP6335"
+		depends on RKWIFI
+
+	config AP6441
+		bool "AP6441"
+		depends on RKWIFI
+		select BCM2079X_NFC
+
+	config AP6476
+		bool "AP6476"
+		depends on RKWIFI
+
+	config AP6493
+		bool "AP6493"
+		depends on RKWIFI
+		select BCM2079X_NFC
+
+	config GB86302I
+		bool "GB86302I"
+		depends on RKWIFI
+
+endchoice
+
+choice
+	depends on RKWIFI
+	prompt "Select the wifi module crystal freq"
+	default RKWIFI_26M
+
+	config RKWIFI_37_4M
+    	bool "37_4M"
+	    depends on RKWIFI
+
+	config RKWIFI_26M
+    	bool "26M"
+	    depends on RKWIFI && !AP6335 && !AP6234 && !AP6441
+
+	config RKWIFI_24M
+    	bool "24M"
+	    depends on RKWIFI && AP6210
+
+endchoice
+
+#menuconfig MTK_WIRELESS_SOLUTION	
+#	bool "MTK wireless chip configuration"
+#	help
+#	  "enable/disable and config MTK wireless solution"
+
+#if MTK_WIRELESS_SOLUTION
+#source "drivers/net/wireless/rockchip_wlan/combo_mt66xx/Kconfig"
+#source "drivers/net/wireless/rockchip_wlan/mt5931_kk/Kconfig"
+#endif # MTK_WIRELESS_SOLUTION
+
+endif
+

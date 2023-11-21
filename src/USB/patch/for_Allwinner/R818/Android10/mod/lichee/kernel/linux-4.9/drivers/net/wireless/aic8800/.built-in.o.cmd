@@ -1,0 +1,1 @@
+cmd_drivers/net/wireless/aic8800/built-in.o :=  rm -f drivers/net/wireless/aic8800/built-in.o; /home/yaya/E/Allwinner/R818/Android10/lichee/out/gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-ar rcsD drivers/net/wireless/aic8800/built-in.o

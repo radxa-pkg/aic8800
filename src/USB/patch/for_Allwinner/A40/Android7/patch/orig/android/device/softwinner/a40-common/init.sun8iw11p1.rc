@@ -1,0 +1,310 @@
+import init.common.rc
+import init.sun8iw11p1.usb.rc
+
+on init
+    # Set permissions for persist partition
+    mkdir /persist 0771 system system
+    mkdir /firmware 0771 system system
+
+    # Support legacy paths
+    symlink /storage/emulated/sdcard /mnt/sdcard
+    symlink /sdcard /storage/sdcard0
+
+    mkdir /oem 0550 system system
+on early-fs
+    insmod nand.ko
+    mount_all /fstab.sun8iw11p1
+    swapon_all /fstab.sun8iw11p1
+#    restorecon_recursive /persist
+
+#    wait /dev/block/by-name/media_data
+#    mount vfat /dev/block/by-name/media_data /oem ro nosuid nodev utf8,context=u:object_r:oemfs:s0
+
+on fs
+	#secure storage
+	# gpu
+    insmod /system/vendor/modules/mali.ko
+    
+# insmod touch_panel gt82x	
+#    insmod  /system/vendor/modules/gslX680new.ko
+    
+#install ir driver . by Gary.
+  #  insmod /system/vendor/modules/sunxi-ir-rx.ko
+
+#gpio driver
+    insmod /system/vendor/modules/gpio-sunxi.ko
+
+	# sw-keyboard
+    #insmod /system/vendor/modules/sunxi-keyboard.ko
+
+	# csi module
+    #insmod /system/vendor/modules/videobuf2-core.ko
+    #insmod /system/vendor/modules/videobuf2-memops.ko
+    #insmod /system/vendor/modules/videobuf2-dma-contig.ko
+    #insmod /system/vendor/modules/cci.ko
+    #insmod /system/vendor/modules/actuator.ko
+    #insmod /system/vendor/modules/vfe_os.ko
+    #insmod /system/vendor/modules/vfe_subdev.ko
+    #insmod /system/vendor/modules/dw9714_act.ko
+    #insmod /system/vendor/modules/hi253.ko
+    #insmod /system/vendor/modules/ov8858_4lane.ko
+    #insmod /system/vendor/modules/vfe_io.ko
+    #insmod /system/vendor/modules/vfe_v4l2.ko
+	
+#tvin      
+    #insmod  /system/vendor/modules/tvin.ko
+    
+# insmod R2 module	
+    #insmod /system/vendor/modules/ttyxin.ko
+    #insmod /system/vendor/modules/usbnet.ko
+    #insmod /system/vendor/modules/cdc_ether.ko
+    #insmod /system/vendor/modules/xin_ncm.ko
+#chipID
+    insmod  /system/vendor/modules/sunxi_eve.ko
+
+# use automatic detecttion insmod ctp & gsensor driver
+#    insmod /system/vendor/modules/sw-device.ko
+
+chmod 0777  /dev/ttyS2
+
+# insmod network
+on property:sys.boot_completed=1
+    insmod /system/vendor/modules/bcmdhd.ko
+    insmod /system/vendor/modules/bt_sleep.ko
+    #insmod /system/vendor/modules/rtl_btlpm.ko
+    #insmod /system/vendor/modules/rtk_btusb.ko
+    #chmod 0660 /dev/rtk_btusb
+    #chown bluetooth net_bt_stack /dev/rtk_btusb
+
+
+#insmod /system/vendor/modules/xradio_mac.ko
+#insmod /system/vendor/modules/xradio_core.ko
+	
+#audio dsp ak7601
+#insmod /system/vendor/modules/ak7601.ko
+
+
+on post-fs-data
+    mkdir /data/media 0770 media_rw media_rw
+    
+    mkdir /data/sk 0777 root root
+    chown system system /dev/carconfig
+    chmod 0777 /dev/carconfig
+    chmod 0777 /system/bin/gocsdk
+    chmod 0644 /system/lib/wb.ko
+	chmod 0777 /data
+	chmod 0777 /data/goc
+	chmod 0777 /dev
+	chmod 0777 /dev/.*
+	chmod 0777 /dev/socket
+	chmod 0777 /dev/socket/.*
+	chmod 0777 /dev/pts
+	chmod 0777 /dev/pts/.*
+
+on boot
+    chmod 0777 /proc/driver/wifi-pm/power
+    write /sys/power/scene_lock "super_standby"
+# bluetooth
+    chmod 0660 /dev/ttyS3
+    chown bluetooth net_bt_stack /dev/ttyS3
+    mkdir /data/misc/bluedroid 770 bluetooth net_bt_stack
+
+	# power up/down interface
+    chmod 0660 /sys/class/rfkill/rfkill0/state
+    chmod 0660 /sys/class/rfkill/rfkill0/type
+    chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/state
+    chown bluetooth net_bt_stack /sys/class/rfkill/rfkill0/type
+    write /sys/class/rfkill/rfkill0/state 0
+
+    # bluetooth MAC address programming
+    chown bluetooth net_bt_stack ro.bt.bdaddr_path
+    chown bluetooth net_bt_stack /system/etc/bluetooth
+    chown bluetooth net_bt_stack /data/misc/bluetooth
+    setprop ro.bt.bdaddr_path "/data/misc/bluetooth/bdaddr"
+
+    # bluetooth LPM
+    chmod 0220 /proc/bluetooth/sleep/lpm
+    chmod 0220 /proc/bluetooth/sleep/btwrite
+    chown bluetooth net_bt_stack /proc/bluetooth/sleep/lpm
+    chown bluetooth net_bt_stack /proc/bluetooth/sleep/btwrite
+
+#wifi	
+chmod a+w /sys/devices/virtual/misc/sunxi-wlan/rf-ctrl/power_state
+chmod a+w /sys/devices/virtual/misc/sunxi-wlan/rf-ctrl/scan_device
+	
+service console /system/bin/sh
+    class core
+    console
+   disabled
+    user shell
+    group shell log
+    
+service insmodlate /system/bin/sh /system/etc/insmodlate.sh
+     class main
+     group system system
+     oneshot
+     disabled
+
+service btuartservice /system/bin/btuartservice
+	class core
+	user root
+	group root
+	disabled
+	oneshot
+	
+	
+service gocsdk /system/bin/gocsdk
+        class main
+        user root
+        group root
+        disabled
+
+on property:persis.sys.bluetooth_goc=1
+		start gocsdk	
+	
+	
+on property:persist.service.bdroid.uart=*
+    start btuartservice
+
+# fusewrapped external sdcard daemon running as media_rw (1023)
+#service fuse_sdcard /system/bin/sdcard -u 1023 -g 1023 -d /mnt/media_rw/sdcard /storage/sdcard
+#    class late_start
+#    disabled
+ 
+#service fuse_extsd /system/bin/sdcard -u 1023 -g 1023 -w 1023 -d /mnt/media_rw/extsd /storage/extsd
+#    class late_start
+     
+# ril related services
+service ril-daemon /system/bin/rild 
+	class main
+	socket rild stream 660 root radio
+	socket rild-debug stream 660 radio system
+	user root
+	group radio cache inet misc audio sdcard_rw log
+
+#service ril-daemon /system/bin/rild -l libr2_t3-ril.so -- -d /dev/ttyVCOM0
+#       class main
+#       socket rild stream 660 root radio
+#       socket rild-debug stream 660 radio system
+#       user root
+#       group radio cache inet misc audio sdcard_rw log
+#       oneshot
+
+#service helloworld /system/bin/helloworld
+#       class main
+#       socket rild stream 660 root radio
+#       socket rild-debug stream 660 radio system
+#       user root
+#       group radio cache inet misc audio sdcard_rw log
+#       oneshot
+    
+# wifi service
+# 1 wifi station and softap
+#service wpa_supplicant /system/bin/logwrapper /system/bin/wpa_supplicant \
+#    p2p_supported=false
+#    class main
+#    socket wpa_wlan0 dgram 660 wifi wifi
+#    disabled
+#    oneshot
+
+# 1. realtek & eagle wifi service
+# 1.1 realtek 8188eu & eagle wifi sta service
+#service wpa_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -I/system/etc/wifi/wpa_supplicant_overlay.conf \
+    -O/data/misc/wifi/sockets \
+    -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
+    #   we will start as root and wpa_supplicant will switch to user wifi
+    #   after setting up the capabilities required for WEXT
+    #   user wifi
+    #   group wifi inet keystore
+#    class main
+#    socket wpa_wlan0 dgram 660 wifi wifi
+#    disabled
+#    oneshot	
+
+# 1.2 realtek 8188eu & eagle wifi sta p2p concurrent service
+#service p2p_supplicant /system/bin/wpa_supplicant \
+    -ip2p0 -Dnl80211 -c/data/misc/wifi/p2p_supplicant.conf \
+    -e/data/misc/wifi/entropy.bin -N \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -I/system/etc/wifi/wpa_supplicant_overlay.conf \
+    -O/data/misc/wifi/sockets \
+    -g@android:wpa_wlan0
+#    class main
+#    socket wpa_wlan0 dgram 660 wifi wifi
+#    disabled
+#    oneshot	
+
+# 1. realtek & eagle wifi service
+# 1.1 bcmdhd &  wifi sta service
+service wpa_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+    -O/data/misc/wifi/sockets \
+    -e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
+    #   we will start as root and wpa_supplicant will switch to user wifi
+    #   after setting up the capabilities required for WEXT
+    #   user wifi
+    #   group wifi inet keystore
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+# 1.2 realtek & eagle wifi sta p2p concurrent service
+service p2p_supplicant /system/bin/wpa_supplicant \
+	-iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf \
+	-O/data/misc/wifi/sockets \
+	-e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0 \
+	-puse_p2p_group_interface=1p2p_device=1
+
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+			
+# 2 wifi sta p2p concurrent service
+#service p2p_supplicant /system/bin/logwrapper /system/bin/wpa_supplicant \
+#    p2p_supported=true
+#    class main
+#    socket wpa_wlan0 dgram 660 wifi wifi
+#    disabled
+#    oneshot
+
+
+# xr819 wpa_supplicant
+#service wpa_supplicant /system/bin/wpa_supplicant -Dnl80211 -iwlan0 -c/data/misc/wifi/wpa_supplicant.conf \
+#    -O/data/misc/wifi/sockets \
+#	-g@android:wpa_wlan0
+#    class main
+#    socket wpa_wlan0 dgram 660 wifi wifi
+#	group wifi
+#    disabled
+#    oneshot
+	
+	
+	
+service dhcpcd_lte0 /system/bin/dhcpcd -ABKL
+    class main
+    disabled
+    oneshot
+    
+service iprenew_lte0 /system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot	
+#xr819 p2p	
+service p2p_supplicant /system/bin/wpa_supplicant -Dnl80211 -ip2p0 -c/data/misc/wifi/p2p_supplicant.conf -N -Dnl80211 -iwlan0 -c/data/misc/wifi/wpa_supplicant.conf \
+    -O/data/misc/wifi/sockets \
+    -g@android:wpa_wlan0
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    group wifi
+    disabled
+    oneshot
+
+on boot
+	setprop service.adb.tcp.port 5555
+	stop adbd
+	start adbd

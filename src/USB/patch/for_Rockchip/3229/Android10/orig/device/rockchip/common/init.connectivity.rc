@@ -1,0 +1,80 @@
+# zygote need to be started after otapreopt which will be done on post-fs-data
+on zygote-start
+
+# for bluetooth
+    # change back to bluetooth from system
+    chown bluetooth net_bt /data/misc/bluetooth
+    mkdir /data/misc/bluedroid 0770 bluetooth net_bt
+    # bluetooth LPM
+    chown bluetooth net_bt /proc/bluetooth/sleep/lpm
+    chown bluetooth net_bt /proc/bluetooth/sleep/btwrite    
+    
+    insmod /vendor/lib/modules/aic_btusb.ko
+
+    chmod 0660 /dev/rtk_btusb
+    chown bluetooth net_bt /dev/rtk_btusb
+    chmod 0660 /dev/rtkbt_dev
+    chown bluetooth net_bt /dev/rtkbt_dev
+
+    # bluetooth MAC address programming
+    chown bluetooth net_bt ro.bt.bdaddr_path
+    chown bluetooth net_bt /data/misc/bluetooth
+    setprop ro.bt.bdaddr_path "/data/misc/bluetooth/bdaddr"
+
+    chmod 0660 /dev/ttyS0
+    chmod 0660 /dev/ttyS1
+    chmod 0660 /dev/vflash
+    chmod 0664 /dev/vendor_storage
+    chown bluetooth net_bt /dev/vflash
+    chown bluetooth net_bt /dev/vendor_storage
+    chown bluetooth net_bt /dev/ttyS1
+    chown bluetooth net_bt /dev/ttyS0
+    chown bluetooth net_bt /sys/class/rfkill/rfkill0/type
+    chown bluetooth net_bt /sys/class/rfkill/rfkill0/state
+    chmod 0664 /sys/class/rfkill/rfkill0/state
+
+# for wifi
+
+    mkdir /data/vendor/wifi 0771 wifi wifi
+    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
+    
+    chown wifi wifi /sys/module/bcmdhd/parameters/firmware_path
+
+# for akmd
+   mkdir /data/vendor/akmd 0771 akmd akmd
+
+#for nfc
+    chmod 0660 /dev/bcm2079x
+    chown nfc nfc /dev/bcm2079x
+    mkdir /data/nfc
+    mkdir /data/nfc/param
+    chmod 0700 /data/nfc
+    chmod 0700 /data/nfc/param
+    chown nfc nfc /data/nfc
+    chown nfc nfc /data/nfc/param
+
+on property:wlan.driver.status=ok
+    chown wifi wifi /sys/module/bcmdhd/parameters/firmware_path
+    chown wifi wifi /sys/module/bcmdhd/parameters/nvram_path
+
+on property:vendor.wifi.direct.interface=p2p0
+    setprop wifi.direct.interface p2p0
+
+on property:vendor.wifi.direct.interface=p2p-dev-wlan0
+    setprop wifi.direct.interface p2p-dev-wlan0
+
+service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+    /vendor/etc/wifi/wpa_config.txt
+#   we will start as root and wpa_supplicant will switch to user wifi
+#   after setting up the capabilities required for WEXT
+#   user wifi
+#   group wifi inet keystore
+    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
+    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
+    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+

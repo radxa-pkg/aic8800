@@ -1,0 +1,207 @@
+/dev/ttyFIQ[0-9]*    u:object_r:serial_device:s0
+/dev/ttyS4           u:object_r:tty_device:s0
+/dev/ttyUSB[0-9]*    u:object_r:tty_device:s0
+/dev/cdc-wdm0        u:object_r:tty_device:s0
+/dev/mali[0-9]       u:object_r:gpu_device:s0
+/dev/mali            u:object_r:gpu_device:s0
+/dev/ddr_freq        u:object_r:ddr_device:s0
+/dev/rga             u:object_r:rga_device:s0
+/dev/pvr_sync        u:object_r:gpu_device:s0
+/dev/ion_legency     u:object_r:gpu_device:s0
+/dev/block/dm-[0-9]* u:object_r:dm_device:s0
+/dev/vflash          u:object_r:vflash_device:s0
+/dev/timerirq        u:object_r:timer_device:s0
+/dev/vpu_service     u:object_r:video_device:s0
+/dev/vpu-service     u:object_r:video_device:s0
+/dev/mpp_service     u:object_r:video_device:s0
+/dev/hevc_service    u:object_r:video_device:s0
+/dev/hevc-service    u:object_r:video_device:s0
+/dev/video_state     u:object_r:video_device:s0
+/dev/iep             u:object_r:video_device:s0
+/dev/camsys_marvin[0-9]*   u:object_r:camera_device:s0
+/dev/camsys_marvin   u:object_r:camera_device:s0
+/dev/block/zram0     u:object_r:zram_device:s0
+/dev/sw_sync         u:object_r:gpu_device:s0
+/dev/mma8452_daemon  u:object_r:sensor_device:s0
+/dev/compass         u:object_r:sensor_dev:s0
+/dev/gyrosensor      u:object_r:sensor_dev:s0
+/dev/stune(/.*)?     u:object_r:cgroup:s0
+
+/dev/akm8963_dev        u:object_r:akmd_device:s0
+/dev/akm_dev            u:object_r:akmd_device:s0
+/vendor/bin/akmd        u:object_r:akmd_exec:s0
+/data/vendor/akmd(/.*)? u:object_r:akmd_vendor_data_file:s0
+
+# camera
+/dev/media[0-9]      u:object_r:camera_device:s0
+/dev/v4l-subdev[0-9] u:object_r:camera_device:s0
+
+#usb
+/sys/devices/virtual/android_usb/android0(/.*)? -- u:object_r:sysfs_usb:s0
+/sys/devices/platform/11000000.syscon/11000000.syscon:usb2-phy@760/otg_mode u:object_r:sysfs_usb:s0
+/sys/devices/platform/ff450000.syscon/ff450000.syscon:usb2-phy@100/otg_mode u:object_r:sysfs_usb:s0
+
+#hctosys
+/sys/devices/platform/rtc-fake/rtc/rtc0/hctosys -- u:object_r:sysfs_hctosys:s0
+
+#lcdcscale
+/sys/devices/fb.11/graphics/fb0/scale -- u:object_r:sysfs_lcdc:s0
+
+#for support ntfs
+/system/bin/ntfs-3g  u:object_r:vold_exec:s0
+/system/bin/mkntfs   u:object_r:vold_exec:s0
+/system/bin/ntfsfix  u:object_r:vold_exec:s0
+
+#for exfat
+/system/bin/mkfs.exfat  u:object_r:vold_exec:s0
+
+#for media
+/sys/firmware/devicetree/base/compatible     u:object_r:sysfs_dev:s0
+
+#hdmi
+/sys/devices/virtual/display/HDMI(/.*)? -- u:object_r:sysfs_hdmi:s0
+/sys/devices/platform/display-subsystem/drm(/.*)? -- u:object_r:sysfs_hdmi:s0
+/sys/class/devfreq/dmc(/.*)? -- u:object_r:sysfs_hdmi:s0
+/sys/system_monitor/system_status               u:object_r:sys_dmc:s0
+
+# for device
+/dev/block/by-name/frp                          u:object_r:frp_block_device:s0
+/dev/block/by-name/system                       u:object_r:system_block_device:s0
+/dev/block/by-name/vendor                       u:object_r:system_block_device:s0
+/dev/block/by-name/oem                          u:object_r:e2fsck_oem_block_device:s0
+/dev/block/by-name/cache                        u:object_r:e2fsck_cache_block_device:s0
+/dev/block/by-name/metadata                     u:object_r:metadata_block_device:s0
+/dev/block/by-name/userdata                     u:object_r:userdata_block_device:s0
+/dev/block/by-name/boot                         u:object_r:boot_block_device:s0
+/dev/block/by-name/recovery                     u:object_r:recovery_block_device:s0
+/dev/block/by-name/misc                         u:object_r:misc_block_device:s0
+/dev/block/by-name/security                     u:object_r:security_block_device:s0
+/dev/block/by-name/baseparameter                u:object_r:baseparameter_block_device:s0
+/dev/block/by-name/super                        u:object_r:super_block_device:s0
+
+/sys/devices/platform/fb/graphics/fb[0-9]/cabc                u:object_r:sysfs_fb:s0
+/sys/kernel/debug/mali/gpu_memory                u:object_r:sys_mali:s0
+
+/mnt/vendor/metadata                            u:object_r:vendor_metadata:s0
+
+#for vpu
+/dev/rkvdec                                     u:object_r:video_device:s0
+/dev/dri(/.*)?                                  u:object_r:gpu_device:s0
+
+/dev/vepu                                       u:object_r:video_device:s0
+/dev/h265e                                      u:object_r:video_device:s0
+
+/dev/vendor_storage                             u:object_r:storage_device:s0
+
+#for tee
+/(vendor|system/vendor)/bin/tee-supplicant      u:object_r:tee_exec:s0
+/dev/opteearmtz[0-9]*                           u:object_r:tee_device:s0
+/dev/tee[0-9]*                                  u:object_r:tee_device:s0
+/dev/teepriv[0-9]*                              u:object_r:tee_device:s0
+#/data/tee(/.*)?                                u:object_r:tee_data_file:s0
+/vendor/bin/rk_store_keybox                     u:object_r:rk_store_keybox_exec:s0
+
+/dev/block/mmcblk[0-9]                          u:object_r:uboot_block_device:s0
+/dev/block/mmcblk[0-9]rpmb                      u:object_r:rpmb_block_device:s0
+/dev/mmcblk[0-9]rpmb                            u:object_r:rpmb_block_device:s0
+
+# Vendor file tag
+/vendor/lib(64)?/hw/android\.hardware\.graphics\.mapper@2\.0-impl-2\.1\.so        u:object_r:same_process_hal_file:s0
+/vendor/bin/usb_dongle                          u:object_r:usb_dongle_exec:s0
+/vendor/bin/rockchip.drmservice                 u:object_r:np_rockchip_drmservice_exec:s0
+/vendor/bin/hw/rk_wifi_hal	                    u:object_r:rk_wifi_hal_exec:s0
+/vendor/bin/hw/rockchip\.hardware\.outputmanager@1\.0-service           u:object_r:rk_output_hal_exec:s0
+/vendor/bin/abc 				                u:object_r:abc_exec:s0
+/vendor/lib(64)?/libdrm.so                      u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libdrm_rockchip.so             u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libIMGegl.so                   u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libusc.so                      u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libPVROCL.so                   u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libpvrANDROID_WSEGL.so         u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libsrv_um.so                   u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libgralloc_drm.so              u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/hw/gralloc.rk30board.so        u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/hw/gralloc.rk3368.so           u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/hw/vulkan.rk30board.so         u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/hw/vulkan.rk3368.so            u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libmpp.so                      u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libvpu.so                      u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libstdc\+\+.so                 u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/librk_vpuapi.so                u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libglslcompiler.so             u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libgralloc_priv_omx.so         u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/librga.so                      u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libiep.so                      u:object_r:same_process_hal_file:s0
+# default hal
+/vendor/bin/hw/android\.hardware\.drm@1\.2-service\.widevine            u:object_r:hal_drm_widevine_exec:s0
+/vendor/bin/hw/android\.hardware\.drm@1\.2-service-lazy\.widevine            u:object_r:hal_drm_widevine_exec:s0
+/vendor/bin/hw/android\.hardware\.drm@1\.2-service\.clearkey            u:object_r:hal_drm_clearkey_exec:s0
+/vendor/bin/hw/android\.hardware\.drm@1\.2-service-lazy\.clearkey            u:object_r:hal_drm_clearkey_exec:s0
+
+# input files
+/vendor/usr/idc(/.*)?                  u:object_r:vendor_idc_file:s0
+/vendor/usr/keylayout(/.*)?            u:object_r:vendor_keylayout_file:s0
+
+#for cec
+/dev/cec[0-9]*              u:object_r:cec_device:s0
+
+#for hid audio
+/dev/hidraw0                u:object_r:hidraw_device:s0
+
+#bluetooth
+/sys/class/rfkill(/.*)?                 u:object_r:rk_bluetooth_file:s0
+/proc/bluetooth/sleep/lpm               u:object_r:rk_bluetooth_file:s0
+
+/dev/i2c-[23]                           u:object_r:i2c_device:s0
+/dev/spidev.*                           u:object_r:spi_device:s0
+/sys/class/gpio/.*export                u:object_r:sysfs_gpio:s0
+/sys/class/pwm/pwmchip1(/.*)?           u:object_r:sysfs_pwm:s0
+/sys/class/rtc/rtc0(/.*)?               u:object_r:sysfs_rtc:s0
+/sys/devices/platform/board/info        u:object_r:sysfs_soc:s0
+/sys/devices/platform/ff420010.pwm/pwm/pwmchip1                             u:object_r:sysfs_pwm:s0
+/sys/devices/platform/ff3c0000.i2c/i2c-0/0-001b/rk808-rtc/rtc/rtc0(/.*)?    u:object_r:sysfs_rtc:s0
+/sys/devices/platform/ff3d0000.i2c/i2c-4/4-0022/extcon/extcon1/state        u:object_r:sysfs_extcon:s0
+/sys/devices/platform/pinctrl/gpiochip[0-4]/gpio/gpio[0-9]*(/.*)?           u:object_r:sysfs_gpio:s0
+/sys/devices/platform/ff100000.saradc/iio:device0/in_voltage.*              u:object_r:sysfs_iio:s0
+
+#gpu_data_file
+/data/ota/view_cts\.ini u:object_r:gpu_data_file:s0
+
+#data
+/data/vendor/mediadrm(/.*)?             u:object_r:mediadrm_vendor_data_file:s0
+
+#for iso
+#TODO removed for Q
+#/system/bin/iso                    u:object_r:iso_exec:s0
+# insmod ko
+/vendor/bin/init\.insmod\.sh                                         u:object_r:init-insmod-sh_exec:s0
+/vendor/etc/init\.insmod\.cfg                                        u:object_r:init-insmod-sh_exec:s0
+
+/vendor/bin/init\.drm\.sh                                            u:object_r:init_rk3399_exec:s0
+/vendor/bin/pwm_fan\.sh                                              u:object_r:pwm_fan_autorun_exec:s0
+
+#for healthd
+/sys/devices/virtual/power_supply(/.*)?                              u:object_r:sysfs_power:s0
+
+/dev/rtkbt_dev       u:object_r:rtkbt_device:s0
+
+
+#weaver hal
+/vendor/bin/hw/android\.hardware\.weaver@1\.0-service                u:object_r:weaver-hal-1-0_exec:s0
+
+#rockit hw hal
+/vendor/bin/hw/rockchip\.hardware\.rockit\.hw@1\.0-service           u:object_r:vendor-rockit-hal-1-0_exec:s0
+/vendor/bin/hw/rockchip\.hardware\.rockit\.hw@1\.0-service-lazy      u:object_r:vendor-rockit-hal-1-0_exec:s0
+
+#abc
+/data/vendor/logs(/.*)?                         u:object_r:abc_data_file:s0
+
+#samba
+/system/bin/cifsmanager.sh     u:object_r:vold_exec:s0
+
+#rockchip audiosetting
+
+/odm/media(/.*)?    u:object_r:oemfs:s0
+
+#flash_img
+/system/bin/flash_img.sh u:object_r:install_recovery_exec:s0

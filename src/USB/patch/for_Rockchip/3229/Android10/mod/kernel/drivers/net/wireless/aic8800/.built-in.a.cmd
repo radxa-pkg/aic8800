@@ -1,0 +1,1 @@
+cmd_drivers/net/wireless/aic8800/built-in.a :=  rm -f drivers/net/wireless/aic8800/built-in.a; ./../prebuilts/gcc/linux-x86/arm/gcc-linaro-6.3.1-2017.05-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-ar rcSTPD drivers/net/wireless/aic8800/built-in.a 

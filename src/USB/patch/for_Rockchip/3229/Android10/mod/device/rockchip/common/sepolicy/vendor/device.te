@@ -1,0 +1,35 @@
+type ddr_device, dev_type;
+type rga_device, dev_type;
+type vflash_device, dev_type;
+type timer_device, dev_type;
+type vpu_device, dev_type;
+type hevc_device, dev_type;
+type rtkbt_device, dev_type;
+type aicbt_device, dev_type;
+type nvm_block_device, dev_type;
+# for rknand device
+type rknand_device, dev_type;
+
+#for displayd
+type baseparameter_block_device, dev_type;
+type sensor_device, dev_type;
+type e2fsck_cache_block_device, dev_type;
+type e2fsck_metadata_block_device, dev_type;
+type e2fsck_system_block_device, dev_type;
+type e2fsck_frp_block_device, dev_type;
+type e2fsck_oem_block_device, dev_type;
+type security_block_device, dev_type;
+
+type zram_device, dev_type;
+type akmd_device, dev_type;
+type storage_device, dev_type;
+
+#for optee
+type uboot_block_device, dev_type;
+type rpmb_block_device, dev_type;
+
+#for cec
+type cec_device, dev_type;
+
+#for hid audio
+type hidraw_device, dev_type;

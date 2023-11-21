@@ -1,0 +1,50 @@
+on init
+    # Load persistent dm-verity state
+    verity_load_state
+
+on early-boot
+    # Update dm-verity state and set partition.*.verified properties
+    verity_update_state
+
+on verity-logging
+    exec u:r:slideshow:s0 -- /sbin/slideshow warning/verity_red_1 warning/verity_red_2
+
+on boot
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chmod 0660 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+    chown system system /sys/class/thermal/thermal_zone0/policy
+    chmod 0660 /sys/class/thermal/thermal_zone0/policy
+
+    chown system system /sys/class/thermal/thermal_zone0/emul_temp
+    chmod 0660 /sys/class/thermal/thermal_zone0/emul_temp
+
+    write /sys/class/disp/disp/attr/runtime_enable 1
+    write /sys/kernel/autohotplug/enable 1
+    write /sys/kernel/autohotplug/boost_all 0
+
+    # Read one page at a time for swap (default is 8)
+    write /proc/sys/vm/page-cluster 0
+    setprop persist.vendor.overlay.user_rotation ${ro.primary_display.user_rotation}
+
+on late-fs
+### csi module
+    insmod /vendor/modules/videobuf2-core.ko
+    insmod /vendor/modules/videobuf2-memops.ko
+    insmod /vendor/modules/videobuf2-dma-contig.ko
+    insmod /vendor/modules/videobuf2-v4l2.ko
+    insmod /vendor/modules/vin_io.ko
+    insmod /vendor/modules/imx278_mipi.ko
+    insmod /vendor/modules/imx386_2lane_mipi.ko
+    insmod /vendor/modules/vin_v4l2.ko
+### uvc module
+    insmod /vendor/modules/videobuf2-vmalloc.ko
+    insmod /vendor/modules/uvcvideo.ko
+
+on property:sys.boot_completed=1
+    #inmod tp module
+    #insmod /vendor/modules/gslX680new.ko
+    insmod /vendor/modules/aic_load_fw.ko
+    insmod /vendor/modules/gt82x.ko
+    write /sys/class/thermal/thermal_zone0/policy power_allocator
+    chown system system /sys/devices/platform/soc/twi0/i2c-0/0-0040/input/input4/runtime_suspend

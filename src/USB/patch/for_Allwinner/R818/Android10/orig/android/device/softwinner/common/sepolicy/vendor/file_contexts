@@ -1,0 +1,171 @@
+# label graphics device with a new type, we need
+# to allow write operation from appdomain
+
+# gpu device labeling
+/dev/mali             u:object_r:gpu_device:s0
+/dev/mali0            u:object_r:gpu_device:s0
+/dev/pvr_sync         u:object_r:gpu_device:s0
+/dev/dri/card0        u:object_r:gpu_device:s0
+/dev/dri/controlD64   u:object_r:gpu_device:s0
+/dev/dri/renderD128   u:object_r:gpu_device:s0
+#/system/bin/service_atw      u:object_r:surfaceflinger_exec:s0
+
+# graphics device labeling
+/dev/disp               u:object_r:graphics_device:s0
+/dev/transform          u:object_r:graphics_device:s0
+/dev/g2d                u:object_r:graphics_device:s0
+/dev/sw_sync            u:object_r:graphics_device:s0
+
+/vendor/lib(64)?/libIMGegl.so                        u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libsrv_um.so                        u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libusc.so                           u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libPVRScopeServices.so         u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libglslcompiler.so             u:object_r:same_process_hal_file:s0
+/vendor/bin/pvrsrvctl                           u:object_r:pvr_exec:s0
+/vendor/firmware/rgx.fw.22.102.54.38            u:object_r:same_process_hal_file:s0
+#/vendor/lib/libufwriter.so                      u:object_r:same_process_hal_file:s0
+
+# graphic mapper
+/vendor/lib(64)?/hw/android\.hardware\.graphics\.mapper@2\.0-impl-2\.1\.so u:object_r:same_process_hal_file:s0
+
+# cedar_dev
+/dev/cedar_dev             u:object_r:cedar_device:s0
+/dev/googlevp9_dev         u:object_r:cedar_device:s0
+/dev/deinterlace           u:object_r:deinterlace_device:s0
+
+# sunxi_soc_device
+/dev/sunxi_soc_info        u:object_r:sunxi_soc_device:s0
+
+# Block labeling
+/dev/block/nand0                u:object_r:root_block_device:s0
+/dev/block/mmcblk0              u:object_r:root_block_device:s0
+/dev/block/mmcblk0p1            u:object_r:sdcard_block_device:s0
+/dev/block/mmcblk1p1            u:object_r:sdcard_block_device:s0
+/dev/block/by-name/boot         u:object_r:boot_block_device:s0
+/dev/block/by-name/system       u:object_r:system_block_device:s0
+/dev/block/by-name/vendor       u:object_r:system_block_device:s0
+/dev/block/by-name/product      u:object_r:system_block_device:s0
+/dev/block/by-name/super        u:object_r:super_block_device:s0
+/dev/block/by-name/recovery     u:object_r:recovery_block_device:s0
+/dev/block/by-name/userdata     u:object_r:userdata_block_device:s0
+/dev/block/by-name/UDISK        u:object_r:userdata_block_device:s0
+/dev/block/by-name/Reserve0     u:object_r:userdata_block_device:s0
+/dev/block/by-name/alog         u:object_r:userdata_block_device:s0
+/dev/block/by-name/metadata     u:object_r:metadata_block_device:s0
+/dev/block/by-name/vbmeta.*     u:object_r:metadata_block_device:s0
+/dev/block/by-name/cache        u:object_r:cache_block_device:s0
+/dev/block/by-name/misc         u:object_r:misc_block_device:s0
+/dev/block/by-name/private      u:object_r:private_block_device:s0
+# factory reset protection partition
+/dev/block/by-name/frp          u:object_r:frp_block_device:s0
+# zram
+/dev/block/zram0                u:object_r:swap_block_device:s0
+# zram backing device
+/dev/block/by-name/zram_back    u:object_r:zram_backing_device:s0
+
+# for dragonface
+/file_contexts.bin              u:object_r:file_contexts_file:s0
+
+# cgroup
+/dev/stune(/.*)?                u:object_r:cgroup:s0
+
+# Bluetooth
+/dev/ttyS1              u:object_r:hci_attach_dev:s0
+/dev/ttyBT0             u:object_r:hci_attach_dev:s0
+/sys/class/rfkill/rfkill0/state u:object_r:sysfs_bluetooth_writable:s0
+
+# wcn_log
+/data/unisoc_dbg(/.*)? u:object_r:wcn_data_file:s0
+/data/unisoc_cp2log_config.txt u:object_r:wcn_data_file:s0
+
+#widevine
+/(vendor|system/vendor)/bin/hw/android\.hardware\.drm@1\.2-service-lazy.widevine    u:object_r:hal_drm_widevine_exec:s0
+/data/vendor/mediadrm(/.*)? u:object_r:mediadrm_vendor_data_file:s0
+/(vendor|system/vendor)/bin/hw/android\.hardware\.drm@1\.2-service-lazy.clearkey    u:object_r:hal_drm_clearkey_exec:s0
+
+# optee
+/dev/tee0               u:object_r:tee_device:s0
+/dev/teepriv0           u:object_r:tee_device:s0
+/data/vendor/tee(/.*)?         u:object_r:tee_data_file:s0
+/(vendor|system/vendor)/bin/hw/tee_supplicant     u:object_r:tee_exec:s0
+/(vendor|system/vendor)/lib/libkeymaster4_ca_aw\.so   u:object_r:hal_keymaster_default_exec:s0
+/(vendor|system/vendor)/bin/hw/android\.hardware\.keymaster@4\.0-service-aw   u:object_r:hal_keymaster_default_exec:s0
+/(vendor|system/vendor)/bin/hw/android\.hardware\.gatekeeper@1\.0-service-aw   u:object_r:hal_gatekeeper_default_exec:s0
+
+# rild
+/dev/ttyUSB[0-4]  u:object_r:radio_device:s0
+/dev/ttyACM[0-4]  u:object_r:radio_device:s0
+/dev/qcqmi[0-4]   u:object_r:radio_device:s0
+
+# radio_monitor
+/vendor/bin/hw/radio_monitor u:object_r:radio_monitor_exec:s0
+
+# regulatory
+/vendor/bin/crda.uevent u:object_r:regulatory_exec:s0
+/vendor/bin/dom2reg     u:object_r:regulatory_exec:s0
+
+# android.hardware.radio.config
+/vendor/bin/hw/android.hardware.radio.config@1.1-service u:object_r:hal_radio_config_default_exec:s0
+
+# wireless info
+/vendor/bin/hw/wireless_hwinfo u:object_r:wl_info_exec:s0
+
+#memtrack
+/sys/kernel/debug/ion/heaps/cma      u:object_r:sysfs_cma_readable:s0
+/sys/kernel/debug/pvr     			 u:object_r:debugfs_gpu_readable:s0
+#sw_sync
+/sys/kernel/debug/sync/sw_sync       u:object_r:sysfs_debugfs_swsync:s0
+
+#vold
+/system/bin/ntfs-3g.probe       u:object_r:fsck_exec:s0
+/system/bin/fsck.exfat          u:object_r:fsck_exec:s0
+
+#fs_mgr
+/system/bin/make_ext4fs      u:object_r:e2fs_exec:s0
+
+# awdisplay
+/system/bin/displayservice  u:object_r:awdisplay_exec:s0
+
+# log
+/system/bin/kmsgd      --      u:object_r:kmsgd_exec:s0
+/system/bin/awlogd     --      u:object_r:kmsgd_exec:s0
+
+#preinstall
+/system/bin/preinstall      --      u:object_r:shell_exec:s0
+
+/system/bin/led             --      u:object_r:init_exec:s0
+
+#aw_thermal
+/system/bin/aw_thermal      u:object_r:shell_exec:s0
+/sys/devices/virtual/thermal/thermal_zone0/temp u:object_r:sysfs_thermal:s0
+/sys/devices/virtual/thermal/thermal_zone0/sustainable_power u:object_r:sysfs_thermal:s0
+
+/system/bin/autoota         --      u:object_r:shell_exec:s0
+
+/system/bin/treadahead         --      u:object_r:init_exec:s0
+
+# gralloc
+/(vendor|system/vendor)/lib(64)*/hw/gralloc\.[a-zA-Z0-9]*\.so     u:object_r:same_process_hal_file:s0
+
+#vulkan
+#/(vendor|system/vendor)/lib(64)*/hw/vulkan\.[a-zA-Z0-9]*\.so     u:object_r:same_process_hal_file:s0
+
+# camera
+/dev/media0                 u:object_r:camera_device:s0
+/dev/v4l-subdev[0-9]+            u:object_r:camera_device:s0
+/vendor/xbin/wpa_supplicant_dummy.sh    u:object_r:wpa_supplicant_exec:s0
+
+# audio
+/data/audio_d(/.*)?    u:object_r:audio_rw_data_file:s0
+
+#Reserve0
+/Reserve0                  u:object_r:vfat:s0
+
+#secure storage
+/dev/sst_storage            u:object_r:sst_storage_device:s0
+
+#newfs_msdos
+/system/bin/newfs_msdos    u:object_r:e2fs_exec:s0
+
+#systemmixservice
+/system/bin/systemmixservice  u:object_r:systemmix_exec:s0

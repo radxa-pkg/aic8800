@@ -1,0 +1,155 @@
+/dev/ttyFIQ[0-9]*    u:object_r:serial_device:s0
+/dev/ttyUSB[0-9]*    u:object_r:tty_device:s0
+/dev/mali[0-9]       u:object_r:gpu_device:s0
+/dev/mali            u:object_r:gpu_device:s0
+/dev/ddr_freq        u:object_r:ddr_device:s0
+/dev/rga             u:object_r:rga_device:s0
+/dev/pvr_sync        u:object_r:gpu_device:s0
+/dev/block/dm-[0-9]* u:object_r:dm_device:s0
+/dev/vflash          u:object_r:vflash_device:s0
+/dev/timerirq        u:object_r:timer_device:s0
+/dev/vpu_service     u:object_r:video_device:s0
+/dev/vpu-service     u:object_r:video_device:s0
+/dev/hevc_service    u:object_r:video_device:s0
+/dev/hevc-service    u:object_r:video_device:s0
+/dev/video_state     u:object_r:video_device:s0
+/dev/iep             u:object_r:video_device:s0
+/dev/camsys_marvin[0-9]*   u:object_r:camera_device:s0
+/dev/camsys_marvin   u:object_r:camera_device:s0
+/dev/block/zram0     u:object_r:zram_device:s0
+/dev/sw_sync         u:object_r:gpu_device:s0
+
+#akmd
+/dev/akm8963_dev     u:object_r:akmd_device:s0
+/system/bin/akmd     u:object_r:akmd_exec:s0
+/data/misc/akmd(/.*)?     u:object_r:akmd_file:s0
+
+/metadata(/.*)?      u:object_r:metadata_file:s0
+/dev/mma8452_daemon  u:object_r:sensor_device:s0
+/data/camera(/.*)?   u:object_r:camdata_file:s0
+
+/radical_update(/.*)? u:object_r:ru_file:s0
+/dev/rtk_btusb       u:object_r:rtkbt_device:s0
+/dev/aicbt_dev       u:object_r:aicbt_device:s0
+/dev/rknand_sys_storage                u:object_r:rknand_device:s0
+/system/vendor/bin/pvrsrvctl           u:object_r:pvrsrvctl_exec:s0
+/system/bin/drmservice                 u:object_r:drmservice_exec:s0
+/system/bin/iso                        u:object_r:iso_exec:s0
+/data/cifsmanager(/.*)?                u:object_r:cifsmanager_exec:s0
+/system/bin/tinyplaywav                u:object_r:tinyplaywav_exec:s0
+/system/bin/tinyplay                   u:object_r:tinyplay_exec:s0
+/system/bin/tinymix                    u:object_r:tinymix_exec:s0
+#/system/bin/e2fsck                     u:object_r:ext4_exec:s0
+#/sbin/resize2fs                        u:object_r:resize2fs_exec:s0
+
+
+/sys/devices/virtual/android_usb/android0/(/.*)? -- u:object_r:sysfs_usb:s0
+
+#add for glgps
+/system/bin/glgps    u:object_r:gpsd_exec:s0
+
+#lcdcscale
+/sys/devices/fb.11/graphics/fb0/scale -- u:object_r:sysfs_lcdc:s0
+
+#lut
+/sys/devices/fb.11/graphics/fb0/dsp_lut -- u:object_r:sysfs_lut:s0
+
+#for support ntfs
+/system/bin/ntfs-3g  u:object_r:vold_exec:s0
+/system/bin/mkntfs   u:object_r:vold_exec:s0
+/system/bin/ntfsfix  u:object_r:vold_exec:s0
+
+#hdmi
+/sys/devices/virtual/display/HDMI(/.*)? -- u:object_r:sysfs_hdmi:s0
+
+#for displayd
+/system/bin/displayd                 u:object_r:displayd_exec:s0
+
+#for glgps
+/data/system/gps(/.*)?     u:object_r:gps_data_file:s0
+
+#for3399 device frp funtions
+/dev/block/platform/fe330000\.sdhci/by-name/frp  u:object_r:frp_block_device:s0
+/dev/block/platform/fe330000\.sdhci/by-name/system u:object_r:resize_block_device:s0
+/dev/block/platform/fe330000\.sdhci/by-name/cache u:object_r:e2fsck_cache_block_device:s0
+/dev/block/platform/fe330000\.sdhci/by-name/metadata u:object_r:e2fsck_metadata_block_device:s0
+/dev/block/platform/fe330000\.sdhci/by-name/userdata u:object_r:userdata_block_device:s0
+/dev/block/platform/fe330000\.sdhci/by-name/boot u:object_r:boot_block_device:s0
+/dev/block/platform/fe330000\.sdhci/by-name/recovery u:object_r:recovery_block_device:s0
+
+# for nand device
+/dev/block/rknand_frp u:object_r:frp_block_device:s0
+/dev/block/rknand_system u:object_r:resize_block_device:s0
+/dev/block/rknand_cache u:object_r:e2fsck_cache_block_device:s0
+/dev/block/rknand_metadata u:object_r:e2fsck_metadata_block_device:s0
+/dev/block/rknand_userdata u:object_r:userdata_block_device:s0
+/dev/block/rknand_boot u:object_r:boot_block_device:s0
+/dev/block/rknand_recovery u:object_r:recovery_block_device:s0
+
+# for rk3368H/3288 emmc device
+/dev/block/platform/ff0f0000.dwmmc/by-name/frp u:object_r:frp_block_device:s0
+/dev/block/platform/ff0f0000.dwmmc/by-name/system/ u:object_r:resize_block_device:s0
+/dev/block/platform/ff0f0000.dwmmc/by-name/cache u:object_r:e2fsck_cache_block_device:s0
+/dev/block/platform/ff0f0000.dwmmc/by-name/metadata u:object_r:e2fsck_metadata_block_device:s0
+/dev/block/platform/ff0f0000.dwmmc/by-name/userdata u:object_r:userdata_block_device:s0
+/dev/block/platform/ff0f0000.dwmmc/by-name/boot u:object_r:boot_block_device:s0
+/dev/block/platform/ff0f0000.dwmmc/by-name/recovery u:object_r:recovery_block_device:s0
+
+#for 312x emmc device
+/dev/block/platform/1021c000.rksdmmc/by-name/frp u:object_r:frp_block_device:s0
+/dev/block/platform/1021c000.rksdmmc/by-name/system/ u:object_r:resize_block_device:s0
+/dev/block/platform/1021c000.rksdmmc/by-name/cache u:object_r:e2fsck_cache_block_device:s0
+/dev/block/platform/1021c000.rksdmmc/by-name/metadata u:object_r:e2fsck_metadata_block_device:s0
+/dev/block/platform/1021c000.rksdmmc/by-name/userdata u:object_r:userdata_block_device:s0
+/dev/block/platform/1021c000.rksdmmc/by-name/boot u:object_r:boot_block_device:s0
+/dev/block/platform/1021c000.rksdmmc/by-name/recovery u:object_r:recovery_block_device:s0
+
+# sensor
+/dev/lightsensor                u:object_r:sensor_device:s0
+/dev/psensor                    u:object_r:sensor_device:s0
+/dev/compass                    u:object_r:sensor_device:s0
+/dev/gyrosensor                 u:object_r:sensor_device:s0
+/dev/pressure                   u:object_r:sensor_device:s0
+
+/sys/devices/platform/fb/graphics/fb[0-9]/cabc                u:object_r:sysfs_fb:s0
+
+#for vpu
+/dev/rkvdec                u:object_r:video_device:s0
+/dev/dri(/.*)?       u:object_r:gpu_device:s0
+
+#for aplog
+(/system)?/vendor/bin/start_log_srv.sh     u:object_r:ap_log_srv_script_exec:s0
+(/system)?/vendor/bin/logcat_ep.sh     u:object_r:apk_logfs_exec:s0
+(/system)?/vendor/bin/log-watch     u:object_r:log-watch_exec:s0
+(/system)?/vendor/etc/log-watch-kmsg.cfg u:object_r:log-watch-cnf:s0
+# Crashlogd executable
+(/system)?/vendor/bin/crashlogd u:object_r:crashlogd_exec:s0
+(/system)?/vendor/bin/elogs.sh u:object_r:earlylogs_exec:s0
+
+# pppoe
+/system/bin/pppoe-setup          u:object_r:pppoe_exec:s0
+/system/bin/pppoe-start          u:object_r:pppoe_exec:s0
+/system/bin/pppoe-stop           u:object_r:pppoe_exec:s0
+/system/bin/pppoe-connect        u:object_r:pppoe_exec:s0
+/system/bin/pppoe-status         u:object_r:pppoe_exec:s0
+
+/data/misc/ppp(/.*)?             u:object_r:pppoe_data_file:s0
+
+/system/bin/wfd                  u:object_r:wfd_exec:s0
+
+/dev/vendor_storage              u:object_r:storage_device:s0
+
+/data/logs(/.*)? u:object_r:aplog_data_file:s0
+
+#for tee
+/system/bin/tee-supplicant     u:object_r:tee_exec:s0
+/dev/opteearmtz[0-9]*         u:object_r:tee_device:s0
+/data/tee(/.*)?        		u:object_r:tee_data_file:s0
+
+/system/bin/rk_store_keybox     u:object_r:rk_store_keybox_exec:s0
+#for abc
+/system/bin/abc             u:object_r:abc_exec:s0
+
+
+/dev/block/mmcblk1 u:object_r:uboot_block_device:s0
+/dev/block/mmcblk1rpmb u:object_r:rpmb_block_device:s0

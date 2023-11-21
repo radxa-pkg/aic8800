@@ -1,0 +1,293 @@
+import init.${ro.hardware}.bootmode.${ro.bootmode}.rc
+import init.rockchip.rc
+import init.connectivity.rc
+import init.box.samba.rc
+import init.${ro.board.platform}.rc
+import init.${ro.target.product}.rc
+import init.car.rc
+import init.optee.rc
+on post-fs
+    insmod /system/lib/modules/ump.ko
+    insmod /system/lib/modules/mali.ko
+    insmod /system/lib/modules/mali_kbase.ko
+    insmod /system/lib/modules/rk30_mirroring.ko
+    insmod /system/lib/modules/rk29-ipp.ko
+    insmod /system/lib/modules/pvrsrvkm.ko
+    insmod /drmboot.ko
+
+    # Turn on swap
+    swapon_all /fstab.rk30board
+
+on post-fs-data
+  
+    # AP6476 GPS permission
+    chmod 755 /system/bin/glgps
+    chown root system /system/bin/glgps
+    chmod 644 /system/lib/hw/gps.default.so
+    chown root system /system/lib/hw/gps.default.so
+    mkdir /data/gps 0770 system net_bt_stack
+
+    chmod 664 /sys/class/display/HDMI/color
+
+    ##$_rbox_$_modify_$_chenzhi_20120309
+    ##$_rbox_$_modify_$_begin
+    mkdir /data/misc/ppp 777 system system
+    chmod 777 /data/misc/ppp
+    copy /etc/ppp/pap-secrets /data/misc/ppp/pap-secrets
+    copy /etc/ppp/pppoe.conf /data/misc/ppp/pppoe.conf
+    ##$_rbox_$_modify_$_end
+
+    mkdir /data/cifsmanager 777 system system
+    chmod 0666 /dev/opteearmtz00
+
+    mkdir /data/logs 0755 root shell
+on init
+    # set temperature control policy as normal mode
+    write /sys/module/rockchip_pm/parameters/policy 1
+
+
+on boot
+
+    restorecon_recursive /sys/devices/system/cpu/cpufreq/interactive
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/timer_rate
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/timer_rate
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/timer_slack
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/timer_slack
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/min_sample_time
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/min_sample_time
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/hispeed_freq
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/hispeed_freq
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/target_loads
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/target_loads
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/go_hispeed_load
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/go_hispeed_load
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/above_hispeed_delay
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/above_hispeed_delay
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/boost
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/boost
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/boostpulse
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/input_boost
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/input_boost
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/boostpulse_duration
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/boostpulse_duration
+    chown system system /sys/devices/system/cpu/cpufreq/interactive/io_is_busy
+    chmod 0660 /sys/devices/system/cpu/cpufreq/interactive/io_is_busy
+
+    # Assume SMP uses shared cpufreq policy for all CPUs
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chmod 0660 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chmod 0660 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+    chown system system  /sys/devices/ffa30000.gpu/dvfs
+    chmod 0777 /sys/devices/platform/ff9a0000.gpu/devfreq/ff9a0000.gpu/governor
+
+    chown system system /sys/devices/system/cpu/cpu0/online
+    chmod 0660 /sys/devices/system/cpu/cpu0/online
+
+    chown system system /sys/devices/system/cpu/cpu1/online
+    chmod 0660 /sys/devices/system/cpu/cpu1/online
+
+    chown system system /sys/devices/system/cpu/cpu2/online
+    chmod 0660 /sys/devices/system/cpu/cpu2/online
+
+    chown system system /sys/devices/system/cpu/cpu3/online
+    chmod 0660 /sys/devices/system/cpu/cpu3/online
+
+    chown system system /sys/devices/system/cpu/cpu4/online
+    chmod 0660 /sys/devices/system/cpu/cpu4/online
+
+    chown system system /sys/devices/system/cpu/cpu5/online
+    chmod 0660 /sys/devices/system/cpu/cpu5/online
+
+    chown system system /sys/devices/system/cpu/cpu6/online
+    chmod 0660 /sys/devices/system/cpu/cpu6/online
+
+    chown system system /sys/devices/system/cpu/cpu7/online
+    chmod 0660 /sys/devices/system/cpu/cpu7/online
+
+    chown system system /sys/module/rockchip_pm/parameters/policy
+    chmod 0660 /sys/module/rockchip_pm/parameters/policy
+
+    # Vop bandwidth for ddr dvfs
+    chown system system /sys/class/devfreq/dmc/vop_bandwidth
+    chmod 0660 /sys/class/devfreq/dmc/vop_bandwidth
+
+    # b/13568411: make lazy vfree flush thresholds match flush_tlb_range
+    write /proc/sys/vm/lazy_vfree_tlb_flush_all_threshold 524288
+
+    chown wifi wifi /sys/class/rkwifi/driver 
+    chown wifi wifi /sys/class/rkwifi/power
+    chown wifi wifi /sys/class/rkwifi/chip
+    chown wifi wifi /sys/class/rkwifi/preload
+
+    write /proc/sys/net/core/rmem_max 1048576
+    write /proc/sys/net/core/wmem_max 1048576
+
+    # backlight
+    chown system system /sys/class/backlight/rk28_bl/brightness
+    chown system system /sys/class/backlight/backlight/brightness
+    
+    # for hdmi
+    chown root system /sys/class/display/HDMI/enable
+    chown root system /sys/class/display/HDMI/mode
+    chown root system /sys/class/display/HDMI/scale
+    chown root system /sys/class/display/HDMI/3dmode
+    chmod 0664 /sys/class/display/HDMI/mode
+    chmod 0664 /sys/class/display/HDMI/3dmode
+
+    chown root system /sys/class/graphics/fb0/bcsh
+    chown root system /sys/class/graphics/fb0/dsp_lut
+    chmod 0664 /sys/class/graphics/fb0/bcsh
+    chmod 0664 /sys/class/graphics/fb0/dsp_lut
+
+	chown system graphics /sys/class/graphics/fb0/scale
+	chmod 0664 /sys/class/graphics/fb0/scale
+
+    chown system system /sys/mali400_utility/utility
+    chmod 0664 /sys/mali400_utility/utility
+
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+     
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+  
+    chown system system /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+     
+    chown system system /sys/devices/system/cpu/cpu4/cpufreq/scaling_setspeed
+    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_setspeed
+   
+    #add for usb otg by lly
+    chown system system /sys/bus/platform/drivers/usb20_otg/force_usb_mode
+    chmod 0664 /sys/bus/platform/drivers/usb20_otg/force_usb_mode
+
+    #add for wakeup to reboot by huangjc
+    chown system system /sys/devices/virtual/resume_reboot/resume_reboot/resume_reboot
+    chmod 0664 /sys/devices/virtual/resume_reboot/resume_reboot/resume_reboot
+
+    #add for leds by huangjc
+    chown system system /sys/class/leds/net-green/brightness
+    chmod 0664 /sys/class/leds/net-green/brightness
+    chown system system /sys/class/leds/net-red/brightness
+    chmod 0664 /sys/class/leds/net-red/brightness
+
+    chown root system /sys/class/graphics/fb0/map
+    chmod 0664 /sys/class/graphics/fb0/map
+
+
+    #add for mid change hdmi mode
+    chmod 0664 /sys/devices/virtual/display/HDMI/enable
+    chmod 0664 /sys/devices/virtual/display/HDMI/mode
+    chmod 0664 /sys/devices/virtual/display/HDMI/scale
+  
+    #add for cts
+    chmod 0660 /sys/bus/platform/drivers/usb20_otg/dwc_otg_conn_en
+    chmod 0660 /sys/bus/platform/drivers/usb20_otg/force_usb_mode
+    chmod 0660 /sys/bus/platform/drivers/usb20_otg/vbus_status
+    chmod 0660 /sys/devices/platform/fb/graphics/fb5/enable
+    chmod 0660 /sys/devices/platform/fb/graphics/fb6/cursor
+    chmod 0660 /sys/devices/platform/fb/graphics/fb6/enable
+    chmod 0660 /sys/devices/platform/fb/graphics/fb7/enable
+    chmod 0660 /sys/devices/platform/fb/graphics/fb8/enable
+    chmod 0660 /sys/devices/platform/fb/graphics/fb9/enable
+    chmod 0660 /sys/devices/platform/fb/graphics/fb9/bits_per_pixel
+    chmod 0660 /sys/devices/platform/fb/graphics/fb9/win_property
+
+    restorecon_recursive /dev/block/platform/fe330000.sdhci/by-name/
+    #for tee
+    restorecon /system/bin/tee-supplicant
+    #for WV keybox provision
+    restorecon /system/bin/rk_store_keybox
+    # for bd  
+    mkdir /mnt/iso 0660 system system
+    chmod 0666 /dev/opteearmtz00
+# cpu min freq must change to 126M when boot completed
+on property:sys.boot_completed=1
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq 0
+    write /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq 0
+    setprop persist.sys.first_booting false
+    # if data is encrypt, when start gps too early, gpsd crashed
+    start gpsd
+
+
+# for Internet adb
+on property:persist.internet.adb.enable=1
+    setprop service.adb.tcp.port 5555
+    restart adbd
+
+# for Internet adb
+on property:persist.internet.adb.enable=0
+    setprop service.adb.tcp.port 0
+    restart adbd
+
+# for telephony function
+on property:ro.boot.noril=true
+    setprop ro.radio.noril true
+    stop ril-daemon
+
+# set ro.serialno
+on property:sys.serialno=*
+    setprop ro.serialno ${sys.serialno}
+
+# Android bug collector
+service abc /system/bin/abc
+    class main
+    disabled
+    oneshot
+
+on property:persist.sys.abc_switch=1
+    start abc
+on property:persist.sys.abc_switch=0
+    stop abc
+
+service drmservice /system/bin/drmservice
+        class main
+        oneshot
+
+##$_rbox_$_modify_$_shenzhenyi_20160312
+##$_rbox_$_modify_$_begin
+service displayd /system/bin/displayd
+    class core
+    socket displayd stream 0760 system system
+##$_rbox_$_modify_$_end
+
+##$_rbox_$_modify_$_chenzhi_20120309
+##$_rbox_$_modify_$_begin
+service pppoe_setup /system/bin/pppoe-setup
+    disabled
+    oneshot
+
+service pppoe_start /system/bin/pppoe-start
+    disabled
+    oneshot
+
+service bplus_helper  /system/bin/bplus_helper
+    class main
+    oneshot
+
+service pppoe_stop /system/bin/pppoe-stop
+    disabled
+    oneshot
+##$_rbox_$_modify_$_end
+
+service up_eth0 /system/bin/busybox ifconfig eth0 up
+    class main
+    oneshot
+
+service shutdownanim /system/bin/bootanimation shutdown
+    class core
+    user graphics
+    group graphics audio
+    disabled
+    oneshot
+
+#for bd	
+service iso_operate /system/bin/iso
+    class main
+    disabled
+    oneshot		
+
+service rk_store_keybox /system/bin/rk_store_keybox
+    class main
+    oneshot		

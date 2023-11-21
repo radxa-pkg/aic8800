@@ -1,0 +1,41 @@
+#!system/bin/sh
+
+mount -o remount,rw /system 2>&1 > /dev/null
+
+sync
+
+busybox mount -o remount,rw /system
+
+sync
+
+case $1 in
+    "enable" | "ENABLE" )
+    if [ -f /system/bin/wificond_bak ]
+    then
+        mv /system/bin/wificond_bak /system/bin/wificond
+    fi
+    if [ -f /system/app/Bluetooth/Bluetooth.apk_bak ]
+    then
+        mv /system/app/Bluetooth/Bluetooth.apk_bak  /system/app/Bluetooth/Bluetooth.apk
+    fi
+    chmod 777 /system/bin/wificond
+    chmod 777 /system/app/Bluetooth/Bluetooth.apk
+    ;;
+    "disable" | "DISABLE" )
+    if [ -f /system/bin/wificond ]
+    then
+        mv /system/bin/wificond /system/bin/wificond_bak
+    fi
+    if [ -f /system/app/Bluetooth/Bluetooth.apk ]
+    then
+        mv /system/app/Bluetooth/Bluetooth.apk  /system/app/Bluetooth/Bluetooth.apk_bak
+    fi
+    ;;
+    *)
+    echo "Usage:"
+    echo "      hiwifibt  enable/disable"
+    ;;
+esac
+
+sync
+

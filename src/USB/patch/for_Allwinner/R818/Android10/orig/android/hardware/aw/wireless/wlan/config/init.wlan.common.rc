@@ -1,0 +1,34 @@
+on early-init
+    # rfkill control for wifi
+    chmod 0666 /sys/devices/virtual/misc/sunxi-wlan/rf-ctrl/power_state
+    chmod 0666 /sys/devices/virtual/misc/sunxi-wlan/rf-ctrl/scan_device
+
+on post-fs-data
+    # Create the directories used by the Wireless subsystem
+    mkdir /data/vendor/wifi 0771 wifi wifi
+    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
+
+# broadcom/realtek/xradio wifi sta p2p concurrent service
+service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+    -O/data/vendor/wifi/wpa/sockets -dd \
+    -g@android:wpa_wlan0
+    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
+    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
+    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
+    socket wpa_wlan0 dgram 660 wifi wifi
+    class main
+    disabled
+    oneshot
+
+on property:persist.vendor.overlay.wlan_vendor=broadcom
+    setprop wifi.direct.interface p2p-dev-wlan0
+
+on property:persist.vendor.overlay.wlan_vendor=reaktek
+    setprop wifi.direct.interface p2p0
+
+on property:persist.vendor.overlay.wlan_vendor=xradio
+    setprop wifi.direct.interface p2p-dev-wlan0
+
+on property:persist.vendor.overlay.wlan_vendor=sprd
+    setprop wifi.direct.interface p2p-dev-wlan0

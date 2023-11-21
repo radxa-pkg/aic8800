@@ -1,0 +1,59 @@
+on boot
+    # UART device
+    chmod 0660 ${persist.vendor.bluetooth_port}
+    chown bluetooth net_bt_admin ${persist.vendor.bluetooth_port}
+
+    # bluetooth power up/down interface
+    chmod 0660 /sys/class/rfkill/rfkill0/state
+    chmod 0660 /sys/class/rfkill/rfkill0/type
+    chown bluetooth net_bt_admin /sys/class/rfkill/rfkill0/state
+    chown bluetooth net_bt_admin /sys/class/rfkill/rfkill0/type
+    write /sys/class/rfkill/rfkill0/state 0
+
+    # bluetooth MAC address programming
+    chown bluetooth net_bt_admin ${ro.bt.bdaddr_path}
+
+on property:persist.vendor.bluetooth_vendor=broadcom
+    insmod /vendor/lib/modules/bcm_btlpm.ko
+    setprop vendor.init.lpm.load 1
+
+on property:persist.vendor.bluetooth_vendor=realtek
+    insmod /vendor/lib/modules/rtl_btlpm.ko
+    setprop vendor.init.lpm.load 1
+
+on property:persist.vendor.bluetooth_vendor=xradio
+    insmod /vendor/lib/modules/xradio_btlpm.ko
+    setprop vendor.init.lpm.load 1
+
+on property:persist.vendor.bluetooth_vendor=sprd
+    insmod /vendor/lib/modules/uwe5622_bsp_sdio.ko
+    insmod /vendor/lib/modules/sprdbt_tty.ko
+    setprop vendor.init.lpm.load 1
+
+
+on property:vendor.driver.lpm.load=1
+    setprop vendor.init.lpm.load 1
+
+on property:vendor.init.lpm.load=1
+    chmod 0660 /proc/bluetooth/sleep/lpm
+    chmod 0660 /proc/bluetooth/sleep/btwrite
+    chmod 0660 /proc/bluetooth/sleep/btwake
+    chown bluetooth net_bt_admin /proc/bluetooth/sleep/lpm
+    chown bluetooth net_bt_admin /proc/bluetooth/sleep/btwrite
+    chown bluetooth net_bt_admin /proc/bluetooth/sleep/btwake
+
+    # only for sprd device
+    chmod 0666 /sys/devices/platform/mtty/rfkill/rfkill1/state
+    chmod 0666 /sys/devices/platform/mtty/rfkill/rfkill1/type
+    chmod 0660 /dev/ttyBT0
+    chown bluetooth net_bt_admin /dev/ttyBT0
+
+on property:persist.vendor.bluetooth_vendor=realtek && property:sys.boot_completed=1
+    setprop persist.vendor.bluetooth.rtkcoex true
+
+on property:persist.vendor.bluetooth_vendor=realtek && property:sys.boot_completed=0
+    setprop persist.vendor.bluetooth.rtkcoex false
+
+on property:persist.vendor.bluetooth_vendor=xradio && property:vold.post_fs_data_done=1
+    mkdir /data/vendor/bluetooth 0771 bluetooth bluetooth
+    mkdir /data/vendor/bluetooth/sdd 0770 bluetooth bluetooth

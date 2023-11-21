@@ -1,0 +1,22 @@
+on early-init
+    loglevel 3
+
+on init
+
+on post-fs-data
+    insmod /vendor/lib/modules/aic8800_bsp.ko
+    insmod /vendor/lib/modules/aic8800_btlpm.ko
+    insmod /vendor/lib/modules/mali.ko
+    insmod /odm/lib/modules/dovi.ko
+    insmod /vendor/lib/sl_hdr.ko
+
+on boot
+    write /sys/module/amvdec_mh264/parameters/reorder_dpb_size_margin 9
+    write /sys/module/amvdec_h265/parameters/dynamic_buf_num_margin 9
+    write /sys/module/amvdec_vp9/parameters/max_buf_num 12
+
+on property:ro.boot.oem.key1=*
+    setprop ro.oem.key1 ${ro.boot.oem.key1}
+
+on property:sys.boot_completed=1
+    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor schedutil

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Default Primary Audio HAL Module Audio Policy Configuration include flie -->
+<module name="primary" halVersion="2.0">
+    <attachedDevices>
+        <item>Speaker</item>
+        <item>Built-In Mic</item>
+        <item>Hisi Cast</item>
+    </attachedDevices>
+    <defaultOutputDevice>Speaker</defaultOutputDevice>
+    <mixPorts>
+        <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
+            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                     samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+        </mixPort>
+        <mixPort name="hw_av_sync" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
+            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO"/>
+        </mixPort>
+        <mixPort name="hw_compress" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT">
+            <profile name="" format="AUDIO_FORMAT_AC3"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_E_AC3"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_AC4"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_DTS"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000,88200,96000,176400,192000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_DTS_HD"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000,88200,96000,176400,192000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_AAC"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000,64000,88200,96000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1"/>
+        </mixPort>
+        <mixPort name="hw_av_sync_compress" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
+            <profile name="" format="AUDIO_FORMAT_AC3"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_E_AC3"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_AC4"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_DTS"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000,88200,96000,176400,192000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_DTS_HD"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000,88200,96000,176400,192000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
+            <profile name="" format="AUDIO_FORMAT_AAC"
+                     samplingRates="8000,11025,16000,22050,24000,32000,44100,48000,64000,88200,96000"
+                     channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_5POINT1"/>
+        </mixPort>
+        <mixPort name="primary input" role="sink">
+            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                     samplingRates="16000,48000" channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
+        </mixPort>
+        <mixPort name="hisiCast input" role="sink">
+            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                     samplingRates="48000" channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
+        </mixPort>
+   </mixPorts>
+   <devicePorts>
+        <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink">
+        </devicePort>
+        <devicePort tagName="HDMI ARC" type="AUDIO_DEVICE_OUT_HDMI_ARC" role="sink">
+        </devicePort>
+        <devicePort tagName="HDMI Out" type="AUDIO_DEVICE_OUT_AUX_DIGITAL" role="sink">
+        </devicePort>
+        <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
+        </devicePort>
+        <devicePort tagName="Hisi Cast" type="AUDIO_DEVICE_IN_BUS" role="source">
+        </devicePort>
+    </devicePorts>
+    <routes>
+        <route type="mix" sink="Speaker"
+               sources="primary output,hw_av_sync,hw_compress,hw_av_sync_compress"/>
+        <route type="mix" sink="HDMI ARC"
+               sources="primary output,hw_av_sync,hw_compress,hw_av_sync_compress"/>
+        <route type="mix" sink="HDMI Out"
+               sources="hw_av_sync,hw_compress,hw_av_sync_compress"/>
+        <route type="mix" sink="primary input"
+               sources="Built-In Mic"/>
+        <route type="mix" sink="hisiCast input"
+               sources="Hisi Cast"/>
+    </routes>
+</module>
