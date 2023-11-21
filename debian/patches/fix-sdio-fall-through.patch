@@ -1,0 +1,92 @@
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 5f71a1e..3624950 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3264,6 +3264,7 @@ static struct rwnx_vif *rwnx_interface_add(struct rwnx_hw *rwnx_hw,
+ 		vif->ap.mesh_pm = NL80211_MESH_POWER_ACTIVE;
+ 		vif->ap.next_mesh_pm = NL80211_MESH_POWER_ACTIVE;
+ 		// no break
++		__attribute__((__fallthrough__));
+ 	case NL80211_IFTYPE_AP:
+ 		INIT_LIST_HEAD(&vif->ap.sta_list);
+ 		memset(&vif->ap.bcn, 0, sizeof(vif->ap.bcn));
+@@ -3673,6 +3674,7 @@ static int rwnx_cfg80211_change_iface(struct wiphy *wiphy,
+ 		vif->ap.create_path = false;
+ 		vif->ap.generation = 0;
+ 		// no break
++		__attribute__((__fallthrough__));
+ 	case NL80211_IFTYPE_AP:
+ 	case NL80211_IFTYPE_P2P_GO:
+ 		INIT_LIST_HEAD(&vif->ap.sta_list);
+@@ -5463,6 +5465,7 @@ static int rwnx_cfg80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
+ 	switch (RWNX_VIF_TYPE(rwnx_vif)) {
+ 	case NL80211_IFTYPE_AP_VLAN:
+ 		rwnx_vif = rwnx_vif->ap_vlan.master;
++		__attribute__((__fallthrough__));
+ 	case NL80211_IFTYPE_AP:
+ 	case NL80211_IFTYPE_P2P_GO:
+ 	case NL80211_IFTYPE_MESH_POINT:
+@@ -6098,6 +6101,7 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+ 	case FORMATMOD_HE_MU:
+ 		sinfo->rxrate.he_ru_alloc = rx_vect1->he.ru_size;
++		__attribute__((__fallthrough__));
+ 	case FORMATMOD_HE_SU:
+ 	case FORMATMOD_HE_ER:
+ 		sinfo->rxrate.flags = RATE_INFO_FLAGS_HE_MCS;
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 90b59df..ba3571d 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -525,6 +525,7 @@ int rwnx_send_add_if (struct rwnx_hw *rwnx_hw, const unsigned char *mac,
+ 	case NL80211_IFTYPE_P2P_CLIENT:
+ 		add_if_req_param->p2p = true;
+ 		// no break
++		__attribute__((__fallthrough__));
+ 	#endif /* CONFIG_RWNX_FULLMAC */
+ 	case NL80211_IFTYPE_STATION:
+ 		add_if_req_param->type = MM_STA;
+@@ -538,6 +539,7 @@ int rwnx_send_add_if (struct rwnx_hw *rwnx_hw, const unsigned char *mac,
+ 	case NL80211_IFTYPE_P2P_GO:
+ 		add_if_req_param->p2p = true;
+ 		// no break
++		__attribute__((__fallthrough__));
+ 	#endif /* CONFIG_RWNX_FULLMAC */
+ 	case NL80211_IFTYPE_AP:
+ 		add_if_req_param->type = MM_AP;
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tdls.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tdls.c
+index 34196ed..63420f3 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tdls.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tdls.c
+@@ -257,6 +257,7 @@ static u8 rwnx_ac_from_wmm(int ac)
+ 	switch (ac) {
+ 	default:
+ 		WARN_ON_ONCE(1);
++		__attribute__((__fallthrough__));
+ 	case 0:
+ 		return AC_BE;
+ 	case 1:
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c
+index 6149343..7a836a8 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c
+@@ -325,6 +325,7 @@ u16 rwnx_select_txq(struct rwnx_vif *rwnx_vif, struct sk_buff *skb)
+ 		/* AP_VLAN interface is not used for a 4A STA,
+ 		   fallback searching sta amongs all AP's clients */
+ 		rwnx_vif = rwnx_vif->ap_vlan.master;
++		__attribute__((__fallthrough__));
+ 	case NL80211_IFTYPE_AP:
+ 	case NL80211_IFTYPE_P2P_GO:
+ 	{
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_txq.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_txq.c
+index a776e31..1dacfcb 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_txq.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_txq.c
+@@ -635,6 +635,7 @@ static inline void rwnx_txq_vif_for_each_sta(struct rwnx_hw *rwnx_hw, struct rwn
+ 	}
+ 	case NL80211_IFTYPE_AP_VLAN:
+ 		rwnx_vif = rwnx_vif->ap_vlan.master;
++		__attribute__((__fallthrough__));
+ 	case NL80211_IFTYPE_AP:
+ 	case NL80211_IFTYPE_MESH_POINT:
+ 	case NL80211_IFTYPE_P2P_GO:

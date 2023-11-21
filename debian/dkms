@@ -1,0 +1,20 @@
+PACKAGE_NAME="aic8800"
+PACKAGE_VERSION="#MODULE_VERSION#"
+CLEAN="make clean"
+
+MAKE[0]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/SDIO/driver_fw/driver/$PACKAGE_NAME/${BUILT_MODULE_NAME[0]}"
+BUILT_MODULE_NAME[0]="aic8800_bsp"
+BUILT_MODULE_LOCATION[0]="SDIO/driver_fw/driver/$PACKAGE_NAME/${BUILT_MODULE_NAME[0]}"
+DEST_MODULE_LOCATION[0]="/updates"
+
+MAKE[1]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/SDIO/driver_fw/driver/$PACKAGE_NAME/${BUILT_MODULE_NAME[1]}"
+BUILT_MODULE_NAME[1]="aic8800_btlpm"
+BUILT_MODULE_LOCATION[1]="SDIO/driver_fw/driver/$PACKAGE_NAME/${BUILT_MODULE_NAME[1]}"
+DEST_MODULE_LOCATION[1]="/updates"
+
+MAKE[2]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/SDIO/driver_fw/driver/$PACKAGE_NAME/${BUILT_MODULE_NAME[2]}"
+BUILT_MODULE_NAME[2]="aic8800_fdrv"
+BUILT_MODULE_LOCATION[2]="SDIO/driver_fw/driver/$PACKAGE_NAME/${BUILT_MODULE_NAME[2]}"
+DEST_MODULE_LOCATION[2]="/updates"
+
+AUTOINSTALL=yes

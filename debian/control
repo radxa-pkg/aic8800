@@ -1,0 +1,18 @@
+Source: aic8800
+Maintainer: "Radxa Computer Co., Ltd" <dev@radxa.com>
+Section: misc
+Priority: optional
+Standards-Version: 4.6.0
+Build-Depends: debhelper (>=12~),
+               devscripts,
+               dh-sequence-dkms,
+               lintian,
+
+Package: aic8800-dkms
+Architecture: all
+Section: misc
+Priority: optional
+Depends: ${misc:Depends},
+Description: dkms sources for Aicsemi aic8800 Wi-Fi driver
+ This package provides the dkms source code for Aicsemi
+ aic8800 Wi-Fi driver.

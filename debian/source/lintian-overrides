@@ -1,0 +1,4 @@
+# Our package is built on GitHub-hosted runner,
+# which uses Ubuntu, and will default to zstd compression.
+# This is currently not supported in Debian.
+aic8800 source: custom-compression-in-debian-rules

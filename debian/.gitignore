@@ -1,0 +1,7 @@
+/.debhelper
+/debhelper-build-stamp
+/files
+/aic8800-dkms
+/*.debhelper.log
+/*.debhelper
+/*.substvars
