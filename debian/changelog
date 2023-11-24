@@ -1,4 +1,4 @@
-aic8800 (3.0+git20231107.581567ff-1) UNRELEASED; urgency=medium
+aic8800 (3.0+git20231107.581567ff-1) jammy; urgency=medium
 
   * Imported from aic8800_linux_sdk_V3.0_2023_1107_581567ff.7z
 
