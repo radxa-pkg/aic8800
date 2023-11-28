@@ -1,5 +1,12 @@
+aic8800 (3.0+git20231107.581567ff-2) jammy; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * Fix default firmware location
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 28 Nov 2023 17:51:52 +0800
+
 aic8800 (3.0+git20231107.581567ff-1) jammy; urgency=medium
 
   * Imported from aic8800_linux_sdk_V3.0_2023_1107_581567ff.7z
 
- -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Sat, 6 May 2023 11:54:41 +0800
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Fri, 24 Nov 2023 18:41:28 +0800
