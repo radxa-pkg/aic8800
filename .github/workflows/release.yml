@@ -43,7 +43,7 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ github.event.repository.name }}
       - name: Check if the latest version is releasable
