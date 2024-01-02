@@ -7,7 +7,7 @@ include /usr/share/dpkg/architecture.mk
 	dh $@
 
 override_dh_install:
-	dh_install -paic8800-dkms --exclude=.gitignore src/* usr/src/aic8800-$(DEB_VERSION)/
+	DEB_VERSION=$(DEB_VERSION) dh_install --exclude=.gitignore --exclude=*.ko --exclude=*.a  --exclude=*.swp
 
 override_dh_dkms:
 	dh_dkms -V $(DEB_VERSION)

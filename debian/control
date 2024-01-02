@@ -5,8 +5,9 @@ Priority: optional
 Standards-Version: 4.6.0
 Build-Depends: debhelper (>=12~),
                devscripts,
+               dh-exec,
                dh-sequence-dkms,
-               lintian,
+               lintian
 
 Package: aic8800-dkms
 Architecture: all
