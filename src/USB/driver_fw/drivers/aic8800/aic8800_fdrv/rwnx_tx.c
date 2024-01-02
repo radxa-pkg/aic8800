@@ -1227,6 +1227,176 @@ int aic_br_client_tx(struct rwnx_vif *vif, struct sk_buff **pskb)
 #endif /* CONFIG_BR_SUPPORT */
 
 
+#ifdef CONFIG_FILTER_TCP_ACK
+/* return:
+ *      0, msg buf freed by the real driver
+ *      others, skb need free by the caller,remember not use msg->skb!
+ */
+
+int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg)
+{
+	struct rwnx_vif *rwnx_vif = msg->rwnx_vif;
+	struct rwnx_hw *rwnx_hw = rwnx_vif->rwnx_hw;
+	struct rwnx_txhdr *txhdr;
+	struct rwnx_sw_txhdr *sw_txhdr;
+	struct txdesc_api *desc;
+	struct rwnx_sta *sta;
+	struct rwnx_txq *txq;
+	int headroom;
+	//int max_headroom;
+	int hdr_pads;
+
+	u16 frame_len;
+	u16 frame_oft;
+	u8 tid;
+	struct sk_buff *skb=msg->skb;
+	struct ethhdr eth_t;
+
+	move_tcpack_msg(rwnx_hw,msg);
+	kfree(msg);
+
+	memcpy(&eth_t, skb->data, sizeof(struct ethhdr));
+
+	/* Get the STA id and TID information */
+	sta = rwnx_get_tx_priv(rwnx_vif, skb, &tid);
+	if (!sta)
+		goto free;
+
+	txq = rwnx_txq_sta_get(sta, tid, rwnx_hw);
+	if (txq->idx == TXQ_INACTIVE)
+		goto free;
+
+#ifdef CONFIG_RWNX_AMSDUS_TX
+	if (rwnx_amsdu_add_subframe(rwnx_hw, skb, sta, txq))
+		return NETDEV_TX_OK;
+#endif
+
+#ifdef CONFIG_BR_SUPPORT
+		 if (1) {//(check_fwstate(&padapter->mlmepriv, WIFI_STATION_STATE | WIFI_ADHOC_STATE) == _TRUE) {
+			 void *br_port = NULL;
+
+	#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2, 6, 35))
+			 br_port = rwnx_vif->ndev->br_port;
+	#else
+			 rcu_read_lock();
+			 br_port = rcu_dereference(rwnx_vif->ndev->rx_handler_data);
+			 rcu_read_unlock();
+	#endif
+
+			 if (br_port) {
+				 s32 res = aic_br_client_tx(rwnx_vif, &skb);
+				 if (res == -1) {
+					 goto free;
+				 }
+			 }
+		 }
+#endif /* CONFIG_BR_SUPPORT */
+
+
+	/* Retrieve the pointer to the Ethernet data */
+	// eth = (struct ethhdr *)skb->data;
+
+	skb_pull(skb, 14);
+	//hdr_pads	= RWNX_SWTXHDR_ALIGN_PADS((long)eth);
+	hdr_pads  = RWNX_SWTXHDR_ALIGN_PADS((long)skb->data);
+	headroom  = sizeof(struct rwnx_txhdr) + hdr_pads;
+
+	skb_push(skb, headroom);
+
+	txhdr = (struct rwnx_txhdr *)skb->data;
+	sw_txhdr = kmem_cache_alloc(rwnx_hw->sw_txhdr_cache, GFP_ATOMIC);
+	if (unlikely(sw_txhdr == NULL))
+		goto free;
+	txhdr->sw_hdr = sw_txhdr;
+	desc = &sw_txhdr->desc;
+
+	frame_len = (u16)skb->len - headroom;// - sizeof(*eth);
+
+	sw_txhdr->txq		= txq;
+	sw_txhdr->frame_len = frame_len;
+	sw_txhdr->rwnx_sta	= sta;
+	sw_txhdr->rwnx_vif	= rwnx_vif;
+	sw_txhdr->skb		= skb;
+	sw_txhdr->headroom	= headroom;
+	sw_txhdr->map_len	= skb->len - offsetof(struct rwnx_txhdr, hw_hdr);
+
+#ifdef CONFIG_RWNX_AMSDUS_TX
+	sw_txhdr->amsdu.len = 0;
+	sw_txhdr->amsdu.nb = 0;
+#endif
+	// Fill-in the descriptor
+	memcpy(&desc->host.eth_dest_addr, eth_t.h_dest, ETH_ALEN);
+	memcpy(&desc->host.eth_src_addr, eth_t.h_source, ETH_ALEN);
+	desc->host.ethertype = eth_t.h_proto;
+	desc->host.staid = sta->sta_idx;
+	desc->host.tid = tid;
+	if (unlikely(rwnx_vif->wdev.iftype == NL80211_IFTYPE_AP_VLAN))
+		desc->host.vif_idx = rwnx_vif->ap_vlan.master->vif_index;
+	else
+		desc->host.vif_idx = rwnx_vif->vif_index;
+
+	if (rwnx_vif->use_4addr && (sta->sta_idx < NX_REMOTE_STA_MAX))
+		desc->host.flags = TXU_CNTRL_USE_4ADDR;
+	else
+		desc->host.flags = 0;
+
+	if ((rwnx_vif->tdls_status == TDLS_LINK_ACTIVE) &&
+		rwnx_vif->sta.tdls_sta &&
+		(memcmp(desc->host.eth_dest_addr.array, rwnx_vif->sta.tdls_sta->mac_addr, ETH_ALEN) == 0)) {
+		desc->host.flags |= TXU_CNTRL_TDLS;
+		rwnx_vif->sta.tdls_sta->tdls.last_tid = desc->host.tid;
+		//rwnx_vif->sta.tdls_sta->tdls.last_sn = desc->host.sn;
+	}
+
+	if (rwnx_vif->wdev.iftype == NL80211_IFTYPE_MESH_POINT) {
+		if (rwnx_vif->is_resending) {
+			desc->host.flags |= TXU_CNTRL_MESH_FWD;
+		}
+	}
+
+#ifdef CONFIG_RWNX_SPLIT_TX_BUF
+	desc->host.packet_len[0] = frame_len;
+#else
+	desc->host.packet_len = frame_len;
+#endif
+
+	txhdr->hw_hdr.cfm.status.value = 0;
+
+	if (unlikely(rwnx_prep_tx(rwnx_hw, txhdr))) {
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+		skb_pull(skb, headroom);
+		dev_kfree_skb_any(skb);
+		return NETDEV_TX_BUSY;
+	}
+
+	/* Fill-in TX descriptor */
+	frame_oft = sizeof(struct rwnx_txhdr) - offsetof(struct rwnx_txhdr, hw_hdr)
+				+ hdr_pads;// + sizeof(*eth);
+#if 0
+#ifdef CONFIG_RWNX_SPLIT_TX_BUF
+	desc->host.packet_addr[0] = sw_txhdr->dma_addr + frame_oft;
+	desc->host.packet_cnt = 1;
+#else
+	desc->host.packet_addr = sw_txhdr->dma_addr + frame_oft;
+#endif
+#endif
+	//desc->host.hostid = sw_txhdr->dma_addr;
+
+	spin_lock_bh(&rwnx_hw->tx_lock);
+	if (rwnx_txq_queue_skb(skb, txq, rwnx_hw, false))
+		rwnx_hwq_process(rwnx_hw, txq->hwq);
+	spin_unlock_bh(&rwnx_hw->tx_lock);
+
+	return 0;//NETDEV_TX_OK
+
+free:
+	dev_kfree_skb_any(skb);
+
+	return 0;//NETDEV_TX_OK
+}
+#endif
+
+
 /**
  * netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,
  *                               struct net_device *dev);
@@ -1257,12 +1427,14 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
     u8 tid;
     
     struct ethhdr eth_t;
+#ifdef CONFIG_FILTER_TCP_ACK
+    struct msg_buf *msgbuf;
+#endif
 
 #ifdef CONFIG_ONE_TXQ
     skb->queue_mapping = rwnx_select_txq(rwnx_vif, skb);
 #endif
 
-    memcpy(&eth_t, skb->data, sizeof(struct ethhdr));
 
     sk_pacing_shift_update(skb->sk, rwnx_hw->tcp_pacing_shift);
     max_headroom = sizeof(struct rwnx_txhdr);
@@ -1279,6 +1451,19 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
         skb = newskb;
     }
+
+#ifdef CONFIG_FILTER_TCP_ACK
+        msgbuf=intf_tcp_alloc_msg(msgbuf);
+        msgbuf->rwnx_vif=rwnx_vif;
+        msgbuf->skb=skb;
+        if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
+            return NETDEV_TX_OK;
+        }else{
+            move_tcpack_msg(rwnx_hw,msgbuf);
+            kfree(msgbuf);
+        }
+#endif
+    memcpy(&eth_t, skb->data, sizeof(struct ethhdr));
 
     /* Get the STA id and TID information */
     sta = rwnx_get_tx_priv(rwnx_vif, skb, &tid);

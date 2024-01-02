@@ -433,12 +433,14 @@ int rwnx_ipc_rxbuf_alloc(struct rwnx_hw *rwnx_hw)
 
 	idx = rwnx_hw->rxbuf_idx;
     while (rwnx_hw->rxbufs[idx].addr && (nb < RWNX_RXBUFF_MAX)) {
+        printk("w %d %x\n", idx, rwnx_hw->rxbufs[idx].addr);
         idx = ( idx + 1 ) % RWNX_RXBUFF_MAX;
         nb++;
     }
     if (nb == RWNX_RXBUFF_MAX) {
         dev_err(rwnx_hw->dev, "No more free space for rxbuff");
-		spin_unlock_bh(&rwnx_hw->rxbuf_lock);
+		printk("No more free space for rxbuff %d %d %d  \n",rwnx_hw->rxbuf_idx,rwnx_hw->rxbuf_cnt,rwnx_hw->ipc_env->rxbuf_idx);
+        spin_unlock_bh(&rwnx_hw->rxbuf_lock);
 		return -ENOMEM;
     }
 
@@ -447,6 +449,7 @@ int rwnx_ipc_rxbuf_alloc(struct rwnx_hw *rwnx_hw)
 	//printk("alloc %d\n", idx);
     err = rwnx_ipc_rxskb_alloc(rwnx_hw, buf, rwnx_hw->ipc_env->rxbuf_sz);
     if (err){
+        printk("ipc_rxskb_alloc fail %d %d %d %d \n",rwnx_hw->rxbuf_idx,rwnx_hw->rxbuf_cnt,rwnx_hw->ipc_env->rxbuf_idx,err);
 		spin_unlock_bh(&rwnx_hw->rxbuf_lock);
 		return err;
     }

@@ -1185,6 +1185,11 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 						IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
 		he_cap->ppe_thres[0] |= 0x10;
 	}
+        if (rwnx_hw->mod_params->use_80) {
+	    he_cap->ppe_thres[0] |= 0x20;
+            he_cap->ppe_thres[2] |= 0xc0;
+	    he_cap->ppe_thres[3] |= 0x07;
+	}
 	//if (rwnx_hw->mod_params->use_80)
 	{
 		he_cap->he_cap_elem.phy_cap_info[0] |=
@@ -1295,6 +1300,11 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		he_cap->he_cap_elem.phy_cap_info[0] |=
 						IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
 		he_cap->ppe_thres[0] |= 0x10;
+	}
+	if (rwnx_hw->mod_params->use_80) {
+	    he_cap->ppe_thres[0] |= 0x20;
+	    he_cap->ppe_thres[2] |= 0xc0;
+	    he_cap->ppe_thres[3] |= 0x07;
 	}
 	//if (rwnx_hw->mod_params->use_80)
 	{
@@ -1410,6 +1420,11 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 			he_cap->he_cap_elem.phy_cap_info[0] |=
 							IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
 			he_cap->ppe_thres[0] |= 0x10;
+		}
+		if (rwnx_hw->mod_params->use_80) {
+			he_cap->ppe_thres[0] |= 0x20;
+			he_cap->ppe_thres[2] |= 0xc0;
+			he_cap->ppe_thres[3] |= 0x07;
 		}
 		//if (rwnx_hw->mod_params->use_80)
 		{
@@ -1691,8 +1706,8 @@ int rwnx_handle_dynparams(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 #endif
 
 	/* Allocate the RX buffers according to the maximum AMSDU RX size */
-	ret = rwnx_ipc_rxbuf_init(rwnx_hw,
-							  (4 * (rwnx_hw->mod_params->amsdu_rx_max + 1) + 1) * 1024);
+	ret = rwnx_ipc_rxbuf_init(rwnx_hw, 2048);
+							 // (4 * (rwnx_hw->mod_params->amsdu_rx_max + 1) + 1) * 1024);
 	if (ret) {
 		wiphy_err(wiphy, "Cannot allocate the RX buffers\n");
 		return ret;

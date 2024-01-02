@@ -968,7 +968,7 @@ static inline int rwnx_rx_sm_external_auth_required_ind(struct rwnx_hw *rwnx_hw,
 	struct sm_external_auth_required_ind *ind =
 		(struct sm_external_auth_required_ind *)msg->param;
 	struct rwnx_vif *rwnx_vif = rwnx_hw->vif_table[ind->vif_idx];
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) //|| defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
 	struct net_device *dev = rwnx_vif->ndev;
 	struct cfg80211_external_auth_params params;
 

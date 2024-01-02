@@ -36,7 +36,7 @@ extern atomic_t aicwf_deinit_atomic;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 #include "uapi/linux/sched/types.h"
-#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0))
 #include "linux/sched/types.h"
 #else
 #include "linux/sched/rt.h"
@@ -546,6 +546,7 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
 
         msleep(100);
+	    return -1;
     }else{
     	atomic_inc(&rx_urb_cnt);
 	}
@@ -597,7 +598,7 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
 
         msleep(100);
-	return -1;
+	    return -1;
     }else{
     	atomic_inc(&rx_urb_cnt);
 	}
@@ -618,12 +619,15 @@ static void aicwf_usb_rx_submit_all_urb(struct aic_usb_dev *usb_dev)
     while((usb_buf = aicwf_usb_rx_buf_get(usb_dev)) != NULL) {
         if (aicwf_usb_submit_rx_urb(usb_dev, usb_buf)) {
             AICWFDBG(LOGERROR, "sub rx fail\n");
-				break;
+		return;
+            #if 0
             AICWFDBG(LOGERROR, "usb rx refill fail\n");
             if (usb_dev->state != USB_UP_ST)
                 return;
+            #endif
         }
     }
+    usb_dev->rx_prepare_ready = true;
 }
 
 #ifdef CONFIG_USB_MSG_IN_EP
@@ -1002,12 +1006,20 @@ int usb_bustx_thread(void *data)
     int set_cpu_ret = 0;
 
 #ifdef CONFIG_THREAD_INFO_IN_TASK
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+	AICWFDBG(LOGINFO, "%s the cpu is:%d\n", __func__, current->thread_info.cpu);
+#else
     AICWFDBG(LOGINFO, "%s the cpu is:%d\n", __func__, current->cpu);
+#endif
 #endif
     set_cpu_ret = set_cpus_allowed_ptr(current, cpumask_of(1));
 #ifdef CONFIG_THREAD_INFO_IN_TASK
     AICWFDBG(LOGINFO, "%s set_cpu_ret is:%d\n", __func__, set_cpu_ret);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+	AICWFDBG(LOGINFO, "%s change cpu to:%d\n", __func__, current->thread_info.cpu);
+#else
     AICWFDBG(LOGINFO, "%s change cpu to:%d\n", __func__, current->cpu);
+#endif
 #endif
 
 
@@ -1061,12 +1073,20 @@ int usb_busrx_thread(void *data)
     int set_cpu_ret = 0;
     
 #ifdef CONFIG_THREAD_INFO_IN_TASK
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+	AICWFDBG(LOGINFO, "%s the cpu is:%d\n", __func__, current->thread_info.cpu);
+#else
     AICWFDBG(LOGINFO, "%s the cpu is:%d\n", __func__, current->cpu);
+#endif
 #endif
     set_cpu_ret = set_cpus_allowed_ptr(current, cpumask_of(1));
 #ifdef CONFIG_THREAD_INFO_IN_TASK
     AICWFDBG(LOGINFO, "%s set_cpu_ret is:%d\n", __func__, set_cpu_ret);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+	AICWFDBG(LOGINFO, "%s change cpu to:%d\n", __func__, current->thread_info.cpu);
+#else
     AICWFDBG(LOGINFO, "%s change cpu to:%d\n", __func__, current->cpu);
+#endif
 #endif
 
 #ifdef CONFIG_TXRX_THREAD_PRIO
@@ -1618,6 +1638,8 @@ static int aicwf_usb_bus_start(struct device *dev)
         return 0;
 
     aicwf_usb_state_change(usb_dev, USB_UP_ST);
+
+    usb_dev->rx_prepare_ready = false;
     aicwf_usb_rx_prepare(usb_dev);
     aicwf_usb_tx_prepare(usb_dev);
 #ifdef CONFIG_USB_MSG_IN_EP
@@ -1626,8 +1648,12 @@ static int aicwf_usb_bus_start(struct device *dev)
 		aicwf_usb_msg_rx_prepare(usb_dev);
 	}
 #endif
-
-    return 0;
+    if(!usb_dev->rx_prepare_ready){
+        AICWFDBG(LOGERROR, "%s rx prepare fail\r\n", __func__);
+        return -1;
+    }else{
+        return 0;
+    }
 }
 
 static void aicwf_usb_cancel_all_urbs_(struct aic_usb_dev *usb_dev)
@@ -1693,7 +1719,7 @@ static void aicwf_usb_bus_stop(struct device *dev)
     if (usb_dev->state == USB_DOWN_ST)
         return;
 
-    if(g_rwnx_plat->wait_disconnect_cb == true){
+    if(g_rwnx_plat && g_rwnx_plat->wait_disconnect_cb == true){
             atomic_set(&aicwf_deinit_atomic, 1);
             up(&aicwf_deinit_sem);
     }

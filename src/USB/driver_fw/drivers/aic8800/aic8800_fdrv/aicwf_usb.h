@@ -132,7 +132,7 @@ struct aic_usb_dev {
 
     int tx_free_count;
     int tx_post_count;
-
+    bool rx_prepare_ready;
 #if 0
     struct aicwf_usb_buf usb_tx_buf[AICWF_USB_TX_URBS];
     struct aicwf_usb_buf usb_rx_buf[AICWF_USB_RX_URBS];

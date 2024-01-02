@@ -735,7 +735,7 @@ int aicwf_sdio_wakeup(struct aic_sdio_dev *sdiodev)
 	int ret = 0;
 	int read_retry;
 	int write_retry = 20;
-    int wakeup_reg_val;
+    int wakeup_reg_val = 0;
 
     if (sdiodev->chipid == PRODUCT_ID_AIC8801 ||
         sdiodev->chipid == PRODUCT_ID_AIC8800DC ||

@@ -1,3 +1,9 @@
+EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
+EXTRA_CFLAGS += -Wno-implicit-fallthrough
+#EXTRA_CFLAGS += -Wno-unused-function
+#EXTRA_CFLAGS += -Wno-maybe-uninitialized
+#EXTRA_CFLAGS += -Wno-unused-variable
+
 RWNX_VERS_NUM := 6.4.3.0
 
 CONFIG_COUNTRY_CODE = "00"
@@ -97,6 +103,7 @@ CONFIG_FORCE_DPD_CALIB = y
 CONFIG_FILTER_TCP_ACK =n
 CONFIG_RESV_MEM_SUPPORT = y
 CONFIG_GKI = n
+CONFIG_TEMP_COMP = n
 
 # Support of MU-MIMO transmission (need FW support)
 ifeq ($(CONFIG_RWNX_BFMER), y)
@@ -146,8 +153,7 @@ $(MODULE_NAME)-y := \
 	aicwf_compat_8800d80.o \
 	rwnx_wakelock.o		\
 	regdb.o				   \
-	aicwf_rx_prealloc.o	\
-	aicwf_tcp_ack.o
+	aicwf_rx_prealloc.o
 
 $(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
 $(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
@@ -159,6 +165,7 @@ $(MODULE_NAME)-$(CONFIG_RWNX_MUMIMO_TX)   += rwnx_mu_group.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += sdio_host.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_txrxif.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_sdio.o
+$(MODULE_NAME)-$(CONFIG_FILTER_TCP_ACK)   += aicwf_tcp_ack.o
 
 $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += usb_host.o
 $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_txrxif.o
@@ -241,6 +248,7 @@ ccflags-$(CONFIG_FORCE_DPD_CALIB) += -DCONFIG_FORCE_DPD_CALIB -DCONFIG_DPD
 ccflags-$(CONFIG_FILTER_TCP_ACK) += -DCONFIG_FILTER_TCP_ACK
 ccflags-$(CONFIG_RESV_MEM_SUPPORT) += -DCONFIG_RESV_MEM_SUPPORT
 ccflags-$(CONFIG_GKI) += -DCONFIG_GKI
+ccflags-$(CONFIG_TEMP_COMP) += -DCONFIG_TEMP_COMP
 
 
 ifeq ($(CONFIG_SDIO_SUPPORT), y)

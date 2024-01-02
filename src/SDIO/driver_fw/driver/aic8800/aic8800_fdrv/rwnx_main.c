@@ -22,6 +22,7 @@
 #include <linux/if_arp.h>
 #include <linux/ctype.h>
 #include <linux/random.h>
+#include <linux/vmalloc.h>
 #include "rwnx_defs.h"
 #include "rwnx_dini.h"
 #include "rwnx_msg_tx.h"
@@ -773,12 +774,12 @@ static void rwnx_csa_finish(struct work_struct *ws)
 		} else
 			rwnx_txq_vif_stop(vif, RWNX_TXQ_STOP_CHAN, rwnx_hw);
 		spin_unlock_bh(&rwnx_hw->cb_lock);
-#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION)
-                cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0, 0);
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION3)
+		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0, 0);
 #elif (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION)
-                cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0);
+		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef, 0);
 #else
-                cfg80211_ch_switch_notify(vif->ndev, &csa->chandef);
+		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef);
 #endif
 		mutex_unlock(&vif->wdev.mtx);
 		__release(&vif->wdev.mtx);
@@ -929,7 +930,7 @@ static int rwnx_open(struct net_device *dev)
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
-	while(test_bit(RWNX_DEV_STARTED, &rwnx_hw->drv_flags)){
+	while(test_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags)){
 		msleep(100);
 		AICWFDBG(LOGDEBUG, "%s waiting for rwnx_close \r\n", __func__);
 		waiting_counter--;
@@ -970,7 +971,7 @@ static int rwnx_open(struct net_device *dev)
 	   #endif
 
 	   /* Device is now started */
-	   set_bit(RWNX_DEV_STARTED, &rwnx_hw->drv_flags);
+	   set_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
 	   atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
 	}
 	#ifdef CONFIG_COEX
@@ -1254,7 +1255,7 @@ static int rwnx_close(struct net_device *dev)
 			}
 		}
 #endif
-		clear_bit(RWNX_DEV_STARTED, &rwnx_hw->drv_flags);
+		clear_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
 	}
 #ifdef CONFIG_COEX
 	else {
@@ -2944,12 +2945,22 @@ static struct rwnx_vif *rwnx_interface_add(struct rwnx_hw *rwnx_hw,
 	}
 
 	if (type == NL80211_IFTYPE_AP_VLAN) {
-		memcpy(ndev->dev_addr, params->macaddr, ETH_ALEN);
-		memcpy(vif->wdev.address, params->macaddr, ETH_ALEN);
+		memcpy((void *)ndev->dev_addr, (const void *)params->macaddr, ETH_ALEN);
+		memcpy((void *)vif->wdev.address, (const void *)params->macaddr, ETH_ALEN);
 	} else {
-		memcpy(ndev->dev_addr, rwnx_hw->wiphy->perm_addr, ETH_ALEN);
-		ndev->dev_addr[5] ^= vif_idx;
-		memcpy(vif->wdev.address, ndev->dev_addr, ETH_ALEN);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 17, 0)
+			unsigned char mac_addr[6];
+			memcpy(mac_addr, rwnx_hw->wiphy->perm_addr, ETH_ALEN);
+			mac_addr[5] ^= vif_idx;
+			//memcpy(ndev->dev_addr, mac_addr, ETH_ALEN);
+			eth_hw_addr_set(ndev, mac_addr);
+			memcpy(vif->wdev.address, mac_addr, ETH_ALEN);
+#else
+			memcpy(ndev->dev_addr, rwnx_hw->wiphy->perm_addr, ETH_ALEN);
+			ndev->dev_addr[5] ^= vif_idx;
+			memcpy(vif->wdev.address, ndev->dev_addr, ETH_ALEN);
+#endif
+
 	}
 
 	AICWFDBG(LOGINFO, "interface add:%x %x %x %x %x %x\n", vif->wdev.address[0], vif->wdev.address[1], \
@@ -3502,12 +3513,13 @@ bool key_flag = false;
  * @add_key: add a key with the given parameters. @mac_addr will be %NULL
  *	when adding a group key.
  */
-static int rwnx_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
-                                                                 int link_id,
+	static int rwnx_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+																	 int link_id,
 #endif
-								 u8 key_index, bool pairwise, const u8 *mac_addr,
-								 struct key_params *params)
+									 u8 key_index, bool pairwise, const u8 *mac_addr,
+									 struct key_params *params)
+
 {
 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 	struct rwnx_vif *vif = netdev_priv(netdev);
@@ -3599,7 +3611,7 @@ static int rwnx_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
  *
  */
 static int rwnx_cfg80211_get_key(struct wiphy *wiphy, struct net_device *netdev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
                                                                  int link_id,
 #endif
 								 u8 key_index, bool pairwise, const u8 *mac_addr,
@@ -3617,7 +3629,7 @@ static int rwnx_cfg80211_get_key(struct wiphy *wiphy, struct net_device *netdev,
  *	and @key_index, return -ENOENT if the key doesn't exist.
  */
 static int rwnx_cfg80211_del_key(struct wiphy *wiphy, struct net_device *netdev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
                                                                  int link_id,
 #endif
 								 u8 key_index, bool pairwise, const u8 *mac_addr)
@@ -3656,7 +3668,7 @@ static int rwnx_cfg80211_del_key(struct wiphy *wiphy, struct net_device *netdev,
  */
 static int rwnx_cfg80211_set_default_key(struct wiphy *wiphy,
 										 struct net_device *netdev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
                                                                                  int link_id,
 #endif
 										 u8 key_index, bool unicast, bool multicast)
@@ -3671,7 +3683,7 @@ static int rwnx_cfg80211_set_default_key(struct wiphy *wiphy,
  */
 static int rwnx_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
 											  struct net_device *netdev,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
                                                                                           int link_id,
 #endif
 											  u8 key_index)
@@ -3758,7 +3770,7 @@ static int rwnx_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 		key_params.seq_len = 0;
 		key_params.cipher = sme->crypto.cipher_group;
 		rwnx_cfg80211_add_key(wiphy, dev, 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
                                 0,
 #endif
 				sme->key_idx, false, NULL, &key_params);
@@ -4025,7 +4037,7 @@ static int rwnx_cfg80211_add_station(struct wiphy *wiphy,
 		sta->vif_idx = rwnx_vif->vif_index;
 		sta->vlan_idx = sta->vif_idx;
 		sta->qos = (params->sta_flags_set & BIT(NL80211_STA_FLAG_WME)) != 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41)
+#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION
                 sta->ht = params->link_sta_params.ht_capa ? 1 : 0;
                 sta->vht = params->link_sta_params.vht_capa ? 1 : 0;
 #else
@@ -4431,7 +4443,7 @@ static int rwnx_cfg80211_change_station(struct wiphy *wiphy,
 				sta->vif_idx = rwnx_vif->vif_index;
 				sta->vlan_idx = sta->vif_idx;
 				sta->qos = (params->sta_flags_set & BIT(NL80211_STA_FLAG_WME)) != 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41)
+#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION
                                 sta->ht = params->link_sta_params.ht_capa ? 1 : 0;
                                 sta->vht = params->link_sta_params.vht_capa ? 1 : 0;
 #else
@@ -5080,6 +5092,11 @@ static int rwnx_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	return rwnx_send_cancel_roc(rwnx_hw);
 }
 
+#define IS_2P4GHZ(n) (n >= 2412 && n <= 2484)
+#define IS_5GHZ(n) (n >= 4000 && n <= 5895)
+#define DEFAULT_NOISE_FLOOR_2GHZ (-89)
+#define DEFAULT_NOISE_FLOOR_5GHZ (-92)
+
 /**
  * @dump_survey: get site survey information.
  */
@@ -5124,7 +5141,9 @@ static int rwnx_cfg80211_dump_survey(struct wiphy *wiphy, struct net_device *net
 	if (rwnx_survey->filled != 0) {
 		SURVEY_TIME(info) = (u64)rwnx_survey->chan_time_ms;
 		SURVEY_TIME_BUSY(info) = (u64)rwnx_survey->chan_time_busy_ms;
-		info->noise = rwnx_survey->noise_dbm;
+		//info->noise = rwnx_survey->noise_dbm;
+		info->noise = ((IS_2P4GHZ(info->channel->center_freq)) ? DEFAULT_NOISE_FLOOR_2GHZ :
+				(IS_5GHZ(info->channel->center_freq)) ? DEFAULT_NOISE_FLOOR_5GHZ : DEFAULT_NOISE_FLOOR_5GHZ);
 
 		// Set the survey report as not used
         if(info->noise == 0){
@@ -5350,7 +5369,7 @@ int rwnx_cfg80211_set_cqm_rssi_config(struct wiphy *wiphy,
 	return rwnx_send_cfg_rssi_req(rwnx_hw, rwnx_vif->vif_index, rssi_thold, rssi_hyst);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
 /**
  *
  * @channel_switch: initiate channel-switch procedure (with CSA). Driver is
@@ -5439,12 +5458,14 @@ int rwnx_cfg80211_channel_switch (struct wiphy *wiphy,
 		goto end;
 	} else {
 		INIT_WORK(&csa->work, rwnx_csa_finish);
-#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION
-                cfg80211_ch_switch_started_notify(dev, &csa->chandef, 0, params->count, false);
+#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION4
+		cfg80211_ch_switch_started_notify(dev, &csa->chandef, 0, params->count, false, 0);
+#elif LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2
+		cfg80211_ch_switch_started_notify(dev, &csa->chandef, 0, params->count, false);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
-                cfg80211_ch_switch_started_notify(dev, &csa->chandef, params->count, params->block_tx);
+		cfg80211_ch_switch_started_notify(dev, &csa->chandef, params->count, params->block_tx);
 #else
-                cfg80211_ch_switch_started_notify(dev, &csa->chandef, params->count);
+		cfg80211_ch_switch_started_notify(dev, &csa->chandef, params->count);
 #endif
 
 	}
@@ -6435,7 +6456,7 @@ static struct cfg80211_ops rwnx_cfg80211_ops = {
 	.start_radar_detection = rwnx_cfg80211_start_radar_detection,
 	.update_ft_ies = rwnx_cfg80211_update_ft_ies,
 	.set_cqm_rssi_config = rwnx_cfg80211_set_cqm_rssi_config,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
 	.channel_switch = rwnx_cfg80211_channel_switch,
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
@@ -6700,6 +6721,9 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	u8_l mac_addr_efuse[ETH_ALEN];
 	struct aicbsp_feature_t feature;
 	struct mm_set_stack_start_cfm set_start_cfm;
+#ifdef CONFIG_TEMP_COMP
+	struct mm_set_vendor_swconfig_cfm swconfig_cfm;
+#endif
 	char fw_path[200];
 	(void)addr_str;
 
@@ -6966,6 +6990,11 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	ret = rwnx_send_reset(rwnx_hw);
 	if (ret)
 		goto err_lmac_reqs;
+
+#ifdef CONFIG_TEMP_COMP
+	rwnx_send_set_temp_comp_req(rwnx_hw, &swconfig_cfm);
+#endif
+
 	ret = rwnx_send_version_req(rwnx_hw, &rwnx_hw->version_cfm);
 	if (ret)
 		goto err_lmac_reqs;

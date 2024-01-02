@@ -32,7 +32,9 @@
 #include "rwnx_gki.h"
 #include "rwnx_compat.h"
 #include "ipc_host.h"
+#ifdef CONFIG_FILTER_TCP_ACK
 #include "aicwf_tcp_ack.h"
+#endif
 
 #ifdef AICWF_SDIO_SUPPORT
 #include "aicwf_sdio.h"
@@ -639,8 +641,10 @@ struct rwnx_hw {
 
 	u8 monitor_vif; /* FW id of the monitor interface, RWNX_INVALID_VIF if no monitor vif at fw level */
 
+#ifdef CONFIG_FILTER_TCP_ACK
 	/* tcp ack management */
 	struct tcp_ack_manage ack_m;
+#endif
 
 	/* RoC Management */
 	struct rwnx_roc_elem *roc_elem;             /* Information provided by cfg80211 in its remain on channel request */
@@ -701,7 +705,7 @@ struct rwnx_hw {
 	struct rwnx_txq txq[NX_NB_TXQ];
 	struct rwnx_hwq hwq[NX_TXQ_CNT];
 
-	u8 avail_idx_map;
+	u64 avail_idx_map;
 	u8 vif_started;
 	bool adding_sta;
 	struct rwnx_phy_info phy;

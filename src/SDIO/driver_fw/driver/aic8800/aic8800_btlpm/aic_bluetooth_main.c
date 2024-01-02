@@ -47,26 +47,18 @@ static int __init aic_bluetooth_mod_init(void)
 		pr_err("rfkill init fail\n");
 		goto err1;
 	}
-#ifdef ANDROID_PLATFORM
-#ifndef CONFIG_PLATFORM_ROCKCHIP
-#ifndef CONFIG_PLATFORM_ROCKCHIP2
+#if defined(ANDROID_PLATFORM) && !defined(CONFIG_PLATFORM_ROCKCHIP) && !defined(CONFIG_PLATFORM_ROCKCHIP2)
 	ret = bluesleep_init(aicbt_pdev);
 	if (ret) {
 		pr_err("bluesleep init fail\n");
 		goto err2;
 	}
 #endif
-#endif
-#endif
 
 	return 0;
 
-#ifdef ANDROID_PLATFORM
-#ifndef CONFIG_PLATFORM_ROCKCHIP
-#ifndef CONFIG_PLATFORM_ROCKCHIP2
+#if defined(ANDROID_PLATFORM) && !defined(CONFIG_PLATFORM_ROCKCHIP) && !defined(CONFIG_PLATFORM_ROCKCHIP2)
 err2:
-#endif
-#endif
 #endif
 	rfkill_bluetooth_remove(aicbt_pdev);
 err1:
@@ -79,12 +71,8 @@ err0:
 static void __exit aic_bluetooth_mod_exit(void)
 {
 	printk("%s\n", __func__);
-#ifdef ANDROID_PLATFORM
-#ifndef CONFIG_PLATFORM_ROCKCHIP
-#ifndef CONFIG_PLATFORM_ROCKCHIP2
+#if defined(ANDROID_PLATFORM) && !defined(CONFIG_PLATFORM_ROCKCHIP) && !defined(CONFIG_PLATFORM_ROCKCHIP2)
 	bluesleep_exit(aicbt_pdev);
-#endif
-#endif
 #endif
 	rfkill_bluetooth_remove(aicbt_pdev);
 	platform_device_del(aicbt_pdev);

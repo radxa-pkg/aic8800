@@ -33,6 +33,9 @@
 #endif
 
 #define RWNX_FCU_FW_NAME                "fcuram.bin"
+#if (defined(CONFIG_DPD) && !defined(CONFIG_FORCE_DPD_CALIB))
+#define FW_DPDRESULT_NAME_8800DC        "aic_dpdresult_lite_8800dc.bin"
+#endif
 
 /**
  * Type of memory to access (cf rwnx_plat.get_address)

@@ -31,6 +31,7 @@ void aicwf_patch_config_8800dc(struct rwnx_hw *rwnx_hw);
 int aicwf_set_rf_config_8800dc(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *cfm);
 int aicwf_misc_ram_init_8800dc(struct rwnx_hw *rwnx_hw);
 #ifdef CONFIG_DPD
+int aicwf_misc_ram_valid_check_8800dc(struct rwnx_hw *rwnx_hw, int *valid_out);
 int aicwf_plat_calib_load_8800dc(struct rwnx_hw *rwnx_hw);
 int aicwf_dpd_calib_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite_t *dpd_res);
 int aicwf_dpd_result_apply_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite_t *dpd_res);

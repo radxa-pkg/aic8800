@@ -91,7 +91,7 @@ CONFIG_USE_P2P0=n
 CONFIG_BR_SUPPORT =n
 BR_NAME = br0
 CONFIG_FILTER_TCP_ACK =n
-CONFIG_ONE_TXQ = n
+CONFIG_ONE_TXQ = y
 CONFIG_RFKILL_POLL = n
 
 # Support of MU-MIMO transmission (need FW support)
@@ -142,8 +142,7 @@ $(MODULE_NAME)-y := \
 	aicwf_compat_8800dc.o  \
 	aicwf_compat_8800d80.o \
 	regdb.o				   \
-	aicwf_rx_prealloc.o	\
-	aicwf_tcp_ack.o
+	aicwf_rx_prealloc.o
 
 $(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
 $(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
@@ -155,6 +154,7 @@ $(MODULE_NAME)-$(CONFIG_RWNX_MUMIMO_TX)   += rwnx_mu_group.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += sdio_host.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_txrxif.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_sdio.o
+$(MODULE_NAME)-$(CONFIG_FILTER_TCP_ACK)   += aicwf_tcp_ack.o
 
 $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += usb_host.o
 $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_txrxif.o

@@ -15,6 +15,8 @@
 #define PRINT 2
 #define GET_VALUE 3
 
+extern int flash_erase_len;
+
 typedef struct
 {
     int8_t enable;
@@ -659,6 +661,90 @@ int rwnx_plat_m2d_flash_ota_check(struct aic_usb_dev *usbdev, char *filename)
 }
 #endif//CONFIG_M2D_OTA_AUTO_SUPPORT
 
+int rwnx_plat_flash_bin_upload_android(struct aic_usb_dev *usbdev, u32 fw_addr,
+                               char *filename)
+{
+    struct device *dev = usbdev->dev;
+    unsigned int i=0;
+    int size;
+    u32 *dst=NULL;
+    int err=0;
+    const u32 mem_addr = fw_addr;
+    struct dbg_mem_read_cfm rd_mem_addr_cfm;
+
+    /* load aic firmware */
+    size = aic_load_firmware(&dst, filename, dev);
+    if(size<=0){
+            printk("wrong size of firmware file\n");
+            vfree(dst);
+            dst = NULL;
+            return ENOENT;
+    }
+
+    printk("size %x, flash_erase_len %x\n", size, flash_erase_len);
+    if (size != flash_erase_len || (flash_erase_len & 0xFFF)) {
+        printk("wrong size of flash_erase_len %d\n", flash_erase_len);
+        vfree(dst);
+        dst = NULL;
+        return -1;
+    }
+
+    err = rwnx_send_dbg_mem_read_req(usbdev, mem_addr, &rd_mem_addr_cfm);
+    if (err) {
+        printk("%x rd fail: %d\n", mem_addr, err);
+        return err;
+    }
+
+    if (rd_mem_addr_cfm.memdata != 0xffffffff) {
+        //erase flash
+        if (size > 0x40000) {
+            for (i = 0; i < (size - 0x40000); i +=0x40000) {//each time erase 256K
+                err = rwnx_send_dbg_mem_mask_write_req(usbdev, fw_addr+i, 0xf150e250, 0x40000);
+                if (err) {
+                    printk("flash erase fail: %x, err:%d\r\n", fw_addr + i, err);
+                    return err;
+                }
+            }
+        }
+        if (!err && (i < size)) {// <256KB data
+            err = rwnx_send_dbg_mem_mask_write_req(usbdev, fw_addr + i, 0xf150e250, size - i);
+            if (err) {
+                printk("flash erase fail: %x, err:%d\r\n", fw_addr + i, err);
+            }
+        }
+    }
+
+    /* Copy the file on the Embedded side */
+    printk("### Upload %s firmware, @ = %x  size=%d\n", filename, fw_addr, size);
+
+    if (size > 1024) {// > 1KB data
+        for (i = 0; i < (size - 1024); i += 1024) {//each time write 1KB
+            err = rwnx_send_dbg_mem_block_write_req(usbdev, fw_addr + i, 1024, dst + i / 4);
+                if (err) {
+                printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+                break;
+            }
+        }
+    }
+
+    if (!err && (i < size)) {// <1KB data
+        err = rwnx_send_dbg_mem_block_write_req(usbdev, fw_addr + i, size - i, dst + i / 4);
+        if (err) {
+            printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+        }
+    }
+
+    if (dst) {
+        vfree(dst);
+        dst = NULL;
+    }
+
+    printk("fw download complete\n\n");
+
+    return err;
+}
+
+
 uint32_t rwnx_atoli(char *value){
 	int len = 0;
 	int temp_len = 0;
@@ -1063,21 +1149,18 @@ struct aicbsp_info_t aicbsp_info = {
 
 static struct aicbt_info_t aicbt_info[] = {
     {   
-
-    },//PRODUCT_ID_AIC8800
-    {
         .btmode        = AICBT_BTMODE_DEFAULT,
         .btport        = AICBT_BTPORT_DEFAULT,
         .uart_baud     = AICBT_UART_BAUD_DEFAULT,
         .uart_flowctrl = AICBT_UART_FC_DEFAULT,
         .lpm_enable    = AICBT_LPM_ENABLE_DEFAULT,
         .txpwr_lvl     = AICBT_TXPWR_LVL_DEFAULT,
+    },//PRODUCT_ID_AIC8800
+    {
     },//PRODUCT_ID_AIC8801
     {
-
     },//PRODUCT_ID_AIC8800DC
     {
-
     },//PRODUCT_ID_AIC8800DW
     {
         .btmode        = AICBT_BTMODE_DEFAULT_8800d80,

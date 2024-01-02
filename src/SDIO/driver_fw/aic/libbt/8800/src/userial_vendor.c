@@ -250,6 +250,10 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
     tcgetattr(vnd_userial.fd, &vnd_userial.termios);
     cfmakeraw(&vnd_userial.termios);
     vnd_userial.termios.c_cflag |= (CRTSCTS | stop_bits);
+    //vnd_userial.termios.c_cflag |= stop_bits;
+    //vnd_userial.termios.c_cflag &= ~CRTSCTS;
+
+
     tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
     tcflush(vnd_userial.fd, TCIOFLUSH);
 
@@ -269,6 +273,7 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
     ALOGI("device fd = %d open", vnd_userial.fd);
 
     return vnd_userial.fd;
+
 }
 
 /*******************************************************************************
@@ -299,7 +304,7 @@ void userial_vendor_close(void)
 
     ALOGI("device fd = %d close", vnd_userial.fd);
     // tcdrain Tx before close to make sure no chars in buffer
-    tcdrain(vnd_userial.fd, TCIOFLUSH);
+    tcdrain(vnd_userial.fd);
     if ((result = close(vnd_userial.fd)) < 0)
         ALOGE( "close(fd:%d) FAILED result:%d", vnd_userial.fd, result);
 

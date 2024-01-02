@@ -105,6 +105,7 @@ int aicwifi_patch_config_8800d80(struct aic_sdio_dev *sdiodev)
 	int adap_patch_cnt = 0;
 
 	if (adap_test) {
+        printk("%s for adaptivity test \r\n", __func__);
 		adap_patch_cnt = sizeof(adaptivity_patch_tbl_8800d80)/sizeof(u32)/2;
 	}
 

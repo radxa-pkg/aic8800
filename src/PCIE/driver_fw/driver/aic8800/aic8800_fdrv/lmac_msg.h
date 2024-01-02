@@ -2181,13 +2181,13 @@ struct apm_stop_req {
 /// Structure containing the parameters of the @ref APM_START_CAC_REQ message.
 struct apm_start_cac_req {
 	/// Control channel on which we have to start the CAC
-	struct mac_chan_def chan;
+	struct mac_chan_op chan;
 	/// Center frequency of the first segment
-	u32_l center_freq1;
+	//u32_l center_freq1;
 	/// Center frequency of the second segment (only in 80+80 configuration)
-	u32_l center_freq2;
+	//u32_l center_freq2;
 	/// Width of channel
-	u8_l ch_width;
+	//u8_l ch_width;
 	/// Index of the VIF for which the CAC is started
 	u8_l vif_idx;
 };

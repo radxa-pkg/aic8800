@@ -608,6 +608,9 @@ static int aicwf_pcie_resume(struct pci_dev *pdev)
 		}
 	} else {
 		printk("resume skip reload\n");
+
+		g_rwnx_plat->pcidev->rwnx_hw->pci_suspending = 0;
+
 		return ret;
 	}
 	printk("%s end\n", __func__);

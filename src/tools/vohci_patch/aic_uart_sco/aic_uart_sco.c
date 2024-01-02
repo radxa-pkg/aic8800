@@ -18,7 +18,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 
-#define USB_OR_UART         1//if driver is uab ,value is 1. if driver is uart ,value is 0
+#define USB_OR_UART         0//if driver is usb ,value is 1. if driver is uart ,value is 0
 #define AIC_SCO_PRINT       0
 
 #define AIC_SCO_ID "snd_sco_aic"
@@ -57,6 +57,7 @@ typedef struct AIC_sco_card {
 		    struct snd_pcm_substream *substream;
 		    unsigned int sco_packet_bytes;
 		    snd_pcm_uframes_t buffer_pos;
+            unsigned int channels;
 	  } capture, playback;
     spinlock_t capture_lock;
     spinlock_t playback_lock;
@@ -106,6 +107,16 @@ static int snd_copy_send_sco_data( AIC_sco_card_t *pSCOSnd,u8 *buffer)
     //u8 buffer[period_size * 3];
     int sco_packet_bytes = pSCOSnd->playback.sco_packet_bytes;
     //struct sk_buff *skb;
+	switch(runtime->channels){
+		case 1:
+			frame_bytes = 2;
+			break;
+		case 2:
+			frame_bytes = 4;
+			break;
+		default:
+			break;
+	}
 
     count = frames_to_bytes(runtime, period_size)/sco_packet_bytes;
 #if AIC_SCO_PRINT
@@ -153,7 +164,16 @@ static bool sco_copy_capture_data_to_alsa(struct uart_sco_data *data, uint8_t* p
 
   	runtime = pSCOSnd->capture.substream->runtime;
   	frame_bytes = 2;
-
+	switch(runtime->channels){
+		case 1:
+			frame_bytes = 2;
+			break;
+		case 2:
+			frame_bytes = 4;
+			break;
+		default:
+			break;
+	}
   	dest = runtime->dma_area + pSCOSnd->capture.buffer_pos * frame_bytes;
   	if (pSCOSnd->capture.buffer_pos + frames <= runtime->buffer_size) {
   		memcpy(dest, p_data, frames * frame_bytes);
@@ -187,8 +207,9 @@ static bool sco_copy_capture_data_to_alsa(struct uart_sco_data *data, uint8_t* p
 static void sco_send_to_alsa_ringbuffer(uint8_t* p_data, int sco_length)
 {
     AIC_sco_card_t  *pSCOSnd = p_uart_sco.pSCOSnd;
+    int input_frames_num;
 #if AIC_SCO_PRINT
-    printk("%s\n", __func__);
+    printk("%s, alsa sco len %d\n", __func__,sco_length);
 #endif
 
     if (!test_bit(ALSA_CAPTURE_RUNNING, &pSCOSnd->states)) {
@@ -197,8 +218,18 @@ static void sco_send_to_alsa_ringbuffer(uint8_t* p_data, int sco_length)
 #endif
         return;
     }
+    switch(pSCOSnd->capture.channels){
+        case 1:
+            input_frames_num = sco_length/2;
+            break;
+        case 2:
+            input_frames_num = sco_length/4;
+            break;
+        default:
+            break;
+    }
 	snd_cap_timer.snd_sco_length = sco_length;
-    sco_copy_capture_data_to_alsa(&p_uart_sco, p_data, sco_length/2);
+    sco_copy_capture_data_to_alsa(&p_uart_sco, p_data, input_frames_num);
 }
 
 
@@ -209,15 +240,26 @@ void aic_snd_capture_timeout(ulong data)
 void aic_snd_capture_timeout(struct timer_list *t)
 #endif
 {
-	uint8_t null_data[255];
+	uint8_t null_data[480];
 	struct uart_sco_data *p_data; 
-	
+	AIC_sco_card_t  *pSCOSnd = p_uart_sco.pSCOSnd;
+	int input_frames_num;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
     p_data = (struct uart_sco_data *)data;
 #else
     p_data = snd_cap_timer.snd_data;
 #endif
-    sco_copy_capture_data_to_alsa(p_data, null_data, snd_cap_timer.snd_sco_length/2);
+    switch(pSCOSnd->capture.channels){
+        case 1:
+            input_frames_num = snd_cap_timer.snd_sco_length/2;
+            break;
+        case 2:
+            input_frames_num = snd_cap_timer.snd_sco_length/4;
+            break;
+        default:
+            break;
+    }
+    sco_copy_capture_data_to_alsa(p_data, null_data, input_frames_num);
 #if AIC_SCO_PRINT
 	printk("%s enter\r\n", __func__);
 #endif
@@ -279,22 +321,21 @@ void aic_snd_play_timeout(struct timer_list *t)
 
 static const struct snd_pcm_hardware snd_card_sco_capture_default =
 {
-    .info               = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_NONINTERLEAVED |
-                            SNDRV_PCM_ACCESS_RW_INTERLEAVED | SNDRV_PCM_INFO_FIFO_IN_FRAMES),
+    .info               = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_ACCESS_RW_INTERLEAVED | SNDRV_PCM_INFO_FIFO_IN_FRAMES),//SNDRV_PCM_INFO_NONINTERLEAVED |
     .formats            = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8,
     .rates              = (SNDRV_PCM_RATE_8000),
     .rate_min           = 8000,
     .rate_max           = 8000,
-    .channels_min       = 1,
-    .channels_max       = 1,
+    .channels_min       = 1,//1,
+    .channels_max       = 2,//1,
 #if USB_OR_UART
-	.buffer_bytes_max	= 8 * 768,
-	.period_bytes_min	= 48,
-	.period_bytes_max	= 768,
+	.buffer_bytes_max	= 2 * 8 * 768,//8 * 768,
+	.period_bytes_min	= 2 * 48,//48,
+	.period_bytes_max	= 2 * 768,//768,
 #else
-	.buffer_bytes_max	= 8 * 960,
-	.period_bytes_min	= 120,
-	.period_bytes_max	= 960,
+	.buffer_bytes_max	= 2 * 8 * 960,//8 * 960,
+	.period_bytes_min	= 2 * 120,//120,
+	.period_bytes_max	= 2 * 960,//960,
 #endif
     .periods_min        = 1,
     .periods_max        = 8,
@@ -323,9 +364,9 @@ static int snd_sco_capture_pcm_open(struct snd_pcm_substream * substream)
     if(check_select_msbc() == CODEC_MSBC ) {
         substream->runtime->hw.rates |= SNDRV_PCM_RATE_16000;
         substream->runtime->hw.rate_max = 16000;
-        substream->runtime->hw.period_bytes_min = 240;
-        substream->runtime->hw.period_bytes_max = 8 * 240;
-        substream->runtime->hw.buffer_bytes_max = 8 * 8 * 240;
+        substream->runtime->hw.period_bytes_min = 2 * 240;//240;
+        substream->runtime->hw.period_bytes_max = 2 * 8 * 240;//8 * 240;
+        substream->runtime->hw.buffer_bytes_max = 2 * 8 * 8 * 240;//8 * 8 * 240;
     }
 
     set_bit(ALSA_CAPTURE_OPEN, &pSCOSnd->states);
@@ -381,16 +422,16 @@ static int snd_sco_capture_pcm_prepare(struct snd_pcm_substream *substream)
 
     if(runtime->rate == 8000) {
 #if USB_OR_UART
-        pSCOSnd->capture.sco_packet_bytes = 48;//120;
+        pSCOSnd->capture.sco_packet_bytes = 2 * 48;//120;//48;//120;
 #else
-		pSCOSnd->capture.sco_packet_bytes = 120;
+		pSCOSnd->capture.sco_packet_bytes = 2 * 120;//120;
 #endif
     }
     else if(runtime->rate == 16000 && check_select_msbc() == CODEC_MSBC ) {
 #if USB_OR_UART
-        pSCOSnd->capture.sco_packet_bytes = 240;
+        pSCOSnd->capture.sco_packet_bytes = 2 * 240;//240;
 #else
-		pSCOSnd->capture.sco_packet_bytes = 240;
+		pSCOSnd->capture.sco_packet_bytes = 2 * 240;//240;
 #endif
     }
     else {
@@ -402,17 +443,21 @@ static int snd_sco_capture_pcm_prepare(struct snd_pcm_substream *substream)
 
 static int snd_sco_capture_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
-	  AIC_sco_card_t *pSCOSnd = substream->private_data;
-    printk("%s, cmd : %d", __FUNCTION__, cmd);
+    AIC_sco_card_t *pSCOSnd = substream->private_data;
+    struct snd_pcm_runtime *runtime = substream->runtime;
+
+    printk("%s, cmd : %d, channels : %d\n", __FUNCTION__, cmd,(int)runtime->channels);
 
 	  switch (cmd) {
 	    case SNDRV_PCM_TRIGGER_START:
 		      if (!test_bit(USB_CAPTURE_RUNNING, &pSCOSnd->states))
 			      return -EIO;
+              pSCOSnd->capture.channels = runtime->channels;
 		      set_bit(ALSA_CAPTURE_RUNNING, &pSCOSnd->states);
 		      return 0;
 	    case SNDRV_PCM_TRIGGER_STOP:
 		      clear_bit(ALSA_CAPTURE_RUNNING, &pSCOSnd->states);
+              pSCOSnd->capture.channels = 0;
 		      return 0;
 	    default:
 		      return -EINVAL;
@@ -441,22 +486,21 @@ static struct snd_pcm_ops snd_sco_capture_pcm_ops = {
 
 static const struct snd_pcm_hardware snd_card_sco_playback_default =
 {
-    .info               = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_NONINTERLEAVED |
-                            SNDRV_PCM_ACCESS_RW_INTERLEAVED | SNDRV_PCM_INFO_FIFO_IN_FRAMES),
+    .info               = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_ACCESS_RW_INTERLEAVED | SNDRV_PCM_INFO_FIFO_IN_FRAMES),//SNDRV_PCM_INFO_NONINTERLEAVED |
     .formats            = SNDRV_PCM_FMTBIT_S16_LE,
     .rates              = (SNDRV_PCM_RATE_8000),
     .rate_min           = 8000,
     .rate_max           = 8000,
-    .channels_min       = 1,
-    .channels_max       = 1,
+    .channels_min       = 1,//1,
+    .channels_max       = 2,//1,
 #if USB_OR_UART
-    .buffer_bytes_max   = 8 * 768,
-    .period_bytes_min   = 48,
-    .period_bytes_max   = 768,
+    .buffer_bytes_max   = 2 * 8 * 768,//8 * 768,
+    .period_bytes_min   = 2 * 48,//48,
+    .period_bytes_max   = 2 * 768,//768,
 #else
-	.buffer_bytes_max	= 8 * 960,
-	.period_bytes_min	= 120,
-	.period_bytes_max	= 960,
+	.buffer_bytes_max	= 2 * 8 * 960,//8 * 960,
+	.period_bytes_min	= 2 * 120,//120,
+	.period_bytes_max	= 2 * 960,//960,
 #endif
     .periods_min        = 1,
     .periods_max        = 8,
@@ -484,9 +528,9 @@ static int snd_sco_playback_pcm_open(struct snd_pcm_substream * substream)
     if(check_select_msbc()) {
         substream->runtime->hw.rates |= SNDRV_PCM_RATE_16000;
         substream->runtime->hw.rate_max = 16000;
-        substream->runtime->hw.period_bytes_min = 240;
-        substream->runtime->hw.period_bytes_max = 8 * 240;
-        substream->runtime->hw.buffer_bytes_max = 8 * 8 * 240;
+        substream->runtime->hw.period_bytes_min = 2 * 240;//240;
+        substream->runtime->hw.period_bytes_max = 2 * 8 * 240;//8 * 240;
+        substream->runtime->hw.buffer_bytes_max = 2 * 8 * 8 * 240;//8 * 8 * 240;
     }
     pSCOSnd->playback.substream = substream;
     set_bit(ALSA_PLAYBACK_OPEN, &pSCOSnd->states);
@@ -544,16 +588,16 @@ static int snd_sco_playback_pcm_prepare(struct snd_pcm_substream *substream)
 
     if(runtime->rate == 8000) {
 #if USB_OR_UART
-        pSCOSnd->playback.sco_packet_bytes = 48;//120;
+        pSCOSnd->playback.sco_packet_bytes = 2 * 48;//120;//48;//120;
 #else
-		pSCOSnd->playback.sco_packet_bytes = 120;
+		pSCOSnd->playback.sco_packet_bytes = 2 * 120;//120;
 #endif
     }
     else if(runtime->rate == 16000) {
 #if USB_OR_UART
-		pSCOSnd->playback.sco_packet_bytes = 240;
+		pSCOSnd->playback.sco_packet_bytes = 2 * 240;//240;
 #else
-		pSCOSnd->playback.sco_packet_bytes = 240;
+		pSCOSnd->playback.sco_packet_bytes = 2 * 240;//240;
 #endif
     }
 
@@ -563,14 +607,16 @@ static int snd_sco_playback_pcm_prepare(struct snd_pcm_substream *substream)
 static int snd_sco_playback_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
     AIC_sco_card_t *pSCOSnd = substream->private_data;
+    struct snd_pcm_runtime *runtime = substream->runtime;
 
-    printk("%s, cmd = %d", __FUNCTION__, cmd);
+    printk("%s, cmd = %d ,channels = %d\n", __FUNCTION__, cmd,runtime->channels);
   	switch (cmd) {
-      	case SNDRV_PCM_TRIGGER_START:
-      		if (!test_bit(USB_PLAYBACK_RUNNING, &pSCOSnd->states))
-      			return -EIO;
-      		set_bit(ALSA_PLAYBACK_RUNNING, &pSCOSnd->states);
-          schedule_work(&pSCOSnd->send_sco_work);
+        case SNDRV_PCM_TRIGGER_START:
+            if (!test_bit(USB_PLAYBACK_RUNNING, &pSCOSnd->states))
+                return -EIO;
+            pSCOSnd->playback.channels = runtime->channels;
+            set_bit(ALSA_PLAYBACK_RUNNING, &pSCOSnd->states);
+            schedule_work(&pSCOSnd->send_sco_work);
           if (!test_bit(USB_PLAYBACK_RUNNING, &pSCOSnd->states)) {
               printk("%s: play_timer cmd 1 start ", __func__);
 #if USB_OR_UART
@@ -581,6 +627,7 @@ static int snd_sco_playback_pcm_trigger(struct snd_pcm_substream *substream, int
           }
             return 0;
       	case SNDRV_PCM_TRIGGER_STOP:
+            pSCOSnd->playback.channels = 0;
             clear_bit(ALSA_PLAYBACK_RUNNING, &pSCOSnd->states);
             return 0;
       	default:
@@ -703,6 +750,8 @@ static ssize_t ioctl_read(struct file *file_p,
         loff_t *pos_p)
 {
     ssize_t ret = 0;
+    unsigned short temp_data[240];
+    unsigned short *temp_ptr = NULL;
 
 	struct uart_sco_data *data = file_p->private_data;
     struct snd_pcm_runtime *runtime;
@@ -711,6 +760,8 @@ static ssize_t ioctl_read(struct file *file_p,
     char __user *ptr = buf_p;
 	int len,sco_count=0;
 	int sco_packet_bytes = data->pSCOSnd->playback.sco_packet_bytes;
+	int i = 0;
+    AIC_sco_card_t  *pSCOSnd = data->pSCOSnd;
 
     if(test_bit(ALSA_PLAYBACK_RUNNING, &data->pSCOSnd->states)){
 		runtime = data->pSCOSnd->playback.substream->runtime;
@@ -718,7 +769,7 @@ static ssize_t ioctl_read(struct file *file_p,
 		buffer = (u8 *)vmalloc((3*period_size)+1);
         sco_count = snd_copy_send_sco_data(data->pSCOSnd,&buffer[1]);
 #if AIC_SCO_PRINT
-		printk("%s sco_count %d\r\n", __func__,sco_count);
+		printk("%s sco_count %d,sco_packet_bytes %d\r\n", __func__,sco_count,sco_packet_bytes);
 #endif
 		if (data->pSCOSnd->capture.sco_packet_bytes != snd_cap_timer.snd_sco_length) {
 			if (data->pSCOSnd->capture.sco_packet_bytes > snd_cap_timer.snd_sco_length) {
@@ -729,7 +780,26 @@ static ssize_t ioctl_read(struct file *file_p,
 		}else{
 			buffer[0] = (u8)sco_count;
 		}
-		len = min_t(unsigned int, (sco_count*sco_packet_bytes+1), count);
+#if AIC_SCO_PRINT
+		printk("%s buffer[0] %d channels %d\r\n", __func__,buffer[0],pSCOSnd->playback.channels);
+#endif
+        switch(pSCOSnd->playback.channels){
+            case 1:
+                len = min_t(unsigned int, (sco_count*sco_packet_bytes+1), count);
+                break;
+            case 2:
+                {
+                    temp_ptr = (unsigned short *)(buffer+1);
+                    for(i = 0; i< (sco_count*sco_packet_bytes/2); i++){
+                        temp_data[i] = temp_ptr[i*2];
+                    }
+                    memcpy(&buffer[1],(u8 *)temp_data,(sco_count*sco_packet_bytes/2));
+                    len = min_t(unsigned int, ((sco_count*sco_packet_bytes/2)+1), count);
+                }
+                break;
+            default:
+                break;
+        }
 #if AIC_SCO_PRINT
 		printk("%s,len:%d\n", __func__, len);
 #endif
@@ -747,9 +817,12 @@ static ssize_t ioctl_write(struct file *file_p,
         loff_t *pos_p)
 {
 	char p_data[1024];
+    unsigned short temp_data[240];
+    unsigned short *temp_ptr = NULL;
 	int ret = 0;
-	struct uart_sco_data *data; 
-	data = file_p->private_data;
+	struct uart_sco_data *data = file_p->private_data;
+    AIC_sco_card_t  *pSCOSnd = data->pSCOSnd;
+
 #if AIC_SCO_PRINT
 	printk("%s enter ,%d\r\n", __func__,(int)count);
 #endif
@@ -789,7 +862,27 @@ static ssize_t ioctl_write(struct file *file_p,
 				break;
 		}
 	}else{
-		sco_send_to_alsa_ringbuffer(p_data,count);
+#if AIC_SCO_PRINT
+        printk("%s channels %d\r\n", __func__,pSCOSnd->capture.channels);
+#endif
+        switch(pSCOSnd->capture.channels){
+            case 1:
+                sco_send_to_alsa_ringbuffer(p_data,count);
+                break;
+            case 2:
+                {
+					int i = 0;
+					temp_ptr = (unsigned short *)p_data;
+					for(i = 0; i< count/2; i++){
+						temp_data[i*2] = temp_ptr[i];
+						temp_data[i*2+1] = temp_ptr[i];
+					}
+					sco_send_to_alsa_ringbuffer((unsigned char *)temp_data,count*2);
+                }
+                break;
+            default:
+                break;
+        }
 	}
 
     return count;

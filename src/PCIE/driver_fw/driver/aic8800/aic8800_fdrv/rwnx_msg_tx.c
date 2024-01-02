@@ -2556,11 +2556,12 @@ int rwnx_send_apm_start_cac_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *vif,
 	/* Set parameters for the APM_START_CAC_REQ message */
 	req->vif_idx = vif->vif_index;
 	req->chan.band = chandef->chan->band;
-	req->chan.freq = chandef->chan->center_freq;
+	req->chan.type = bw2chnl[chandef->width];
+	req->chan.prim20_freq = chandef->chan->center_freq;
+	req->chan.center1_freq = chandef->center_freq1;
+	req->chan.center2_freq = chandef->center_freq2;
+	req->chan.tx_power = 20;
 	req->chan.flags = 0;
-	req->center_freq1 = chandef->center_freq1;
-	req->center_freq2 = chandef->center_freq2;
-	req->ch_width = bw2chnl[chandef->width];
 
 	/* Send the APM_START_CAC_REQ message to LMAC FW */
 	return rwnx_send_msg(rwnx_hw, req, 1, APM_START_CAC_CFM, cfm);

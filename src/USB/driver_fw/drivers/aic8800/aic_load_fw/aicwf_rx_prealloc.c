@@ -67,7 +67,7 @@ void aicwf_prealloc_rxbuff_free(struct rx_buff *rxbuff, spinlock_t *lock)
     spin_unlock_irqrestore(lock, flags);
 }
 
-int aicwf_prealloc_init()
+int aicwf_prealloc_init(void)
 {
     struct rx_buff *rxbuff;
     int i = 0;
@@ -98,7 +98,7 @@ int aicwf_prealloc_init()
     return 0;
 }
 
-void aicwf_prealloc_exit()
+void aicwf_prealloc_exit(void)
 {
     struct rx_buff *rxbuff;
     struct rx_buff *pos;

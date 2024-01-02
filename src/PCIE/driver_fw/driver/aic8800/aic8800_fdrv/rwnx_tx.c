@@ -1256,7 +1256,7 @@ int aic_br_client_tx(struct rwnx_vif *vif, struct sk_buff **pskb)
 }
 #endif /* CONFIG_BR_SUPPORT */
 
-
+#ifdef CONFIG_FILTER_TCP_ACK
 /* return:
  *      0, msg buf freed by the real driver
  *      others, skb need free by the caller,remember not use msg->skb!
@@ -1403,6 +1403,7 @@ free:
 
 	return 0;//NETDEV_TX_OK;
 }
+#endif
 
 /**
  * netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,

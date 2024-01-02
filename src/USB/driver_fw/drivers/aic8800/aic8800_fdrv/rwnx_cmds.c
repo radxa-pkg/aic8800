@@ -491,12 +491,14 @@ void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr)
 
 void rwnx_cmd_mgr_deinit(struct rwnx_cmd_mgr *cmd_mgr)
 {
-    cmd_mgr->print(cmd_mgr);
-    cmd_mgr->drain(cmd_mgr);
-    cmd_mgr->print(cmd_mgr);
-    flush_workqueue(cmd_mgr->cmd_wq);
-    destroy_workqueue(cmd_mgr->cmd_wq);
-    memset(cmd_mgr, 0, sizeof(*cmd_mgr));
+    if(cmd_mgr->print && cmd_mgr->drain){
+        cmd_mgr->print(cmd_mgr);
+        cmd_mgr->drain(cmd_mgr);
+        cmd_mgr->print(cmd_mgr);
+        flush_workqueue(cmd_mgr->cmd_wq);
+        destroy_workqueue(cmd_mgr->cmd_wq);
+        memset(cmd_mgr, 0, sizeof(*cmd_mgr));
+    }
 }
 
 

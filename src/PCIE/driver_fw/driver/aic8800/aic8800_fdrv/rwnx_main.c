@@ -1363,10 +1363,16 @@ enum {
 	RDWR_EFUSE_PWROFST,
 	RDWR_EFUSE_DRVIBIT,
 	SET_PAPR,
-    SET_COB_CAL,
-    GET_COB_CAL_RES,
-	SETSUSPENDMODE,
-
+	SET_CAL_XTAL,
+	GET_CAL_XTAL_RES,
+	SET_COB_CAL,
+	GET_COB_CAL_RES,
+	RDWR_EFUSE_USRDATA,
+	SET_NOTCH,
+    RDWR_PWROFSTFINE,
+    RDWR_EFUSE_PWROFSTFINE,
+    RDWR_EFUSE_SDIOCFG,
+    RDWR_EFUSE_USBVIDPID,
 };
 
 typedef struct {
@@ -1375,6 +1381,7 @@ typedef struct {
 	u8_l mode;
 	u8_l rate;
 	u16_l length;
+	u16_l tx_intv_us;
 } cmd_rf_settx_t;
 
 typedef struct {
@@ -2206,8 +2213,13 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
             settx_param.mode = command_strtoul(argv[3], NULL, 10);
             settx_param.rate = command_strtoul(argv[4], NULL, 10);
             settx_param.length = command_strtoul(argv[5], NULL, 10);
-            printk("txparam:%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
-                settx_param.mode, settx_param.rate, settx_param.length);
+			if (argc > 6) {
+                settx_param.tx_intv_us = command_strtoul(argv[6], NULL, 10);
+            } else {
+                settx_param.tx_intv_us = 0;
+            }
+            printk("txparam:%d,%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
+                settx_param.mode, settx_param.rate, settx_param.length, settx_param.tx_intv_us);
             rwnx_send_rftest_req(p_rwnx_hw, SET_TX, sizeof(cmd_rf_settx_t), (u8_l *)&settx_param, NULL);
         } else if (strcasecmp(argv[0], "SET_TXSTOP") == 0) {
             printk("settx_stop\n");
@@ -2292,6 +2304,16 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 
             printk("pwr =%x\r\n", pwr);
             rwnx_send_rftest_req(p_rwnx_hw, SET_POWER, sizeof(pwr), (u8_l *)&pwr, NULL);
+        } else if (strcasecmp(argv[0], "SET_NOTCH") == 0) {
+            if (argc > 1) {
+                u8_l func = command_strtoul(argv[1], NULL, 10);
+                printk("set notch: %d\n", func);
+                rwnx_send_rftest_req(p_rwnx_hw, SET_NOTCH, sizeof(func), (u8_l *)&func, NULL);
+            } else {
+                printk("wrong args\n");
+                bytes_written = -EINVAL;
+                break;
+            }
         } else if (strcasecmp(argv[0], "SET_XTAL_CAP")==0) {
             printk("set_xtal_cap\n");
             if (argc < 2) {
@@ -4101,7 +4123,7 @@ static int rwnx_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 #endif
 		sme->key_idx, false, NULL, &key_params);
 	}
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0)  //|| defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
 	else if ((sme->auth_type == NL80211_AUTHTYPE_SAE) &&
 			 !(sme->flags & CONNECT_REQ_EXTERNAL_AUTH_SUPPORT)) {
 		netdev_err(dev, "Doesn't support SAE without external authentication\n");
@@ -4185,7 +4207,7 @@ static int rwnx_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) //|| defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
 /**
  * @external_auth: indicates result of offloaded authentication processing from
  *     user space
@@ -5336,6 +5358,11 @@ static int rwnx_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	return rwnx_send_cancel_roc(rwnx_hw);
 }
 
+#define IS_2P4GHZ(n) (n >= 2412 && n <= 2484)
+#define IS_5GHZ(n) (n >= 4000 && n <= 5895)
+#define DEFAULT_NOISE_FLOOR_2GHZ (-89)
+#define DEFAULT_NOISE_FLOOR_5GHZ (-92)
+
 /**
  * @dump_survey: get site survey information.
  */
@@ -5380,7 +5407,9 @@ static int rwnx_cfg80211_dump_survey(struct wiphy *wiphy, struct net_device *net
 	if (rwnx_survey->filled != 0) {
 		SURVEY_TIME(info) = (u64)rwnx_survey->chan_time_ms;
 		SURVEY_TIME_BUSY(info) = (u64)rwnx_survey->chan_time_busy_ms;
-		info->noise = rwnx_survey->noise_dbm;
+		//info->noise = rwnx_survey->noise_dbm;
+		info->noise = ((IS_2P4GHZ(info->channel->center_freq)) ? DEFAULT_NOISE_FLOOR_2GHZ :
+				(IS_5GHZ(info->channel->center_freq)) ? DEFAULT_NOISE_FLOOR_5GHZ : DEFAULT_NOISE_FLOOR_5GHZ);
 
 		// Set the survey report as not used
 		rwnx_survey->filled = 0;
@@ -6697,7 +6726,7 @@ static struct cfg80211_ops rwnx_cfg80211_ops = {
 	.tdls_mgmt = rwnx_cfg80211_tdls_mgmt,
 	.tdls_oper = rwnx_cfg80211_tdls_oper,
 	.change_bss = rwnx_cfg80211_change_bss,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) //|| defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
 	.external_auth = rwnx_cfg80211_external_auth,
 #endif
 #ifdef CONFIG_RFKILL_POLL
@@ -7089,7 +7118,7 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 		#endif
 		0;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) //|| defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
 	wiphy->features |= NL80211_FEATURE_SAE;
 #endif
 

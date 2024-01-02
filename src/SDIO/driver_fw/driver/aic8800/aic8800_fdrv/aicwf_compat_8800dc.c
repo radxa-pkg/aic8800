@@ -294,9 +294,11 @@ u32 wifi_rxgain_table_24g_40m_8800dcdw[64] = {
     0x000000f0
 };
 
-#ifdef CONFIG_DPD
 #define RAM_LMAC_FW_ADDR               0x00150000
+#ifdef CONFIG_DPD
+#if (defined(CONFIG_DPD) && !defined(CONFIG_FORCE_DPD_CALIB))
 extern int is_file_exist(char* name);
+#endif
 extern rf_misc_ram_lite_t dpd_res;
 
 int aicwf_fdrv_dpd_result_apply_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite_t *dpd_res)
@@ -352,26 +354,24 @@ int aicwf_fdrv_dpd_result_apply_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite
 }
 
 #ifndef CONFIG_FORCE_DPD_CALIB
-int aicwf_fdrv_dpd_result_load_8800dc(struct rwnx_hw *rwnx_hw)
+int aicwf_fdrv_dpd_result_load_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite_t *dpd_res)
 {
     int ret = 0;
-    uint32_t cfg_base = 0x10164;
-    struct dbg_mem_read_cfm cfm;
-    uint32_t misc_ram_addr;
-
-	printk("%s\n", __func__);
-    if (testmode == 1) {
-        cfg_base = RAM_LMAC_FW_ADDR + 0x0164;
+    int size;
+    u32 *dst=NULL;
+    char *filename = FW_DPDRESULT_NAME_8800DC;
+    AICWFDBG(LOGINFO, "dpd_res file path:%s \r\n", filename);
+    /* load file */
+    size = rwnx_request_firmware_common(rwnx_hw, &dst, filename);
+    if (size <= 0) {
+        AICWFDBG(LOGERROR, "wrong size of dpd_res file\n");
+        dst = NULL;
+        return -1;
     }
-    if ((ret = rwnx_send_dbg_mem_read_req(rwnx_hw, cfg_base + 0x14, &cfm))) {
-        AICWFDBG(LOGERROR, "rf misc ram[0x%x] rd fail: %d\n", cfg_base + 0x14, ret);
-        return ret;
-    }
-    misc_ram_addr = cfm.memdata;
-    ret = rwnx_plat_bin_fw_upload_2(rwnx_hw, misc_ram_addr, FW_DPDRESULT_NAME_8800DC);
-    if (ret) {
-        AICWFDBG(LOGINFO, "load calib bin fail: %d\n", ret);
-        return ret;
+    AICWFDBG(LOGINFO, "### Load file done: %s, size=%d, dst[0]=%x\n", filename, size, dst[0]);
+    memcpy((u8 *)dpd_res, (u8 *)dst, sizeof(rf_misc_ram_lite_t));
+    if (dst) {
+        rwnx_release_firmware_common(&dst);
     }
     return ret;
 }
@@ -452,7 +452,7 @@ int aicwf_set_rf_config_8800dc(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_c
 			#ifndef CONFIG_FORCE_DPD_CALIB
             if (is_file_exist(FW_DPDRESULT_NAME_8800DC) == 1) {
                 AICWFDBG(LOGINFO, "%s load dpd bin\n", __func__);
-                ret = aicwf_fdrv_dpd_result_load_8800dc(rwnx_hw);
+                ret = aicwf_fdrv_dpd_result_load_8800dc(rwnx_hw, &dpd_res);
                 if (ret) {
                     AICWFDBG(LOGINFO, "load dpd bin fail: %d\n", ret);
                     return ret;
@@ -465,25 +465,25 @@ int aicwf_set_rf_config_8800dc(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_c
                     AICWFDBG(LOGINFO, "apply dpd bin fail: %d\n", ret);
                     return ret;
                 }
-            } else
-			#else
+            }
+            #else
             {
                 ret = aicwf_fdrv_misc_ram_init_8800dc(rwnx_hw);
                 if (ret) {
                     AICWFDBG(LOGINFO, "misc ram init fail: %d\n", ret);
                     return ret;
                 }
-
-			#endif
+            }
+            #endif
             ret = rwnx_send_rf_calib_req(rwnx_hw, cfm);
             if (ret) {
                 AICWFDBG(LOGINFO, "rf calib req fail: %d\n", ret);
                 return ret;
             }
         }
-	}
+    }
 
-	return 0 ;
+    return 0 ;
 }
 
 int	rwnx_plat_userconfig_load_8800dc(struct rwnx_hw *rwnx_hw){

@@ -405,6 +405,7 @@ int upio_set_bluetooth_power(int on)
 ** Returns         None
 **
 *******************************************************************************/
+void ms_delay (uint32_t timeout);
 void upio_set(uint8_t pio, uint8_t action, uint8_t polarity)
 {
     int rc;
@@ -542,6 +543,11 @@ void upio_set(uint8_t pio, uint8_t action, uint8_t polarity)
 #if (BT_WAKE_VIA_PROC_NOTIFY_DEASSERT == TRUE)
             lpm_proc_cb.btwrite_active = TRUE;
 #endif
+
+            if(buffer == '1'){
+                UPIODBG("delay 10ms for upio set %c", buffer);
+                ms_delay(10);
+            }
 
             UPIODBG("%s: proc btwrite assertion, buffer: %c, timer_armed %d %d",
                     __FUNCTION__, buffer, lpm_proc_cb.btwrite_active, lpm_proc_cb.timer_created);

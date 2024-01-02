@@ -1239,7 +1239,7 @@ static void rwnx_plat_mpif_sel(struct rwnx_plat *rwnx_plat)
 #endif
 }
 #endif
-#ifdef CONFIG_DPD
+#if (defined(CONFIG_DPD) && !defined(CONFIG_FORCE_DPD_CALIB))
 int is_file_exist(char* name)
 {
     char *path = NULL;
@@ -1266,7 +1266,7 @@ int is_file_exist(char* name)
         return 1;
     }
 }
-#endif//CONFIG_DPD
+#endif//CONFIG_DPD && !CONFIG_FORCE_DPD_CALIB
 /**
  * rwnx_plat_patch_load() - Load patch code
  *

@@ -243,7 +243,7 @@ int rwnx_dini_platform_init(struct pci_dev *pci_dev, struct rwnx_plat **rwnx_pla
 	pci_read_config_word(pci_dev, PCI_COMMAND, &pci_cmd);
 	pci_cmd |= PCI_COMMAND_PARITY | PCI_COMMAND_SERR;
 	pci_write_config_word(pci_dev, PCI_COMMAND, pci_cmd);
-	pci_write_config_byte(pci_dev, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES >> 2);
+	//pci_write_config_byte(pci_dev, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES >> 2);
 
 	ret = pci_enable_device(pci_dev);
 	if (ret) {
@@ -252,13 +252,13 @@ int rwnx_dini_platform_init(struct pci_dev *pci_dev, struct rwnx_plat **rwnx_pla
 	}
 
 	pci_set_master(pci_dev);
-
+#if 0
 	ret = pci_request_regions(pci_dev, KBUILD_MODNAME);
 	if (ret) {
 		dev_err(&(pci_dev->dev), "pci_request_regions failed\n");
 		goto out_request;
 	}
-
+#endif
 	rwnx_dini->pci_bar0_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 0);
 	if (!rwnx_dini->pci_bar0_vaddr) {
 		dev_err(&(pci_dev->dev), "pci_ioremap_bar(%d) failed\n", 0);
@@ -289,7 +289,7 @@ out_bar4:
 	iounmap(rwnx_dini->pci_bar0_vaddr);
 out_bar0:
 	pci_release_regions(pci_dev);
-out_request:
+//out_request:
 	pci_disable_device(pci_dev);
 out_enable:
 	kfree(*rwnx_plat);

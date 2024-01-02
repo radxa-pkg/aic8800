@@ -73,7 +73,7 @@
  * Number of Host buffers available for Emb->App MSGs sending (through DMA)
  */
 #ifdef CONFIG_RWNX_FULLMAC
-#define IPC_MSGE2A_BUF_CNT       16//64
+#define IPC_MSGE2A_BUF_CNT       96//64
 #endif
 /*
  * Number of Host buffers available for Debug Messages sending (through DMA)
@@ -542,8 +542,8 @@ struct ipc_e2a_msg {
 	u16_l dummy_dest_id;
 	u16_l dummy_src_id;
 	u16_l param_len;         ///< Parameter embedded struct length.
-	u32_l pattern;           ///< Used to stamp a valid MSG buffer
 	u32_l param[IPC_E2A_MSG_PARAM_SIZE];  ///< Parameter embedded struct. Must be word-aligned.
+	u32_l pattern;           ///< Used to stamp a valid MSG buffer
 };
 
 /// Message structure for Debug messages from Emb to App

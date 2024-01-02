@@ -994,25 +994,45 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
 #else
 							wdev->ssid, wdev->ssid_len,
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
 							wdev->conn_bss_type,
 							IEEE80211_PRIVACY_ANY);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+							IEEE80211_BSS_TYPE_ESS,
+							IEEE80211_PRIVACY_ANY);
+#else
+                            WLAN_CAPABILITY_ESS,
+                            WLAN_CAPABILITY_PRIVACY);
+#endif
+
 
 		if (!bss) {
 			printk("%s bss is NULL \r\n", __func__);
 
 			printk("%s bss ssid(%d):%s conn_bss_type:%d bss2 ssid(%d):%s conn_bss_type:%d\r\n", 
 				__func__, 
-				rwnx_vif->sta.ssid_len,
+				(int)rwnx_vif->sta.ssid_len,
 				rwnx_vif->sta.ssid,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
 				IEEE80211_BSS_TYPE_ESS,
-#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION
-				wdev->u.client.ssid, 
-				wdev->u.client.ssid_len,
 #else
-				wdev->ssid_len,
+				WLAN_CAPABILITY_ESS,
+#endif
+#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION
+				(int)wdev->u.client.ssid_len,
+				wdev->u.client.ssid, 
+#else
+				(int)wdev->ssid_len,
 				wdev->ssid,
 #endif
-				wdev->conn_bss_type);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0)
+				wdev->conn_bss_type
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
+				IEEE80211_BSS_TYPE_ESS
+#else
+				WLAN_CAPABILITY_ESS
+#endif
+				);
 
 			printk("%s rwnx_vif->sta.bssid %02x %02x %02x %02x %02x %02x \r\n", __func__, 
 				rwnx_vif->sta.bssid[0], rwnx_vif->sta.bssid[1], rwnx_vif->sta.bssid[2],
@@ -1039,30 +1059,36 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
                                 ind->assoc_req_ie_len, rsp_ie,
                                 ind->assoc_rsp_ie_len, ind->status_code,
                                 GFP_ATOMIC);
-		atomic_set(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_CONNECTED);
-		AICWFDBG(LOGINFO, "%s cfg80211_connect_result pass \r\n", __func__);
+		if (ind->status_code == 0) {
+			atomic_set(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_CONNECTED);
+		} else {
+			atomic_set(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_DISCONNECTED);
+			rwnx_external_auth_disable(rwnx_vif);
+		}
+		AICWFDBG(LOGINFO, "%s cfg80211_connect_result pass, rwnx_vif->drv_conn_state:%d\r\n", __func__, (int)atomic_read(&rwnx_vif->drv_conn_state));
     }
     else {//roaming
         if(ind->status_code != 0){
             AICWFDBG(LOGINFO, "%s roaming fail to notify disconnect \r\n", __func__);
 			cfg80211_disconnected(dev, 0, NULL, 0,1, GFP_ATOMIC);
 			atomic_set(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_DISCONNECTED);
+			rwnx_external_auth_disable(rwnx_vif);
         }else{
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
             struct cfg80211_roam_info info;
             memset(&info, 0, sizeof(info));
-            if (rwnx_vif->ch_index < NX_CHAN_CTXT_CNT)
+            
 #if LINUX_VERSION_CODE < HIGH_KERNEL_VERSION
+			if (rwnx_vif->ch_index < NX_CHAN_CTXT_CNT)
     			info.channel = rwnx_hw->chanctx_table[rwnx_vif->ch_index].chan_def.chan;
+			info.bssid = (const u8 *)ind->bssid.array;
+
 #else
+			if (rwnx_vif->ch_index < NX_CHAN_CTXT_CNT)
     			info.links[0].channel = rwnx_hw->chanctx_table[rwnx_vif->ch_index].chan_def.chan;
+			info.links[0].bssid = (const u8 *)ind->bssid.array;;
 #endif//LINUX_VERSION_CODE < HIGH_KERNEL_VERSION    
 
-#if LINUX_VERSION_CODE < HIGH_KERNEL_VERSION
-            info.bssid = (const u8 *)ind->bssid.array;
-#else
-            info.links[0].bssid = (const u8 *)ind->bssid.array;;
-#endif//LINUX_VERSION_CODE < HIGH_KERNEL_VERSION
             info.req_ie = req_ie;
             info.req_ie_len = ind->assoc_req_ie_len;
             info.resp_ie = rsp_ie;
@@ -1187,11 +1213,11 @@ static inline int rwnx_rx_sm_disconnect_ind(struct rwnx_hw *rwnx_hw,
     rx_priv = rwnx_hw->usbdev->rx_priv;
 #endif
     if((rwnx_vif->wdev.iftype == NL80211_IFTYPE_STATION) || (rwnx_vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT)) {
-        macaddr = rwnx_vif->ndev->dev_addr;
+        macaddr = (u8*)rwnx_vif->ndev->dev_addr;
 		AICWFDBG(LOGINFO, "deinit:macaddr:%x,%x,%x,%x,%x,%x\r\n", macaddr[0],macaddr[1],macaddr[2], \
                                macaddr[3],macaddr[4],macaddr[5]);
         list_for_each_entry_safe(reord_info, tmp, &rx_priv->stas_reord_list, list) {
-            macaddr = rwnx_vif->ndev->dev_addr;
+            macaddr = (u8*)rwnx_vif->ndev->dev_addr;
 			AICWFDBG(LOGINFO, "reord_mac:%x,%x,%x,%x,%x,%x\r\n", reord_info->mac_addr[0],reord_info->mac_addr[1],reord_info->mac_addr[2], \
                                    reord_info->mac_addr[3],reord_info->mac_addr[4],reord_info->mac_addr[5]);
             if (!memcmp(reord_info->mac_addr, macaddr, 6)) {

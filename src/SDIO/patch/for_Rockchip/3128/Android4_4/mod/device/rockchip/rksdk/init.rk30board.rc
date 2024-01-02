@@ -1,0 +1,233 @@
+import init.rk30board.usb.rc
+import init.${ro.hardware}.bootmode.${ro.bootmode}.rc
+import init.${ro.hardware}.environment.rc
+import init.connectivity.rc
+
+on early-init
+    export SECOND_VOLUME_STORAGE /mnt/external_sd
+    mkdir /mnt/external_sd 0000 system system
+    export THIRD_VOLUME_STORAGE /mnt/usb_storage
+    mkdir /mnt/usb_storage 0000 system system
+
+on post-fs
+    insmod /system/lib/modules/ump.ko
+    insmod /system/lib/modules/mali.ko
+    insmod /system/lib/modules/mali_kbase.ko
+    insmod /system/lib/modules/rk30_mirroring.ko
+    insmod /system/lib/modules/rk29-ipp.ko
+    insmod /system/lib/modules/aic8800_bsp.ko aic_fw_path=/system/etc/firmware
+#    insmod /system/lib/modules/aic8800_btlpm.ko
+#    insmod /system/lib/modules/aic8800_fdrv.ko
+
+# AP6476 GPS permission
+    chmod 755 /system/bin/glgps
+    chown root system /system/bin/glgps
+    chmod 644 /system/lib/hw/gps.default.so
+    chown root system /system/lib/hw/gps.default.so
+    mkdir /data/gps
+    chmod 770 /data/gps
+    chown system net_bt_stack /data/gps
+
+on post-fs-data
+    # we will remap this as /mnt/sdcard with the sdcard fuse tool
+    mkdir /data/media 0770 media_rw media_rw
+    chown media_rw media_rw /data/media
+
+    setprop vold.post_fs_data_done 1
+
+on init
+# for adobe reader mobile
+    export RK_ADOBE_DE_MOBILE 1
+    export EBOOK_PAGE_VISIBLE_NUMBER 2　
+    export RK_ADEPT_DEVICE_TYPE mobile
+    export RK_ADOBE_DE_DOC_FOLDER "/mnt/sdcard/Digital Editions"
+    export RK_ADEPT_ACTIVATION_FILE /mnt/sdcard/.adobe-digital-editions/activation.xml
+    export RK_ADEPT_DEVICE_FILE /mnt/sdcard/.adobe-digital-editions/device.xml
+    export RK_ADEPT_DEVICE_SALT_FILE /mnt/sdcard/.adobe-digital-editions/devicesalt
+    export ADOBE_FONTS_DIR  /system/fonts/adobefonts/
+
+    mkdir /mnt/internal_sd 0000 system system
+    mkdir /mnt/shell/emulated 0700 shell shell
+    mkdir /storage/emulated 0555 root root
+
+on boot
+    setprop UserVolumeLabel "RockChips"
+    mount debugfs /sys/kernel/debug /sys/kernel/debug mode=0755
+    chown system system /sys/devices/system/cpu/cpu1/online
+    chmod 0660 /sys/devices/system/cpu/cpu1/online
+#    insmod /system/lib/modules/vpu_service.ko
+    chown wifi wifi /sys/class/rkwifi/driver 
+    chown wifi wifi /sys/class/rkwifi/power
+
+#backlight
+    chown system system /sys/class/backlight/rk28_bl/brightness
+    
+#for hdmi timem out
+   chown root system /sys/class/graphics/fb0/blank
+   chmod 0664 /sys/class/graphics/fb0/blank
+   chmod 0664 /dev/graphics/fb0
+
+   chown root system /sys/class/graphics/fb0/bcsh
+   chown root system /sys/class/graphics/fb0/dsp_lut
+   chmod 0664 /sys/class/graphics/fb0/bcsh
+   chmod 0664 /sys/class/graphics/fb0/dsp_lut
+
+    chown system system /sys/mali400_utility/utility
+    chmod 0664 /sys/mali400_utility/utility
+
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+     
+    chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed
+
+# create virtual SD card at /mnt/sdcard, based on the /data/media directory
+# daemon will drop to user/group system/media_rw after initializing
+# underlying files in /data/media will be created with user and group media_rw (1023)
+service sdcard /system/bin/sdcard -u 1023 -g 1023 -l /data/media /mnt/shell/emulated
+    class main
+    
+
+on property:ro.factory.hasUMS=false
+    symlink /storage/emulated/legacy /sdcard
+    symlink /storage/emulated/legacy /mnt/sdcard
+    symlink /storage/emulated/legacy /storage/sdcard0
+    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+    mount rootfs rootfs / ro remount
+
+on property:ro.factory.hasUMS=cdrom
+    symlink /storage/emulated/legacy /sdcard
+    symlink /storage/emulated/legacy /mnt/sdcard
+    symlink /storage/emulated/legacy /storage/sdcard0
+    symlink /mnt/shell/emulated/0 /storage/emulated/legacy
+    mount rootfs rootfs / ro remount
+
+on property:ro.factory.hasUMS=true
+    symlink /mnt/internal_sd /sdcard
+    symlink /mnt/internal_sd /mnt/sdcard
+    symlink /mnt/internal_sd /storage/sdcard0
+    mount rootfs rootfs / ro remount
+    stop sdcard
+
+
+# Binding fuse mount point to /storage/emulated/legacy
+#on property:init.svc.sdcard=running
+#    wait /mnt/shell/emulated/0
+#    mount none /mnt/shell/emulated/0 /storage/emulated/legacy bind
+
+
+service wfd /system/bin/wfd
+    class main
+    disabled
+    oneshot
+
+service dhcpcd_wlan0 /system/bin/dhcpcd -ABKL
+    class main
+    disabled
+    oneshot
+
+service iprenew_wlan0 system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+
+service dhcpcd_p2p /system/bin/dhcpcd -aABKL
+    class main
+    disabled
+    oneshot
+
+service iprenew_p2p system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+# bugreport is triggered by holding down volume down, volume up and power
+service bugreport /system/bin/bugreport.sh
+    class main
+    disabled
+    oneshot
+    keycodes 114 115 116
+
+service chrome /system/bin/chrome.sh
+    class main
+    oneshot
+
+service dhcpcd_eth0 /system/bin/dhcpcd -ABKL
+    class main
+	disabled
+	oneshot
+			
+service iprenew_eth0 system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+
+service dhcpcd_bt-pan /system/bin/dhcpcd -ABKL
+    class main
+    disabled
+    oneshot
+
+service iprenew_bt-pan /system/bin/dhcpcd -n
+    class main
+    disabled
+    oneshot
+
+on property:ro.boot.charger.emmc=1
+    mount ext4 /dev/block/platform/emmc/by-name/system /system wait ro noatime nodiratime
+    start console
+    mount ext4 /dev/block/platform/emmc/by-name/metadata /metadata wait noatime nodiratime nosuid nodev noauto_da_alloc,discard
+    mount ext4 /dev/block/platform/1021c000.rksdmmc/by-name/metadata /metadata wait noatime nodiratime nosuid nodev noauto_da_alloc,discard
+    mount ext4 /dev/block/platform/1021c000.rksdmmc/by-name/userdata /data wait noatime nodiratime nosuid nodev noauto_da_alloc,discard
+    start charger
+
+on property:ro.boot.charger.emmc=0
+    insmod /rk30xxnand_ko.ko
+    mount ext4 mtd@system /system wait ro noatime nodiratime noauto_da_alloc
+    start console
+    mount ext4 mtd@metadata /metadata wait noatime nodiratime nosuid nodev noauto_da_alloc
+    mount ext4 /dev/block/rknand_metadata /metadata wait noatime nodiratime nosuid nodev noauto_da_alloc,discard
+    mount ext4 /dev/block/rknand_userdata /data wait noatime nodiratime nosuid nodev noauto_da_alloc,discard
+    start charger
+
+on charger
+    setprop ro.boot.charger.emmc 0
+    export PATH /sbin:/vendor/bin:/system/sbin:/system/bin:/system/xbin
+    export LD_LIBRARY_PATH /vendor/lib:/system/lib
+    setprop sys.usb.config adb
+
+service charger /charger
+    disabled
+
+service akmd /system/bin/akmd
+        class main
+        user system
+        group system
+        oneshot
+
+on property:sys.gmali.performance=ui
+    start pat_ui
+
+service pat_ui /system/bin/performance ui
+    disabled
+    oneshot
+
+on property:sys.gmali.performance=video
+    start pat_video
+
+#factory
+on property:ro.factory.tool=1     
+    write /sys/class/gsensor_class/orientation gsensor={-1,0,0,0,0,1,0,-1,0}
+    write /sys/devices/platform/rk29-keypad/rk29key {menu:MENU,home:HOME,vol+:VOLUP,vol-:VOLDOWN,play:PLAY,esc:ESC,sensor:CAMERA}
+    write /sys/devices/platform/rk29_backlight/rk29backlight 100
+
+service pat_video /system/bin/performance video
+    disabled
+    oneshot
+
+on property:ro.rk.btchip=broadcom.bplus
+    start gpsd
+
+service gpsd  /system/bin/glgps -c /system/etc/gps/gpsconfig.xml
+    class main
+    disabled
+    user root
+    group system

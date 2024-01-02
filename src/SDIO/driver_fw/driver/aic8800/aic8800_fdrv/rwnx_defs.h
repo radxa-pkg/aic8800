@@ -33,7 +33,9 @@
 #include "rwnx_gki.h"
 #endif
 #include "rwnx_compat.h"
+#ifdef CONFIG_FILTER_TCP_ACK
 #include "aicwf_tcp_ack.h"
+#endif
 
 #ifdef AICWF_SDIO_SUPPORT
 #include "aicwf_sdio.h"
@@ -298,6 +300,7 @@ struct rwnx_vif {
 	struct net_device *ndev;
 	struct net_device_stats net_stats;
 	struct rwnx_key key[6];
+    unsigned long drv_flags;
 	atomic_t drv_conn_state;
 	u8 drv_vif_index;           /* Identifier of the VIF in driver */
 	u8 vif_index;               /* Identifier of the station in FW */
@@ -612,8 +615,10 @@ struct rwnx_hw {
 
 	u8 monitor_vif; /* FW id of the monitor interface, RWNX_INVALID_VIF if no monitor vif at fw level */
 
+#ifdef CONFIG_FILTER_TCP_ACK
 	/* tcp ack management */
 	struct tcp_ack_manage ack_m;
+#endif
 
 	/* RoC Management */
 	struct rwnx_roc_elem *roc_elem;             /* Information provided by cfg80211 in its remain on channel request */
@@ -621,7 +626,6 @@ struct rwnx_hw {
 
 	struct rwnx_cmd_mgr *cmd_mgr;
 
-	unsigned long drv_flags;
 	struct rwnx_plat *plat;
 
 	spinlock_t tx_lock;
@@ -665,7 +669,7 @@ struct rwnx_hw {
 
 	struct rwnx_hwq hwq[NX_TXQ_CNT];
 
-	u8 avail_idx_map;
+	u64 avail_idx_map;
 	u8 vif_started;
 	bool adding_sta;
 	struct rwnx_phy_info phy;

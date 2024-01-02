@@ -400,7 +400,10 @@ static char *aicwf_get_iwe_stream_mac_addr(struct rwnx_hw* rwnx_hw,
 	iwe->cmd = SIOCGIWAP;
 	iwe->u.ap_addr.sa_family = ARPHRD_ETHER;
 
+	if(scan_re->bss && scan_re->bss->bssid){
 	memcpy(iwe->u.ap_addr.sa_data, scan_re->bss->bssid, ETH_ALEN);
+	}
+
 	start = iwe_stream_add_event(info, start, stop, iwe, IW_EV_ADDR_LEN);
 	return start;
 }
@@ -878,19 +881,21 @@ static char *translate_scan(struct rwnx_hw* rwnx_hw,
 	struct iw_event iwe;
 	memset(&iwe, 0, sizeof(iwe));
 
-	
-	start = aicwf_get_iwe_stream_mac_addr(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_essid(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_protocol(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_chan(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_mode(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_encryption(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_rate(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_wpa_wpa2(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_wps(rwnx_hw, info, scan_re, start, stop, &iwe);
-	start = aicwf_get_iwe_stream_rssi(rwnx_hw, info, scan_re, start, stop, &iwe);
-
-	return start;
+	if(scan_re->bss){
+	    	start = aicwf_get_iwe_stream_mac_addr(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_essid(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_protocol(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_chan(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_mode(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_encryption(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_rate(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_wpa_wpa2(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_wps(rwnx_hw, info, scan_re, start, stop, &iwe);
+	    	start = aicwf_get_iwe_stream_rssi(rwnx_hw, info, scan_re, start, stop, &iwe);
+		return start;
+	} else{
+		return NULL;
+	}	
 }
 
 

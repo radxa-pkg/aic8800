@@ -1195,6 +1195,7 @@ int aic_br_client_tx(struct rwnx_vif *vif, struct sk_buff **pskb)
 #endif /* CONFIG_BR_SUPPORT */
 
 
+#ifdef CONFIG_FILTER_TCP_ACK
 /* return:
  *      0, msg buf freed by the real driver
  *      others, skb need free by the caller,remember not use msg->skb!
@@ -1361,6 +1362,7 @@ free:
 
 	return 0;//NETDEV_TX_OK
 }
+#endif
 
 /**
  * netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,
@@ -1675,7 +1677,7 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 		robust = ieee80211_is_robust_mgmt_frame((void *)skb->data);
 #endif
 
-	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
+	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0))
 	/* Update CSA counter if present */
 	if (unlikely(params->n_csa_offsets) &&
 		vif->wdev.iftype == NL80211_IFTYPE_AP &&

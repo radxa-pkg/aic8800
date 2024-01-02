@@ -985,6 +985,76 @@ int aicwf_plat_rftest_load_8800dc(struct aic_sdio_dev *sdiodev)
 }
 
 #ifdef CONFIG_DPD
+int aicwf_misc_ram_valid_check_8800dc(struct aic_sdio_dev *sdiodev, int *valid_out)
+{
+    int ret = 0;
+    uint32_t cfg_base = 0x10164;
+    struct dbg_mem_read_cfm cfm;
+    uint32_t misc_ram_addr;
+    uint32_t ram_base_addr, ram_word_cnt;
+    uint32_t bit_mask[4];
+    int i;
+    if (valid_out) {
+        *valid_out = 0;
+    }
+    if (testmode == FW_RFTEST_MODE) {
+		
+	    uint32_t vect1 = 0;
+	    uint32_t vect2 = 0;
+	    cfg_base = RAM_LMAC_FW_ADDR + 0x0004;
+	    ret = rwnx_send_dbg_mem_read_req(sdiodev, cfg_base, &cfm);
+	    if (ret) {
+		    AICWFDBG(LOGERROR, "cfg_base:%x vcet1 rd fail: %d\n", cfg_base, ret);
+		    return ret;
+	    }
+	    vect1 = cfm.memdata;
+	    if ((vect1 & 0xFFFF0000) != (RAM_LMAC_FW_ADDR & 0xFFFF0000)) {
+		    AICWFDBG(LOGERROR, "vect1 invalid: %x\n", vect1);
+		    return ret;
+	    }
+	    cfg_base = RAM_LMAC_FW_ADDR + 0x0008;
+	    ret = rwnx_send_dbg_mem_read_req(sdiodev, cfg_base, &cfm);
+	    if (ret) {
+		    AICWFDBG(LOGERROR, "cfg_base:%x vcet2 rd fail: %d\n", cfg_base, ret);
+		    return ret;
+	    }
+	    vect2 = cfm.memdata;
+	    if ((vect2 & 0xFFFF0000) != (RAM_LMAC_FW_ADDR & 0xFFFF0000)) {
+		    AICWFDBG(LOGERROR, "vect2 invalid: %x\n", vect2);
+		    return ret;
+	    }
+
+        cfg_base = RAM_LMAC_FW_ADDR + 0x0164;
+    }
+    // init misc ram
+    ret = rwnx_send_dbg_mem_read_req(sdiodev, cfg_base + 0x14, &cfm);
+    if (ret) {
+        AICWFDBG(LOGERROR, "rf misc ram[0x%x] rd fail: %d\n", cfg_base + 0x14, ret);
+        return ret;
+    }
+    misc_ram_addr = cfm.memdata;
+    AICWFDBG(LOGERROR, "misc_ram_addr=%x\n", misc_ram_addr);
+    // bit_mask
+    ram_base_addr = misc_ram_addr + offsetof(rf_misc_ram_t, bit_mask);
+    ram_word_cnt = (MEMBER_SIZE(rf_misc_ram_t, bit_mask) + MEMBER_SIZE(rf_misc_ram_t, reserved)) / 4;
+    for (i = 0; i < ram_word_cnt; i++) {
+        ret = rwnx_send_dbg_mem_read_req(sdiodev, ram_base_addr + i * 4, &cfm);
+        if (ret) {
+            AICWFDBG(LOGERROR, "bit_mask[0x%x] rd fail: %d\n",  ram_base_addr + i * 4, ret);
+            return ret;
+        }
+        bit_mask[i] = cfm.memdata;
+    }
+    AICWFDBG(LOGTRACE, "bit_mask:%x,%x,%x,%x\n",bit_mask[0],bit_mask[1],bit_mask[2],bit_mask[3]);
+    if ((bit_mask[0] == 0) && ((bit_mask[1] & 0xFFF00000) == 0x80000000) &&
+        (bit_mask[2] == 0) && ((bit_mask[3] & 0xFFFFFF00) == 0x00000000)) {
+        if (valid_out) {
+            *valid_out = 1;
+        }
+    }
+    return ret;
+}
+
 int aicwf_plat_calib_load_8800dc(struct aic_sdio_dev *sdiodev)
 {
     int ret = 0;
@@ -1004,6 +1074,7 @@ int aicwf_plat_calib_load_8800dc(struct aic_sdio_dev *sdiodev)
     return ret;
 }
 
+#ifndef CONFIG_FORCE_DPD_CALIB
 int is_file_exist(char* name)
 {
     char *path = NULL;
@@ -1033,9 +1104,10 @@ int is_file_exist(char* name)
 
 EXPORT_SYMBOL(is_file_exist);
 #endif
+#endif
 
 #ifdef CONFIG_DPD
-rf_misc_ram_lite_t dpd_res = {0,};
+rf_misc_ram_lite_t dpd_res = {{0},};
 EXPORT_SYMBOL(dpd_res);
 #endif
 
@@ -1782,6 +1854,7 @@ int aicbsp_driver_fw_init(struct aic_sdio_dev *sdiodev)
 	u32 mem_addr;
 	struct dbg_mem_read_cfm rd_mem_addr_cfm;
 	u32 btenable = 0;
+	u8 is_chip_id_h = 0;
 	int ret = 0;
 
 	mem_addr = 0x40500000;
@@ -1813,7 +1886,8 @@ int aicbsp_driver_fw_init(struct aic_sdio_dev *sdiodev)
 		if (rwnx_send_dbg_mem_read_req(sdiodev, mem_addr, &rd_mem_addr_cfm))
 			return -1;
 
-		aicbsp_info.chip_rev = (u8)(rd_mem_addr_cfm.memdata >> 16);
+		aicbsp_info.chip_rev = (u8)((rd_mem_addr_cfm.memdata >> 16) & 0x3F);
+		is_chip_id_h = (u8)(((rd_mem_addr_cfm.memdata >> 16) & 0xC0) == 0xC0);
 
 		btenable = ((rd_mem_addr_cfm.memdata >> 26) & 0x1);
 		AICWFDBG(LOGINFO, "btenable = %d \n",btenable);
@@ -1830,10 +1904,15 @@ int aicbsp_driver_fw_init(struct aic_sdio_dev *sdiodev)
 			pr_err("aicbsp: %s, unsupport chip rev: %d\n", __func__, aicbsp_info.chip_rev);
 			return -1;
 		}
-		if(aicbsp_info.chip_rev == CHIP_REV_U01){
-			aicbsp_firmware_list = fw_8800dc_u01;
-		}else{
-			aicbsp_firmware_list = fw_8800dc_u02;
+		if (is_chip_id_h) {
+			AICWFDBG(LOGINFO, "IS_CHIP_ID_H \n");
+			aicbsp_firmware_list = fw_8800dc_h_u02;
+		} else {
+			if(aicbsp_info.chip_rev == CHIP_REV_U01){
+				aicbsp_firmware_list = fw_8800dc_u01;
+			}else{
+				aicbsp_firmware_list = fw_8800dc_u02;
+			}
 		}
 	}
     else if(sdiodev->chipid == PRODUCT_ID_AIC8800D80){

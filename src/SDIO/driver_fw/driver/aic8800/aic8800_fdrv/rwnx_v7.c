@@ -129,7 +129,7 @@ int rwnx_v7_platform_init(struct pci_dev *pci_dev, struct rwnx_plat **rwnx_plat)
 	pci_read_config_word(pci_dev, PCI_COMMAND, &pci_cmd);
 	pci_cmd |= PCI_COMMAND_PARITY | PCI_COMMAND_SERR;
 	pci_write_config_word(pci_dev, PCI_COMMAND, pci_cmd);
-	pci_write_config_byte(pci_dev, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES >> 2);
+	//pci_write_config_byte(pci_dev, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES >> 2);
 
 	ret = pci_enable_device(pci_dev);
 	if (ret) {
@@ -139,12 +139,13 @@ int rwnx_v7_platform_init(struct pci_dev *pci_dev, struct rwnx_plat **rwnx_plat)
 
 	pci_set_master(pci_dev);
 
+#if 0
 	ret = pci_request_regions(pci_dev, KBUILD_MODNAME);
 	if (ret) {
 		dev_err(&(pci_dev->dev), "pci_request_regions failed\n");
 		goto out_request;
 	}
-
+#endif
 	#ifdef CONFIG_PCI
 	if (pci_enable_msi(pci_dev)) {
 		dev_err(&(pci_dev->dev), "pci_enable_msi failed\n");
@@ -183,7 +184,7 @@ out_bar0:
 out_msi:
 #endif
 	pci_release_regions(pci_dev);
-out_request:
+//out_request:
 #ifdef CONFIG_PCI
 	pci_clear_master(pci_dev);
 #endif

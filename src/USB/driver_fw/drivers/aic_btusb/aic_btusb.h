@@ -663,6 +663,8 @@ typedef struct {
 #define FW_PATCH_BASE_NAME              "fw_patch_8800dc.bin"
 #define FW_PATCH_TABLE_NAME_U02         "fw_patch_table_8800dc_u02.bin"
 #define FW_PATCH_BASE_NAME_U02          "fw_patch_8800dc_u02.bin"
+#define FW_PATCH_TABLE_NAME_U02H        "fw_patch_table_8800dc_u02h.bin"
+#define FW_PATCH_BASE_NAME_U02H         "fw_patch_8800dc_u02h.bin"
 #define AICBT_PT_TAG                    "AICBT_PT_TAG"
 
 enum aicbt_patch_table_type {

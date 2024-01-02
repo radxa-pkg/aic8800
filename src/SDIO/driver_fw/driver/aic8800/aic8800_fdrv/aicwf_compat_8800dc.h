@@ -4,7 +4,7 @@
 #ifdef CONFIG_DPD
 int aicwf_fdrv_dpd_result_apply_8800dc(struct rwnx_hw * rwnx_hw, rf_misc_ram_lite_t * dpd_res);
 #ifndef CONFIG_FORCE_DPD_CALIB
-int aicwf_fdrv_dpd_result_load_8800dc(struct rwnx_hw *rwnx_hw);
+int aicwf_fdrv_dpd_result_load_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite_t *dpd_res);
 #endif
 #endif
 int aicwf_fdrv_misc_ram_init_8800dc(struct rwnx_hw *rwnx_hw);

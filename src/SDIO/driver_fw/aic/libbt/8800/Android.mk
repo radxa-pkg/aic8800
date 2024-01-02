@@ -15,6 +15,9 @@ endif
 TARGET_CHIP_AICBT := aic8800
 BDROID_DIR := $(TOP_DIR)system/bt
 
+#for Android13
+#BDROID_DIR := $(TOP_DIR)packages/modules/Bluetooth/system
+
 ifeq ($(strip $(USE_BLUETOOTH_AIC8800)),true)
 LOCAL_CFLAGS += -DUSE_BLUETOOTH_AIC8800
 endif

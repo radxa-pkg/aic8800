@@ -32,32 +32,18 @@ struct wakeup_source *rwnx_wakeup_register(struct device *dev, const char *name)
 	return wakeup_source_register(dev, name);
 #else
 
-#ifndef CONFIG_PLATFORM_ROCKCHIP2
-#ifdef CONFIG_PLATFORM_ROCKCHIP
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
+#if defined(CONFIG_PLATFORM_ROCKCHIP2) || defined(CONFIG_PLATFORM_ROCKCHIP)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)
     return wakeup_source_register(dev, name);
 #else
     return wakeup_source_register(name);
 #endif
+
 #else
 	return wakeup_source_register(name);
-#endif//CONFIG_PLATFORM_ROCKCHIP
-#endif //CONFIG_PLATFORM_ROCKCHIP2
+#endif//#if defined(CONFIG_PLATFORM_ROCKCHIP2) || defined(CONFIG_PLATFORM_ROCKCHIP)
 
-#ifndef CONFIG_PLATFORM_ROCKCHIP
-#ifdef CONFIG_PLATFORM_ROCKCHIP2
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
-    return wakeup_source_register(dev, name);
-#else
-    return wakeup_source_register(name);
-#endif
-#else
-    return wakeup_source_register(name);
-#endif//CONFIG_PLATFORM_ROCKCHIP
-#endif
-
-
-#endif
+#endif//LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 }
 
 void rwnx_wakeup_unregister(struct wakeup_source *ws)

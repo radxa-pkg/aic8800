@@ -195,6 +195,8 @@ enum {
     HW_CFG_SET_PWR_CTRL_SLAVE,
     HW_CFG_SET_CPU_POWR_OFF_EN,
     HW_CFG_SET_PCM_PARAM,
+    HW_CFG_SET_RET_PARAM,
+    HW_CFG_COMPLETED,
 };
 
 /* h/w config control block */
@@ -543,6 +545,7 @@ bool hw_aic_bt_set_sleep_en(HC_BT_HDR *p_buf);
 void hw_config_pre_start(void);
 void hw_config_start(void);
 uint8_t hw_config_set_pcm_param(HC_BT_HDR *p_buf);
+bool hw_aicbt_fw_retention_params_config(HC_BT_HDR *p_buf);
 
 
 /******************************************************************************
@@ -607,6 +610,11 @@ static uint8_t bt_sco_i2spcm_param[SCO_I2SPCM_PARAM_SIZE] = {
     SCO_I2SPCM_IF_CLOCK_RATE
 };
 
+//FOR AIC retention
+#ifndef BT_RETENTION
+#define BT_RETENTION 0
+#endif
+
 //FOR AIC CVSD PCM SETTING START
 #define BT_PCM_PARAM_SIZE   7
 
@@ -627,8 +635,10 @@ static uint8_t bt_sco_i2spcm_param[SCO_I2SPCM_PARAM_SIZE] = {
 #endif
 
 /* PCM_ROLE
-    0 : master, only support long  <pcm_fsync>
-    1 : slave , support long/short <pcm_fsync>
+    0 : mono for master, only support long  <pcm_fsync>
+    1 : mono for slave, support long/short <pcm_fsync>
+    2 : stereo for master, only support long  <pcm_fsync>
+    3 : stereo for slave, support long/short <pcm_fsync>
 */
 #ifndef PCM_ROLE
 #define PCM_ROLE 0
@@ -643,8 +653,9 @@ static uint8_t bt_sco_i2spcm_param[SCO_I2SPCM_PARAM_SIZE] = {
 #endif
 
 /* PCM_SYNC_MODE
-    0 : first bit align  with <pcm_fsync>
-    1 : first bit follow with <pcm_fsync>
+    0 : first bit align  with <pcm_fsync> bit0
+    1 : first bit follow with <pcm_fsync> bit1
+    (master only support 0)
 */
 #ifndef PCM_SYNC_MODE
 #define PCM_SYNC_MODE 0
@@ -665,7 +676,7 @@ static uint8_t bt_sco_i2spcm_param[SCO_I2SPCM_PARAM_SIZE] = {
     3 : 1024K
     4 : 2048K
     
-pcm_bclk = 8k(SIMPLE_RATE) * 16bit(CVSD data bits) * 2(left and right channels) = 256k
+pcm_bclk = 8k(SIMPLE_RATE) * 16bits(CVSD data bits) * 2(left and right channels) = 256k
 
 */
 #ifndef PCM_CLOCK_RATE
@@ -1357,24 +1368,20 @@ void hw_config_cback(void *p_mem)
                 aicbt_sleep_state = AICBT_SLEEP_STATE_CONFIG_DONE;
                 is_proceeding = hw_aic_bt_pta_en(p_buf);
                 break;
-            case HW_CFG_UPDATE_CONFIG_INFO:
+            case HW_CFG_SET_PCM_PARAM:
                 #if (PCM_SETTING == 1)
                 is_proceeding = hw_config_set_pcm_param(p_buf);
-                #else
-                is_proceeding = TRUE;
-                config_success = true;
+                break;
                 #endif
+            case HW_CFG_SET_RET_PARAM:
+                #if (BT_RETENTION == 1)
+                is_proceeding = hw_aicbt_fw_retention_params_config(p_buf);
                 break;
-            case HW_CFG_SET_PCM_PARAM:
+                #endif
+            case HW_CFG_COMPLETED:
                 is_proceeding = TRUE;
                 config_success = true;
                 break;
-            #if 0
-            case HW_CFG_SET_FW_RET_PARAM:
-                is_proceeding = TRUE;
-                config_success = true;
-                break;
-            #endif
 #if (USE_CONTROLLER_BDADDR == TRUE)
             case HW_CFG_READ_BD_ADDR:
                 p_tmp = (char *) (p_evt_buf + 1) + \
@@ -1611,26 +1618,62 @@ static void hw_set_CVSD_codec_cback(void *p_mem)
 /*****************************************************************************
 **   Hardware Configuration Interface Functions
 *****************************************************************************/
-#if 0
-void hw_config_set_pcm_param_cback(void *p_mem){
-    HC_BT_HDR *p_evt_buf = (HC_BT_HDR *)p_mem;
-    bool command_success = *((uint8_t *)(p_evt_buf + 1) + HCI_EVT_CMD_CMPL_STATUS_RET_BYTE) == 0;
-    uint8_t *evt_data = (uint8_t *)(p_evt_buf);
+#define AICBT_FW_RET_FLAG                0xAC88
+#define AICBT_FW_RET_CMD_SUBCODE         0x06
+    
+struct aicbt_fw_ret_param_tag
+{
+    uint16_t ret_flag;
+    uint16_t ret_type;
+    uint16_t ret_len;
+    uint8_t ret_datalen;
+    uint8_t ret_data[16];
+};
 
-    /* Free the RX event buffer */
-    if (bt_vendor_cbacks)
-        bt_vendor_cbacks->dealloc(p_evt_buf);
+struct aicbt_fw_ret_param_tag ret_params =
+{
+ .ret_flag  = AICBT_FW_RET_FLAG,
+ .ret_type  = 0x00FF,//manufacture data
+ .ret_len   = 0x0009,
+ .ret_datalen = 0x08,
+ .ret_data = {0x00,0x11,0x22,0x33,0xaa,0xbb,0xcc,0xdd}
+};
 
-    if(command_success){
-        ALOGI("%s Successful \n", __func__);
-    }else{ 
-        ALOGI("%s Fail %02x %02x %02x %02x %02x %02x\n", __func__,
-            evt_data[1], evt_data[2], evt_data[3],
-            evt_data[4], evt_data[5], evt_data[6]);
+bool hw_aicbt_fw_retention_params_config(HC_BT_HDR *p_buf)
+{
+    uint8_t   *p;
+    bool ret = false;
+    int ret_para_len = 2 + 2 + 2 + 1 + ret_params.ret_len;
+    ALOGI("%s", __func__);
+    if (bt_vendor_cbacks) {
+        p_buf = (HC_BT_HDR *) bt_vendor_cbacks->alloc(BT_HC_HDR_SIZE + HCI_CMD_PREAMBLE_SIZE + ret_para_len);
     }
+    if (p_buf) {
+        p_buf->event = MSG_STACK_TO_HC_HCI_CMD;
+        p_buf->offset = 0;
+        p_buf->layer_specific = 0;
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE;
+        p = (uint8_t *) (p_buf + 1);
+        UINT16_TO_STREAM(p, HCI_BLE_ADV_FILTER);
+        *p++ = ret_para_len; /* parameter length */
+        *p++ = AICBT_FW_RET_CMD_SUBCODE; /* APCF subcmd*/
+        UINT16_TO_STREAM(p, ret_params.ret_flag);
+        UINT16_TO_STREAM(p, ret_params.ret_type);
+        UINT16_TO_STREAM(p, ret_params.ret_len);
+        *p++ = ret_params.ret_datalen;
+        memcpy(p, (uint8_t *)&ret_params.ret_data[0], ret_params.ret_datalen);
+        p  += ret_params.ret_datalen; /* APCF enable for aic ble remote controller */
+        p_buf->len = HCI_CMD_PREAMBLE_SIZE + ret_para_len;
 
+        hw_cfg_cb.state = HW_CFG_COMPLETED;
+
+        bt_vendor_cbacks->xmit_cb(HCI_BLE_ADV_FILTER, p_buf, hw_config_cback);
+        ret = true;
+    } else {
+        ALOGE("hw_aicbt_fw_retention_params_config aborted [no buffer]");
+    }
+    return ret;
 }
-#endif
 
 uint8_t hw_config_set_pcm_param(HC_BT_HDR *p_buf){
     uint8_t     *p;
@@ -1666,7 +1709,7 @@ uint8_t hw_config_set_pcm_param(HC_BT_HDR *p_buf){
                 bt_pcm_param[4], bt_pcm_param[5],
                 bt_pcm_param[6]);
         
-        hw_cfg_cb.state = HW_CFG_SET_PCM_PARAM;
+        hw_cfg_cb.state = HW_CFG_SET_RET_PARAM;
         
         bt_vendor_cbacks->xmit_cb(HCI_VSC_PCM_PARAM_SET, p_buf, hw_config_cback);
 
@@ -2473,7 +2516,8 @@ bool hw_aic_bt_pta_en(HC_BT_HDR *p_buf)
         UINT16_TO_STREAM(p, sizeof(struct aicbt_pta_config));
         memcpy(p, (void *)&pta_config, sizeof(struct aicbt_pta_config));
         p_buf->len = HCI_CMD_PREAMBLE_SIZE + HCI_VSC_UPDATE_CONFIG_INFO_SIZE;
-        hw_cfg_cb.state = HW_CFG_UPDATE_CONFIG_INFO;
+        //hw_cfg_cb.state = HW_CFG_UPDATE_CONFIG_INFO;
+        hw_cfg_cb.state = HW_CFG_SET_PCM_PARAM;
         aicbt_up_config_info_state = VS_UPDATE_CONFIG_INFO_STATE_PTA_EN;
         ret = bt_vendor_cbacks->xmit_cb(HCI_VSC_UPDATE_CONFIG_INFO_CMD, p_buf, \
                                 hw_config_cback);
@@ -2767,7 +2811,7 @@ static void *inotify_pthread_handle(void *args)
     int nread;
     char buf[BUFSIZ];
     int i = 0;
-
+    
     fd = inotify_init1(IN_NONBLOCK);
     if (fd < 0) {
         ALOGE("inotify_init failed, Error no. %d: %s", errno, strerror(errno));

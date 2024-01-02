@@ -95,13 +95,6 @@ void rwnx_task(unsigned long data)
                     printk("pattern error: 0x%x\n", msg->pattern);
                 }
 
-                if (msg->param_len == IPC_E2A_MSG_PARAM_SIZE) {
-                    udelay(10);
-                } else if (msg->param[IPC_E2A_MSG_PARAM_SIZE - 1] == 0x12345678) {
-                    printk("msg[%d] undone\n", rwnx_hw->ipc_env->msgbuf_idx);
-                    udelay(1);
-                    continue;
-                }
 
                 /* Relay further actions to the msg parser */
                 if(msg->pattern == IPC_MSGE2A_VALID_PATTERN)
@@ -125,7 +118,6 @@ void rwnx_task(unsigned long data)
 
                 /* Reset the msg buffer and re-use it */
                 msg->pattern = 0;
-                msg->param[IPC_E2A_MSG_PARAM_SIZE - 1] = 0x12345678;
 		//wmb();
 
                 dma_sync_single_for_device(&rwnx_hw->pcidev->pci_dev->dev, buf->dma_addr, sizeof(struct ipc_e2a_msg), DMA_TO_DEVICE);
@@ -169,7 +161,7 @@ void rwnx_task(unsigned long data)
                     }
                     break;
                 }
-				if(rxdata_successive_cnt >= 10) {
+                if(rxdata_successive_cnt >= 10 ){
 					if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
 						rxdata_pause = true;
 						break;
@@ -178,6 +170,7 @@ void rwnx_task(unsigned long data)
 
                 rxbuf->pattern = 0;
                 wmb();
+
 
                 idx = data_cnt;
                 cnt = 0;
@@ -202,7 +195,7 @@ void rwnx_task(unsigned long data)
 
                 //rwnx_ipc_rxbuf_dealloc(rwnx_hw, ipc_buf);
                 if (buf->addr) {
-                	dma_unmap_single(rwnx_hw->dev, buf->dma_addr, buf->size, DMA_TO_DEVICE);
+					dma_unmap_single(rwnx_hw->dev, buf->dma_addr, buf->size, DMA_FROM_DEVICE);
                 	buf->addr = NULL;
                 }
 
@@ -261,7 +254,7 @@ void rwnx_task(unsigned long data)
                     txcfm_buf = &sw_txhdr->ipc_desc;
                     struct sk_buff *skb_tmp = sw_txhdr->skb;
 
-					if(txdata_successive_cnt >= 10) {
+                    if(txdata_successive_cnt >= 10 ){
 						if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
 							//printk("m%d\n",txcfm_idx);
 							txdata_pause = true;

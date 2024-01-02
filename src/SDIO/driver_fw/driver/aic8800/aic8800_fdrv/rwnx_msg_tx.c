@@ -1025,7 +1025,7 @@ int rwnx_send_rf_calib_req(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *
     	rf_calib_req->cal_cfg_24g = 0x0f8f;
     	rf_calib_req->cal_cfg_5g = 0x0f0f;
     }
-    
+
 	rf_calib_req->param_alpha = 0x0c34c008;
 	rf_calib_req->bt_calib_en = 0;
 	rf_calib_req->bt_calib_param = 0x264203;
@@ -1116,33 +1116,33 @@ int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_v
 	return error;
 }
 
-#if 0
-int rwnx_send_txop_req(struct rwnx_hw *rwnx_hw, uint16_t *txop, u8_l long_nav_en, u8_l cfe_en)
+int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm)
 {
-	struct mm_set_txop_req *req;
-	int error;
+	struct mm_set_vendor_swconfig_req *req;
+	int ret;
 
-	/* Build the MM_SET_TXOP_REQ message */
-        req = rwnx_msg_zalloc(MM_SET_TXOP_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_txop_req));
+	RWNX_DBG(RWNX_FN_ENTRY_STR);
+	/* Build the TEMP_COMP_SET_REQ message */
+	req = rwnx_msg_zalloc(MM_SET_VENDOR_SWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_vendor_swconfig_req));
+	if (!req) {
+		printk("%s msg_alloc fail\n", __func__);
+		return -ENOMEM;
+	}
+	req->swconfig_id = TEMP_COMP_SET_REQ;
+	req->temp_comp_set_req.enable = 1;
+	req->temp_comp_set_req.tmr_period_ms = 15 * 1000;
 
-        if (!req) {
-                return -ENOMEM;
-        }
-
-        req->txop_bk = txop[0];
-	req->txop_be = txop[1];
-	req->txop_vi = txop[2];
-	req->txop_vo = txop[3];
-        req->long_nav_en = long_nav_en;
-        req->cfe_en = cfe_en;
-        /* Send the MM_SET_TXOP_REQ  message to UMAC FW */
-        error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_TXOP_CFM, NULL);
-
-        return error;
+	ret = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_VENDOR_SWCONFIG_CFM, cfm);
+	if (!ret)
+		printk("temp_comp status: %d\n", cfm->temp_comp_set_cfm.status);
+	else {
+		printk("%s msg_fail\n", __func__);
+		return ret;
+	}
+	return ret;
 }
-#endif
 
-int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id, int32_t *param)
+int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id, int32_t *param, int32_t *param_out)
 {
 	struct mm_set_acs_txop_req *req0;
 	struct mm_set_channel_access_req *req1;
@@ -1150,7 +1150,7 @@ int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id,
 	struct mm_set_cca_threshold_req *req3;
 	struct mm_set_bwmode_req *req4;
 
-	int error;
+	int error = 0;
 
 	switch (hwconfig_id)
 	{
@@ -1188,8 +1188,9 @@ int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id,
 		req1->rc_retry_cnt[0] = param[9];
 		req1->rc_retry_cnt[1] = param[10];
 		req1->rc_retry_cnt[2] = param[11];
-		printk("set_channel_access_req:edca[]= %x %x %x %x\nvif_idx: %x, retry_cnt: %x, rts_en: %x, long_nav_en: %x, cfe_en: %x, rc_retry_cnt: %x:%x:%x\n",
-			req1->edca[0], req1->edca[1], req1->edca[2], req1->edca[3], req1->vif_idx, req1->retry_cnt, req1->rts_en, req1->long_nav_en, req1->cfe_en, req1->rc_retry_cnt[0],req1->rc_retry_cnt[1], req1->rc_retry_cnt[2]);
+		req1->ccademod_th = param[12];
+		printk("set_channel_access_req:edca[]= %x %x %x %x\nvif_idx: %x, retry_cnt: %x, rts_en: %x, long_nav_en: %x, cfe_en: %x, rc_retry_cnt: %x:%x:%x, ccademod_th = %d\n",
+			req1->edca[0], req1->edca[1], req1->edca[2], req1->edca[3], req1->vif_idx, req1->retry_cnt, req1->rts_en, req1->long_nav_en, req1->cfe_en, req1->rc_retry_cnt[0],req1->rc_retry_cnt[1], req1->rc_retry_cnt[2], req1->ccademod_th);
 		/* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
 		error = rwnx_send_msg(rwnx_hw, req1, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
 		break;
@@ -1239,9 +1240,92 @@ int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id,
                 /* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
 		error = rwnx_send_msg(rwnx_hw, req4, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
 		break;
+        case CHIP_TEMP_GET_REQ:
+        if ((rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
+            (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW))
+        {
+            struct mm_get_chip_temp_req *req;
+            struct mm_set_vendor_hwconfig_cfm cfm = {0,};
+            /* Build the CHIP_TEMP_GET_REQ message */
+            req = rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_get_chip_temp_req));
+            if (!req)
+                return -ENOMEM;
+            req->hwconfig_id = hwconfig_id;
+            /* Send the MM_SET_VENDOR_HWCONFIG_REQ  message to UMAC FW */
+            error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_VENDOR_HWCONFIG_CFM, &cfm);
+            if (!error) {
+                if (param_out) {
+                    param_out[0] = (int32_t)cfm.chip_temp_cfm.degree;
+                }
+                printk("get_chip_temp degree=%d\n", cfm.chip_temp_cfm.degree);
+            } else {
+                printk("get_chip_temp err=%d\n", error);
+            }
+        }
+        break;
 	    default:
 		return -ENOMEM;
 	}
+    return error;
+}
+
+int rwnx_send_vendor_swconfig_req(struct rwnx_hw *rwnx_hw, uint32_t swconfig_id, int32_t *param_in, int32_t *param_out)
+{
+    struct mm_set_vendor_swconfig_req *req;
+    struct mm_set_vendor_swconfig_cfm cfm = {0,};
+    int error;
+
+    req = rwnx_msg_zalloc(MM_SET_VENDOR_SWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_vendor_swconfig_req));
+    if (!req) {
+        return -ENOMEM;
+    }
+    req->swconfig_id = swconfig_id;
+
+    switch (swconfig_id)
+    {
+        case BCN_CFG_REQ:
+            /* Build the BCN_CFG_REQ message */
+            req->bcn_cfg_req.tim_bcmc_ignored_enable = (bool_l)param_in[0];
+            printk("bcn_cfg_req: tim_bcmc_ignd=%d\n", req->bcn_cfg_req.tim_bcmc_ignored_enable);
+            /* Send the MM_SET_VENDOR_SWCONFIG_REQ message to UMAC FW */
+            error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_VENDOR_SWCONFIG_CFM, &cfm);
+            if (!error) {
+                param_out[0] = (int32_t)cfm.bcn_cfg_cfm.tim_bcmc_ignored_status;
+                printk("status=%d\n", cfm.bcn_cfg_cfm.tim_bcmc_ignored_status);
+            }
+            break;
+
+        case TEMP_COMP_SET_REQ:
+            /* Build the TEMP_COMP_SET_REQ message */
+            req->temp_comp_set_req.enable = (u8_l)param_in[0];
+            req->temp_comp_set_req.tmr_period_ms = (u32_l)param_in[1];
+            printk("temp_comp_set_req: en=%d, tmr=%x\n",
+                req->temp_comp_set_req.enable, req->temp_comp_set_req.tmr_period_ms);
+            /* Send the MM_SET_VENDOR_SWCONFIG_REQ message to UMAC FW */
+            error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_VENDOR_SWCONFIG_CFM, &cfm);
+            if (!error) {
+                param_out[0] = (int32_t)cfm.temp_comp_set_cfm.status;
+                printk("status=%d\n", cfm.temp_comp_set_cfm.status);
+            }
+            break;
+
+        case TEMP_COMP_GET_REQ:
+            printk("temp_comp_get_req\n");
+            /* Send the MM_SET_VENDOR_SWCONFIG_REQ message to UMAC FW */
+            error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_VENDOR_SWCONFIG_CFM, &cfm);
+            if (!error) {
+                param_out[0] = (int32_t)cfm.temp_comp_get_cfm.status;
+                param_out[1] = (int32_t)cfm.temp_comp_get_cfm.degree;
+                printk("status=%d, degree=%d\n",
+                    cfm.temp_comp_get_cfm.status, cfm.temp_comp_get_cfm.degree);
+            }
+            break;
+
+        default:
+            error = -ENOMEM;
+            break;
+    }
+
     return error;
 }
 
@@ -1831,8 +1915,8 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 						 const u8 *mac, u8 inst_nbr, struct me_sta_add_cfm *cfm)
 {
 	struct me_sta_add_req *req;
-    
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41)
+
+#if LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION
     struct link_station_parameters *link_sta_params = &params->link_sta_params;
 #else
     struct station_parameters *link_sta_params = params;
@@ -1862,7 +1946,7 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 	/* Set parameters for the MM_STA_ADD_REQ message */
 	memcpy(&(req->mac_addr.array[0]), mac, ETH_ALEN);
 
-	req->rate_set.length = link_sta_params->supported_rates_len;;
+	req->rate_set.length = link_sta_params->supported_rates_len;
 	for (i = 0; i < link_sta_params->supported_rates_len; i++)
 		req->rate_set.array[i] = link_sta_params->supported_rates[i];
 
@@ -2497,7 +2581,7 @@ int rwnx_send_scanu_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
 			if (rwnx_vif->is_p2p_vif && !rwnx_hw->is_p2p_alive) {
 #else
 			if (rwnx_vif == rwnx_hw->p2p_dev_vif && !rwnx_vif->up) {
-#endif			
+#endif
 				err = rwnx_send_add_if (rwnx_hw, rwnx_vif->wdev.address,
 											  RWNX_VIF_TYPE(rwnx_vif), false, &add_if_cfm);
 				if (err)

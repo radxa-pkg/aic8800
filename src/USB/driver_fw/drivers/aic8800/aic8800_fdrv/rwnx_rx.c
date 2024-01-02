@@ -414,6 +414,12 @@ static void rwnx_rx_data_skb_forward(struct rwnx_hw *rwnx_hw, struct rwnx_vif *r
 	rx_skb->protocol = eth_type_trans(rx_skb, rwnx_vif->ndev);
 	memset(rx_skb->cb, 0, sizeof(rx_skb->cb));
 	REG_SW_SET_PROFILING(rwnx_hw, SW_PROF_IEEE80211RX);
+
+
+#ifdef CONFIG_FILTER_TCP_ACK
+	filter_rx_tcp_ack(rwnx_hw, rx_skb->data, cpu_to_le16(rx_skb->len));
+#endif
+
 	#ifdef CONFIG_RX_NETIF_RECV_SKB //modify by aic
 	local_bh_disable();
 	netif_receive_skb(rx_skb);
@@ -589,6 +595,12 @@ static bool rwnx_rx_data_skb(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
 #endif
             memset(rx_skb->cb, 0, sizeof(rx_skb->cb));
             REG_SW_SET_PROFILING(rwnx_hw, SW_PROF_IEEE80211RX);
+
+
+#ifdef CONFIG_FILTER_TCP_ACK
+            filter_rx_tcp_ack(rwnx_hw, rx_skb->data, cpu_to_le16(rx_skb->len));
+#endif
+
             #ifdef CONFIG_RX_NETIF_RECV_SKB //modify by aic
             local_bh_disable();
             netif_receive_skb(rx_skb);
@@ -1235,7 +1247,11 @@ static int rwnx_rx_monitor(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
     skb->ip_summed = CHECKSUM_UNNECESSARY;
     skb->pkt_type = PACKET_OTHERHOST;
     skb->protocol = htons(ETH_P_802_2);
-    
+
+#ifdef CONFIG_FILTER_TCP_ACK
+    filter_rx_tcp_ack(rwnx_hw, skb->data, cpu_to_le16(skb->len));
+#endif
+
     local_bh_disable();
     netif_receive_skb(skb);
     local_bh_enable();
@@ -1530,6 +1546,10 @@ int reord_single_frame_ind(struct aicwf_rx_priv *rx_priv, struct recv_msdu *prfr
     }
 #endif
     memset(skb->cb, 0, sizeof(skb->cb));
+
+#ifdef CONFIG_FILTER_TCP_ACK
+     filter_rx_tcp_ack(rwnx_vif->rwnx_hw, skb->data, cpu_to_le16(skb->len));
+#endif
 
 #ifdef CONFIG_RX_NETIF_RECV_SKB//AIDEN test
     local_bh_disable();

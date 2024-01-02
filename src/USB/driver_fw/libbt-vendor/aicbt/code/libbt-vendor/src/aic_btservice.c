@@ -611,7 +611,7 @@ void aic_btservice_internal_event_intercept(uint8_t *p_full_msg, uint8_t *p_msg)
 }
 
 
-static int aic_socket_accept(socketfd)
+static int aic_socket_accept(int socketfd)
 {
     struct sockaddr_un un;
     socklen_t len;

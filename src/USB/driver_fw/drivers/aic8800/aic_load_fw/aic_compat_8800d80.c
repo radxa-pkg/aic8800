@@ -17,6 +17,7 @@ void rwnx_release_firmware_common(u32** buffer);
 
 extern int testmode;
 extern int chip_id;
+u8 chip_mcu_id = 0;
 
 typedef u32 (*array2_tbl_t)[2];
 
@@ -81,6 +82,7 @@ int aicwf_patch_config_8800d80(struct aic_usb_dev *usb_dev)
     int adap_patch_cnt = 0;
 
     if (adap_test) {
+        AICWFDBG(LOGINFO, "%s adap test \r\n", __func__);
         adap_patch_cnt = sizeof(adaptivity_patch_tbl_d80)/sizeof(u32)/2;
     }
 
@@ -230,8 +232,11 @@ int system_config_8800d80(struct aic_usb_dev *usb_dev){
 			printk("%x rd fail: %d\n", mem_addr, ret);
 			return ret;
 		}
+        if (((rd_mem_addr_cfm.memdata >> 25) & 0x01UL) == 0x00UL) {
+            chip_mcu_id = 1;
+        }
 		chip_id = (u8)(rd_mem_addr_cfm.memdata >> 16);
-		printk("chip_id=%x\n", chip_id);
+		printk("chip_id=%x, chip_mcu_id = %d\n", chip_id, chip_mcu_id);
     #if 1
 		syscfg_num = sizeof(syscfg_tbl_8800d80) / sizeof(u32) / 2;
 		for (cnt = 0; cnt < syscfg_num; cnt++) {
@@ -253,7 +258,6 @@ int system_config_8800d80(struct aic_usb_dev *usb_dev){
     #endif
     return 0;
 }
-
 
 
 int aicfw_download_fw_8800d80(struct aic_usb_dev *usb_dev)
@@ -377,6 +381,15 @@ int aicfw_download_fw_8800d80(struct aic_usb_dev *usb_dev)
                 return -1;
             }
 #endif
+
+            if (chip_mcu_id) {
+                int ret = 0;
+                ret = rwnx_plat_flash_bin_upload_android(usb_dev, FLASH_BIN_ADDR_8800M80, FLASH_BIN_8800M80);
+                if (ret && ret!= ENOENT) {
+                    AICWFDBG(LOGERROR,"%s flash bin download fail \r\n", __func__);
+                    return -1;
+                }
+            }
 
 			if(rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FMAC_RF_FW_ADDR_8800D80_U02, FW_RF_BASE_NAME_8800D80_U02)) {
 				AICWFDBG(LOGERROR,"%s wifi fw download fail \r\n", __func__);

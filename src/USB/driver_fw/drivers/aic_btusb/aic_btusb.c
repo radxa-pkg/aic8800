@@ -72,6 +72,12 @@ u16 g_chipid = PRODUCT_ID_AIC8801;
 u8 chip_id = 0;
 u8 sub_chip_id = 0;
 
+int btdual = 0;
+int bt_support = 0;
+
+module_param(btdual, int, 0660);
+module_param(bt_support, int, 0660);
+
 struct btusb_data {
     struct hci_dev       *hdev;
     struct usb_device    *udev;
@@ -149,8 +155,6 @@ static struct snd_sco_cap_timer snd_cap_timer;
 #endif
 
 
-int bt_support = 0;
-module_param(bt_support, int, 0660);
 
 #ifdef CONFIG_SUPPORT_VENDOR_APCF
 int vendor_apcf_sent_done = 0;
@@ -586,7 +590,9 @@ static int aic_skb_queue_rear = 0;
 
 static void aic_enqueue(struct sk_buff *skb)
 {
-    spin_lock(&queue_lock);
+	unsigned long flags = 0;
+	
+	spin_lock_irqsave(&queue_lock, flags);
     if (aic_skb_queue_front == (aic_skb_queue_rear + 1) % QUEUE_SIZE) {
         /*
          * If queue is full, current solution is to drop
@@ -600,16 +606,19 @@ static void aic_enqueue(struct sk_buff *skb)
         aic_skb_queue_rear %= QUEUE_SIZE;
 
     }
-    spin_unlock(&queue_lock);
+	spin_unlock_irqrestore(&queue_lock, flags);
 }
 
 static struct sk_buff *aic_dequeue_try(unsigned int deq_len)
 {
     struct sk_buff *skb;
     struct sk_buff *skb_copy;
-
+	unsigned long flags = 0;
+	
+	spin_lock_irqsave(&queue_lock, flags);
     if (aic_skb_queue_front == aic_skb_queue_rear) {
         AICBT_WARN("%s: Queue is empty", __func__);
+		spin_unlock_irqrestore(&queue_lock, flags);
         return NULL;
     }
 
@@ -623,11 +632,13 @@ static struct sk_buff *aic_dequeue_try(unsigned int deq_len)
          * Return skb addr to be dequeued, and the caller
          * should free the skb eventually.
          */
+		spin_unlock_irqrestore(&queue_lock, flags);
         return skb;
     } else {
         skb_copy = pskb_copy(skb, GFP_ATOMIC);
         skb_pull(skb, deq_len);
         /* Return its copy to be freed */
+		spin_unlock_irqrestore(&queue_lock, flags);
         return skb_copy;
     }
 }
@@ -640,7 +651,9 @@ static inline int is_queue_empty(void)
 static void aic_clear_queue(void)
 {
     struct sk_buff *skb;
-    spin_lock(&queue_lock);
+	unsigned long flags = 0;
+	
+	spin_lock_irqsave(&queue_lock, flags);
     while(!is_queue_empty()) {
         skb = aic_skb_queue[aic_skb_queue_front];
         aic_skb_queue[aic_skb_queue_front] = NULL;
@@ -650,7 +663,7 @@ static void aic_clear_queue(void)
             kfree_skb(skb);
         }
     }
-    spin_unlock(&queue_lock);
+	spin_unlock_irqrestore(&queue_lock, flags);
 }
 
 /*
@@ -1747,6 +1760,8 @@ int system_config(firmware_info *fw_info)
         uint32_t rd_data = (evt_para->data[0] | (evt_para->data[1] << 8) | (evt_para->data[2] << 16) | (evt_para->data[3] << 24));
         //printk("%s 0x40500000 rd_data is %x\n", __func__, rd_data);
         chip_id = (u8) (rd_data >> 16);
+		//btenable = (u8) ((rd_data >> 26) && 0x01);
+		btdual = (u8) ((rd_data >> 27) && 0x01);
     }
 
     rd_cmd->start_addr = 0x20;
@@ -2501,10 +2516,32 @@ int download_patch(firmware_info *fw_info, int cached)
                 printk("aic load patch ftable ail %d\n", ret_val);
                 goto free;
             }
-        } else {
+        } else if (sub_chip_id == 2) {
+            uint32_t fw_ram_patch_base_addr = FW_RAM_PATCH_BASE_ADDR;
+
+            ret_val = get_patch_addr_from_patch_table(fw_info, FW_PATCH_TABLE_NAME_U02H, &fw_ram_patch_base_addr);
+            if (ret_val)
+            {
+                printk("aic get patch addr fail %d\n", ret_val);
+                goto free;
+            }
+            printk("U02H %s %x\n", __func__, fw_ram_patch_base_addr);
+            ret_val = download_data(fw_info, fw_ram_patch_base_addr, FW_PATCH_BASE_NAME_U02H);
+            if (ret_val)
+            {
+                printk("aic load patch fail %d\n", ret_val);
+                goto free;
+            }
+
+            ret_val = patch_table_download(fw_info, FW_PATCH_TABLE_NAME_U02H);
+            if (ret_val)
+            {
+                printk("aic load patch ftable ail %d\n", ret_val);
+                goto free;
+            }
+	} else {
             printk("%s unsupported sub_chip_id %x\n", __func__, sub_chip_id);
         }
-
     }
 
 free:
@@ -3740,8 +3777,10 @@ retry:
         }
         kfree(urb->setup_packet);
         usb_unanchor_urb(urb);
-    } else
+    } else{
+    	
         usb_mark_last_busy(data->udev);
+    }
     usb_free_urb(urb);
 
 done:
@@ -4522,8 +4561,8 @@ static int btusb_probe(struct usb_interface *intf, const struct usb_device_id *i
     firmware_info *fw_info;
     int i, err=0;
 
-    bt_support = 1;
-    
+	bt_support = 1;
+	
     AICBT_INFO("%s: usb_interface %p, bInterfaceNumber %d, idVendor 0x%04x, "
             "idProduct 0x%04x", __func__, intf,
             intf->cur_altsetting->desc.bInterfaceNumber,
@@ -4966,7 +5005,7 @@ static int __init btusb_init(void)
 
     AICBT_INFO("AICBT_RELEASE_NAME: %s",AICBT_RELEASE_NAME);
     AICBT_INFO("AicSemi Bluetooth USB driver module init, version %s", VERSION);
-	AICBT_INFO("RELEASE DATE: 2023_0506_1635 \r\n");
+	AICBT_INFO("RELEASE DATE: 2023_1211_1958 \r\n");
 #if CONFIG_BLUEDROID
     err = btchr_init();
     if (err < 0) {

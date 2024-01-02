@@ -2000,9 +2000,19 @@ int aicwf_dpd_calib_8800dc(struct aic_sdio_dev *sdiodev, rf_misc_ram_lite_t *dpd
 {
     int ret = 0;
     uint32_t fw_addr, boot_type;
+    int valid_flag;
 
 	printk("%s\n", __func__);
 
+    ret = aicwf_misc_ram_valid_check_8800dc(sdiodev, &valid_flag);
+    if (ret) {
+        AICWFDBG(LOGINFO, "misc ram check fail: %d\n", ret);
+        return ret;
+    }
+    if (valid_flag) {
+        AICWFDBG(LOGINFO, "misc ram valid, skip calib process\n");
+        return ret;
+    }
     ret = aicwf_plat_calib_load_8800dc(sdiodev);
     if (ret) {
         AICWFDBG(LOGINFO, "load calib bin fail: %d\n", ret);
@@ -2119,26 +2129,33 @@ int aicwf_dpd_result_apply_8800dc(struct aic_sdio_dev *sdiodev, rf_misc_ram_lite
 }
 
 #ifndef CONFIG_FORCE_DPD_CALIB
-int aicwf_dpd_result_load_8800dc(struct aic_sdio_dev *sdiodev)
+int aicwf_dpd_result_load_8800dc(struct aic_sdio_dev *sdiodev, rf_misc_ram_lite_t *dpd_res)
 {
     int ret = 0;
-    uint32_t cfg_base = 0x10164;
-    struct dbg_mem_read_cfm cfm;
-    uint32_t misc_ram_addr;
-
-    AICWFDBG(LOGINFO, "%s\n", __func__);
-	if (testmode == 1) {
-		cfg_base = RAM_LMAC_FW_ADDR + 0x0164;
-	}
-    if ((ret = rwnx_send_dbg_mem_read_req(sdiodev, cfg_base + 0x14, &cfm))) {
-        AICWFDBG(LOGERROR, "rf misc ram[0x%x] rd fail: %d\n", cfg_base + 0x14, ret);
-        return ret;
+    int size;
+    u32 *dst=NULL;
+    char *filename = FW_DPDRESULT_NAME_8800DC;
+    struct device *dev = sdiodev->dev;
+    AICWFDBG(LOGINFO, "%s: dpd_res file path:%s \r\n", __func__, filename);
+    /* load file */
+    size = rwnx_load_firmware(&dst, filename, dev);
+    if (size <= 0) {
+        AICWFDBG(LOGERROR, "wrong size of dpd_res file\n");
+        if (dst) {
+            #ifndef CONFIG_FIRMWARE_ARRAY
+            vfree(dst);
+            #endif
+            dst = NULL;
+        }
+        return -1;
     }
-    misc_ram_addr = cfm.memdata;
-    ret = rwnx_plat_bin_fw_upload_android(sdiodev, misc_ram_addr, FW_DPDRESULT_NAME_8800DC);
-    if (ret) {
-        AICWFDBG(LOGINFO, "load calib bin fail: %d\n", ret);
-        return ret;
+    AICWFDBG(LOGINFO, "### Load file done: %s, size=%d, dst[0]=%x\n", filename, size, dst[0]);
+    memcpy((u8 *)dpd_res, (u8 *)dst, sizeof(rf_misc_ram_lite_t));
+    if (dst) {
+        #ifndef CONFIG_FIRMWARE_ARRAY
+        vfree(dst);
+        #endif
+        dst = NULL;
     }
     return ret;
 }

@@ -12,7 +12,7 @@
  */
 
 #include <linux/list.h>
-#include <stddef.h>
+//#include <stddef.h>
 #include "aicbluetooth_cmds.h"
 #include "aic_txrxif.h"
 #include "aicwf_usb.h"

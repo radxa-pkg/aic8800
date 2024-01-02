@@ -134,7 +134,9 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
 #endif
 	//if want to send apcf command when support platform, 
 	//use inotify_pthread_init and inotify_pthread_deinit
-    //inotify_pthread_init();
+	#if (BT_RETENTION == 1)
+        inotify_pthread_init();
+	#endif
 
     return 0;
 }
@@ -266,7 +268,10 @@ static void cleanup( void )
 	
 	//if want to send apcf command when support platform, 
 	//use inotify_pthread_init and inotify_pthread_deinit
-    //inotify_pthread_deinit(); 
+	#if (BT_RETENTION == 1)
+        inotify_pthread_deinit();
+	#endif
+    
     upio_cleanup();
 
     bt_vendor_cbacks = NULL;
