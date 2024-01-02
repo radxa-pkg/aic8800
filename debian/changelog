@@ -1,3 +1,19 @@
+aic8800 (3.0+git20231212.15dcf017-1) jammy; urgency=medium
+
+  [ dependabot[bot] ]
+  * Bump actions/upload-artifact from 3 to 4
+  * Bump actions/download-artifact from 3 to 4
+
+  [ ZHANG Yuntian ]
+  * Update to aic8800d_linux_sdk_V3.0_2023_1212_15dcf017
+  * Update firmware path
+  * Update dkms module installation location
+  * Use dh-install to handle package content
+  * Prepare for additional package
+  * Add aicrf-test package
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 02 Jan 2024 17:25:38 +0800
+
 aic8800 (3.0+git20231107.581567ff-2) jammy; urgency=medium
 
   [ ZHANG Yuntian ]
