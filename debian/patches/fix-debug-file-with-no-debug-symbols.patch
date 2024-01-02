@@ -1,0 +1,13 @@
+diff --git a/src/tools/aicrf_test/Makefile b/src/tools/aicrf_test/Makefile
+index c3de1a1..165773a 100644
+--- a/src/tools/aicrf_test/Makefile
++++ b/src/tools/aicrf_test/Makefile
+@@ -13,7 +13,7 @@ bt_test: bt_test.o
+ 	$(CROSS_COMPILE)gcc $+ $(LDFLAGS) -o $@
+ 
+ %.o: %.c
+-	$(CROSS_COMPILE)gcc -c $+ -o $@
++	$(CROSS_COMPILE)gcc -g -c $+ -o $@
+ 
+ clean:
+ 	rm *.o wifi_test bt_test

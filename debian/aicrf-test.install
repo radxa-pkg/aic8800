@@ -1,0 +1,4 @@
+#!/usr/bin/dh-exec
+
+src/tools/aicrf_test/bt_test usr/bin/
+src/tools/aicrf_test/wifi_test usr/bin/

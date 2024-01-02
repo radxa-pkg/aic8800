@@ -23,7 +23,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get build-dep --no-install-recommends -y .
-          make all deb
+          sudo apt install -y binfmt-support qemu-user-static
+          .github/container/build-deb
       - name: Workaround actions/upload-artifact#176
         run: |
           echo "artifacts_path=$(realpath ..)" >> $GITHUB_ENV

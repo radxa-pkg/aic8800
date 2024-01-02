@@ -1,0 +1,5 @@
+# We do not track this on GitHub
+aicrf-test: initial-upload-closes-no-bugs
+
+# Upstream does not provide manual page
+aicrf-test: no-manual-page

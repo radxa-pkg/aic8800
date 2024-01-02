@@ -17,3 +17,13 @@ Depends: ${misc:Depends},
 Description: dkms sources for Aicsemi aic8800 Wi-Fi driver
  This package provides the dkms source code for Aicsemi
  aic8800 Wi-Fi driver.
+
+Package: aicrf-test
+Architecture: any
+Section: misc
+Priority: optional
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+Description: Aicsemi RF test tools
+ This Package provides Bluetooth and Wi-Fi test tools
+ from Aicsemi aic8800 Wi-Fi driver.
