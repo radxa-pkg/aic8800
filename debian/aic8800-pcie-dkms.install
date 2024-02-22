@@ -1,0 +1,3 @@
+#!/usr/bin/dh-exec
+
+src/PCIE usr/src/aic8800-pcie-${DEB_VERSION}/

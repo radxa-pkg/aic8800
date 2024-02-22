@@ -1,0 +1,10 @@
+PACKAGE_NAME="aic8800-pcie"
+PACKAGE_VERSION="#MODULE_VERSION#"
+CLEAN="make clean"
+MAKE[0]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/PCIE/driver_fw/driver/aic8800/aic8800_fdrv"
+
+BUILT_MODULE_NAME[0]="aic8800D80_fdrv"
+BUILT_MODULE_LOCATION[0]="PCIE/driver_fw/driver/aic8800/aic8800_fdrv"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+
+AUTOINSTALL=yes

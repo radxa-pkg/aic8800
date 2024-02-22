@@ -1,0 +1,30 @@
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+index 5bdb438..99f44b7 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+@@ -1,3 +1,12 @@
++ccflags-y += -Wno-implicit-fallthrough
++ccflags-y += -Wno-unused-function
++ccflags-y += -Wno-unused-variable
++ccflags-y += -Wno-comment
++ccflags-y += -Wno-format
++ccflags-y += -Wno-declaration-after-statement
++ccflags-y += -Wno-misleading-indentation
++ccflags-y += -Wno-parentheses
++
+ RWNX_VERS_NUM := 6.4.3.0
+ 
+ CONFIG_COUNTRY_CODE = "00"
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+index 27e61f0..d6f983e 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+@@ -48,7 +48,7 @@ extern char aic_fw_path[FW_PATH_MAX_LEN];
+ #define PRINT 2
+ #define GET_VALUE 3
+ 
+-
++MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ 
+ struct rwnx_plat *g_rwnx_plat;
+ 
