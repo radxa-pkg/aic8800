@@ -1,0 +1,3 @@
+#!/usr/bin/dh-exec
+
+src/USB usr/src/aic8800-usb-${DEB_VERSION}/

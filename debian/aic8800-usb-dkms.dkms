@@ -1,0 +1,14 @@
+PACKAGE_NAME="aic8800-usb"
+PACKAGE_VERSION="#MODULE_VERSION#"
+CLEAN="make clean"
+MAKE[0]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/USB/driver_fw/drivers/aic8800"
+
+BUILT_MODULE_NAME[0]="aic_load_fw"
+BUILT_MODULE_LOCATION[0]="USB/driver_fw/drivers/aic8800/aic_load_fw"
+DEST_MODULE_LOCATION[0]="/updates/dkms"
+
+BUILT_MODULE_NAME[1]="aic8800_fdrv"
+BUILT_MODULE_LOCATION[1]="USB/driver_fw/drivers/aic8800/aic8800_fdrv"
+DEST_MODULE_LOCATION[1]="/updates/dkms"
+
+AUTOINSTALL=yes

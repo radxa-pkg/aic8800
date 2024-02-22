@@ -15,11 +15,23 @@ Section: misc
 Priority: optional
 Depends: ${misc:Depends},
 Provides: aic8800-dkms (= 3.0+git20231212.15dcf017-2)
-Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2)
+Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2),
+           aic8800-usb-dkms
 Replaces: aic8800-dkms (<< 3.0+git20231212.15dcf017-2)
 Description: dkms sources for Aicsemi aic8800 SDIO Wi-Fi driver
  This package provides the dkms source code for Aicsemi
  aic8800 SDIO Wi-Fi driver.
+
+Package: aic8800-usb-dkms
+Architecture: all
+Section: misc
+Priority: optional
+Depends: ${misc:Depends},
+Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2),
+           aic8800-sdio-dkms
+Description: dkms sources for Aicsemi aic8800 USB Wi-Fi driver
+ This package provides the dkms source code for Aicsemi
+ aic8800 USB Wi-Fi driver.
 
 Package: aicrf-test
 Architecture: any

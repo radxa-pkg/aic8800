@@ -1,5 +1,5 @@
 diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
-index 8701cdc..632435a 100644
+index 8701cdc..71685f0 100644
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
 @@ -1,7 +1,7 @@
