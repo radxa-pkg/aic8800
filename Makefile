@@ -53,7 +53,7 @@ clean-doc:
 
 .PHONY: clean-deb
 clean-deb:
-	rm -rf debian/.debhelper debian/aic8800-dkms debian/aicrf-test debian/debhelper-build-stamp debian/files debian/*.debhelper.log debian/*.*.debhelper debian/*.substvars
+	rm -rf debian/.debhelper debian/aic8800-*-dkms debian/aicrf-test debian/debhelper-build-stamp debian/files debian/*.debhelper.log debian/*.*.debhelper debian/*.substvars
 
 .PHONY: clean-aicrf-test
 clean-aicrf-test:

@@ -1,3 +1,0 @@
-#!/usr/bin/dh-exec
-
-src/SDIO usr/src/aic8800-${DEB_VERSION}/

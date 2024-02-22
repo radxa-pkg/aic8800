@@ -9,14 +9,17 @@ Build-Depends: debhelper (>=12~),
                dh-sequence-dkms,
                lintian
 
-Package: aic8800-dkms
+Package: aic8800-sdio-dkms
 Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
-Description: dkms sources for Aicsemi aic8800 Wi-Fi driver
+Provides: aic8800-dkms (= 3.0+git20231212.15dcf017-2)
+Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2)
+Replaces: aic8800-dkms (<< 3.0+git20231212.15dcf017-2)
+Description: dkms sources for Aicsemi aic8800 SDIO Wi-Fi driver
  This package provides the dkms source code for Aicsemi
- aic8800 Wi-Fi driver.
+ aic8800 SDIO Wi-Fi driver.
 
 Package: aicrf-test
 Architecture: any
