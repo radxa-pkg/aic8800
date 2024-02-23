@@ -161,7 +161,9 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
         if (argC < 4) {
             is_param_err = 1;
         }
-    } else if ((strcasecmp(argV[2], "SET_NOTCH") == 0)) {
+    } else if ((strcasecmp(argV[2], "SET_NOTCH") == 0)
+            || (strcasecmp(argV[2], "SET_SRRC") == 0)
+            || (strcasecmp(argV[2], "SET_FSS") == 0)) {
         if (argC < 4) {
             is_param_err = 1;
         }

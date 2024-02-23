@@ -765,7 +765,7 @@ void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
 	
 	ret = aicwf_bus_init(0, &pciedev->pci_dev->dev);
 	if(ret)
-		printk("%s fail\n");
+		printk("%s fail\n", __func__);
 }
 
 #endif

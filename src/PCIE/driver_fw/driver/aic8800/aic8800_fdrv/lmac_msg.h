@@ -1296,6 +1296,29 @@ typedef struct {
 	s8_l chan_142_165;
 } txpwr_ofst_conf_t;
 
+/*
+ * pwrofst2x_tbl_2g4[3][3]:
+ * +---------------+----------+----------+----------+
+ * | RateTyp\ChGrp |  CH_1_4  |  CH_5_9  | CH_10_13 |
+ * +---------------+----------+----------+----------+
+ * | DSSS          |  [0][0]  |  [0][1]  |  [0][2]  |
+ * +---------------+----------+----------+----------+
+ * | OFDM_HIGHRATE |  [1][0]  |  [1][1]  |  [1][2]  |
+ * +---------------+----------+----------+----------+
+ * | OFDM_LOWRATE  |  [2][0]  |  [2][1]  |  [2][2]  |
+ * +---------------+----------+----------+----------+
+ * pwrofst2x_tbl_5g[3][6]:
+ * +---------------+--------------+--------------+----------------+----------------+----------------+----------------+
+ * | RateTyp\ChGrp | CH_42(36~50) | CH_58(51~64) | CH_106(98~114) | CH_122(115~130)| CH_138(131~146)| CH_155(147~166)|
+ * +---------------+--------------+--------------+----------------+----------------+----------------+----------------+
+ * | OFDM_LOWRATE  |    [0][0]    |    [0][1]    |     [0][2]     |     [0][3]     |     [0][4]     |     [0][5]     |
+ * +---------------+--------------+--------------+----------------+----------------+----------------+----------------+
+ * | OFDM_HIGHRATE |    [1][0]    |    [1][1]    |     [1][2]     |     [1][3]     |     [1][4]     |     [1][5]     |
+ * +---------------+--------------+--------------+----------------+----------------+----------------+----------------+
+ * | OFDM_MIDRATE  |    [2][0]    |    [2][1]    |     [2][2]     |     [2][3]     |     [2][4]     |     [2][5]     |
+ * +---------------+--------------+--------------+----------------+----------------+----------------+----------------+
+ */
+
 typedef struct
 {
     int8_t enable;
@@ -1810,6 +1833,90 @@ struct mm_apm_staloss_ind
         u8_l sta_idx;
         u8_l vif_idx;
         u8_l mac_addr[6];
+};
+
+enum vendor_hwconfig_tag{
+	ACS_TXOP_REQ = 0,
+	CHANNEL_ACCESS_REQ,
+	MAC_TIMESCALE_REQ,
+	CCA_THRESHOLD_REQ,
+	BWMODE_REQ,
+	CHIP_TEMP_GET_REQ,
+};
+
+enum {
+    BWMODE20M = 0,
+    BWMODE10M,
+    BWMODE5M,
+};
+
+struct mm_set_acs_txop_req
+{
+    u32_l hwconfig_id;
+	u16_l txop_bk;
+	u16_l txop_be;
+	u16_l txop_vi;
+	u16_l txop_vo;
+};
+
+struct mm_set_channel_access_req
+{
+    u32_l hwconfig_id;
+	u32_l edca[4];
+	u8_l  vif_idx;
+	u8_l  retry_cnt;
+	u8_l  rts_en;
+	u8_l  long_nav_en;
+	u8_l  cfe_en;
+	u8_l  rc_retry_cnt[3];
+	s8_l ccademod_th;
+};
+
+struct mm_set_mac_timescale_req
+{
+    u32_l hwconfig_id;
+	u8_l  sifsA_time;
+	u8_l  sifsB_time;
+	u8_l  slot_time;
+	u8_l  rx_startdelay_ofdm;
+	u8_l  rx_startdelay_long;
+	u8_l  rx_startdelay_short;
+};
+
+struct mm_set_cca_threshold_req
+{
+    u32_l hwconfig_id;
+	u8_l  auto_cca_en;
+	s8_l  cca20p_rise_th;
+	s8_l  cca20s_rise_th;
+	s8_l  cca20p_fall_th;
+	s8_l  cca20s_fall_th;
+
+};
+
+struct mm_set_bwmode_req
+{
+    u32_l hwconfig_id;
+    u8_l bwmode;
+};
+
+struct mm_get_chip_temp_req
+{
+    u32_l hwconfig_id;
+};
+
+struct mm_get_chip_temp_cfm
+{
+    /// Temp degree val
+    s8_l degree;
+};
+
+struct mm_set_vendor_hwconfig_cfm
+{
+    u32_l hwconfig_id;
+    union {
+        struct mm_get_chip_temp_cfm chip_temp_cfm;
+    };
 };
 
 struct mm_set_txop_req

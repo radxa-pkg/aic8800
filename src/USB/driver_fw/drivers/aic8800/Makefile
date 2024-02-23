@@ -47,7 +47,7 @@ KDIR  := /lib/modules/$(shell uname -r)/build
 PWD   := $(shell pwd)
 KVER := $(shell uname -r)
 MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
-ARCH ?= x86_64
+ARCH ?= arm64
 CROSS_COMPILE ?=
 endif
 

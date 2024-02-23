@@ -1105,13 +1105,13 @@ static int rwnx_close (struct net_device * dev)
 #elif defined (AICWF_SDIO_SUPPORT) 
 	struct aicwf_bus * bus_if = NULL;
 	struct aic_sdio_dev * sdiodev = NULL;
-#else
-
+#elif defined (AICWF_PCIE_SUPPORT)
+	struct aic_pci_dev * pcidev = rwnx_hw->pcidev;
 #endif
 
 	RWNX_DBG (RWNX_FN_ENTRY_STR);
 
-#if defined (AICWF_USB_SUPPORT) 	|| defined(AICWF_SDIO_SUPPORT)
+#if defined (AICWF_USB_SUPPORT) 	|| defined(AICWF_SDIO_SUPPORT)	||defined (AICWF_PCIE_SUPPORT)
 
 	if (scanning) {
 		scanning = false;
@@ -1236,6 +1236,14 @@ static int rwnx_close (struct net_device * dev)
 				}
 		}
 
+#endif
+
+#if defined (AICWF_PCIE_SUPPORT)
+	if (pcidev != NULL)
+	{
+		if (pcidev->bus_if->state != BUS_DOWN_ST)
+			rwnx_send_remove_if (rwnx_hw, rwnx_vif->vif_index, false);
+	}
 #endif
 
 	/* Ensure that we won't process disconnect ind */

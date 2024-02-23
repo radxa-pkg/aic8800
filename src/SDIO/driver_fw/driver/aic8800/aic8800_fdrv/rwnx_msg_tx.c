@@ -942,6 +942,31 @@ int rwnx_send_arpoffload_en_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_v
 }
 #endif
 
+int rwnx_send_disable_agg_req(struct rwnx_hw *rwnx_hw, u8_l agg_disable, u8_l agg_disable_rx, u8_l sta_idx)
+{
+    struct mm_set_agg_disable_req *req;
+    int error;
+
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+    /* Build the MM_SET_AGG_DISABLE_REQ message */
+    req = rwnx_msg_zalloc(MM_SET_AGG_DISABLE_REQ, TASK_MM, DRV_TASK_ID,
+                                  sizeof(struct mm_set_agg_disable_req));
+
+    if (!req) {
+        return -ENOMEM;
+    }
+
+    req->disable = agg_disable;
+    req->staidx = sta_idx;
+    req->disable_rx = agg_disable_rx;
+
+    /* Send the MM_SET_AGG_DISABLE_REQ message to UMAC FW */
+    error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_AGG_DISABLE_CFM, NULL);
+
+    return (error);
+};
+
 int rwnx_send_coex_req(struct rwnx_hw *rwnx_hw, u8_l disable_coexnull, u8_l enable_nullcts)
 {
 	struct mm_set_coex_req *coex_req;

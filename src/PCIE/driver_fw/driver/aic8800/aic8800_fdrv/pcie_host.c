@@ -127,8 +127,8 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 	//txdesc_host->ready = 0xFFFFFFFF;
     txdesc_host->api.host.flags_ext = 0;
 
-        sw_txhdr->desc.ready = 0;
-        sw_txhdr->desc.packet_dma_addr = 0;
+    txdesc_host->ready = 0;
+    txdesc_host->packet_dma_addr = 0;
 
 
 	//rwnx_data_dump("dhcp2", skb->data, 128);

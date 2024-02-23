@@ -11,7 +11,7 @@ struct aicwf_rx_buff_list aic_rx_buff_list;
 
 int aic_rxbuff_num_max = 1000;
 
-int aic_rxbuff_size = (4 * 512) * 1;
+int aic_rxbuff_size = (4 * 512) * 10;
 
 int rx_buff_list_ava = 0;
 

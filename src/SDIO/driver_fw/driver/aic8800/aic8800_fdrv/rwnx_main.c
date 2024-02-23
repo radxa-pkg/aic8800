@@ -1319,6 +1319,8 @@ enum {
     RDWR_EFUSE_PWROFSTFINE,
     RDWR_EFUSE_SDIOCFG,
     RDWR_EFUSE_USBVIDPID,
+    SET_SRRC,
+    SET_FSS,
 };
 
 typedef struct {
@@ -2181,6 +2183,30 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 	#ifdef AICWF_SDIO_SUPPORT
 				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_NOTCH, sizeof(func), &func, NULL);
 	#endif
+			} else {
+				AICWFDBG(LOGERROR, "wrong args\n");
+				bytes_written = -EINVAL;
+				break;
+			}
+		} else if (strcasecmp(argv[0], "SET_SRRC") == 0) {
+			if (argc > 1) {
+				u8_l func = (u8_l) command_strtoul(argv[1], NULL, 10);
+				AICWFDBG(LOGINFO, "set srrc %d\r\n", func);
+				#ifdef AICWF_SDIO_SUPPORT
+				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_SRRC, sizeof(func), &func, NULL);
+				#endif
+			} else {
+				AICWFDBG(LOGERROR, "wrong args\n");
+				bytes_written = -EINVAL;
+				break;
+			}
+		} else if (strcasecmp(argv[0], "SET_FSS") == 0) {
+			if (argc > 1) {
+				u8_l func = (u8_l) command_strtoul(argv[1], NULL, 10);
+				AICWFDBG(LOGINFO, "set fss: %d\r\n", func);
+				#ifdef AICWF_SDIO_SUPPORT
+				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_FSS, sizeof(func), &func, NULL);
+				#endif
 			} else {
 				AICWFDBG(LOGERROR, "wrong args\n");
 				bytes_written = -EINVAL;

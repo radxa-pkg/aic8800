@@ -116,24 +116,27 @@ static inline int rwnx_rx_chan_switch_ind(struct rwnx_hw *rwnx_hw,
     } else {
         /* Retrieve the allocated RoC element */
         struct rwnx_roc_elem *roc_elem = rwnx_hw->roc_elem;
+        if (roc_elem) {
+            /* If mgmt_roc is true, remain on channel has been started by ourself */
+            if (!roc_elem->mgmt_roc) {
+                /* Inform the host that we have switch on the indicated off-channel */
+                #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
+                cfg80211_ready_on_channel(roc_elem->wdev->netdev, (u64)(rwnx_hw->roc_cookie_cnt),
+                                        roc_elem->chan, NL80211_CHAN_HT20, roc_elem->duration, GFP_ATOMIC);
+                #elif LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+                cfg80211_ready_on_channel(roc_elem->wdev, (u64)(rwnx_hw->roc_cookie_cnt),
+                                        roc_elem->chan, NL80211_CHAN_HT20, roc_elem->duration, GFP_ATOMIC);
+                #else
+                cfg80211_ready_on_channel(roc_elem->wdev, (u64)(rwnx_hw->roc_cookie_cnt),
+                                        roc_elem->chan, roc_elem->duration, GFP_ATOMIC);
+                #endif
+            }
 
-        /* If mgmt_roc is true, remain on channel has been started by ourself */
-        if (!roc_elem->mgmt_roc) {
-            /* Inform the host that we have switch on the indicated off-channel */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
-	    cfg80211_ready_on_channel(roc_elem->wdev->netdev, (u64)(rwnx_hw->roc_cookie_cnt),
-                                      roc_elem->chan, NL80211_CHAN_HT20, roc_elem->duration, GFP_ATOMIC);
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
-	    cfg80211_ready_on_channel(roc_elem->wdev, (u64)(rwnx_hw->roc_cookie_cnt),
-                                      roc_elem->chan, NL80211_CHAN_HT20, roc_elem->duration, GFP_ATOMIC);
-#else
-            cfg80211_ready_on_channel(roc_elem->wdev, (u64)(rwnx_hw->roc_cookie_cnt),
-                                      roc_elem->chan, roc_elem->duration, GFP_ATOMIC);
-#endif
+            /* Keep in mind that we have switched on the channel */
+            roc_elem->on_chan = true;
+        } else {
+            printk("roc_elem == null\n");
         }
-
-        /* Keep in mind that we have switched on the channel */
-        roc_elem->on_chan = true;
 
         // Enable traffic on OFF channel queue
         rwnx_txq_offchan_start(rwnx_hw);

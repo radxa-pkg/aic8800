@@ -759,7 +759,7 @@ void rwnx_chanctx_link(struct rwnx_vif *vif, u8 idx,
 void rwnx_chanctx_unlink(struct rwnx_vif *vif);
 int  rwnx_chanctx_valid(struct rwnx_hw *rwnx_hw, u8 idx);
 
-extern u8 chip_id;
+extern u32 chip_id;
 static inline bool is_multicast_sta(int sta_idx)
 {
 

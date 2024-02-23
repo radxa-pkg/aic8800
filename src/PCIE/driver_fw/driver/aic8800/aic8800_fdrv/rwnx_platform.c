@@ -1557,7 +1557,11 @@ int patch_config(struct rwnx_hw *rwnx_hw)
 	const u32 rd_patch_addr = RAM_FMAC_FW_ADDR + 0x0198;
 	u32 aic_patch_addr;
 	u32 config_base, aic_patch_str_base;
-	uint32_t start_addr = 0x0016F800;
+	#ifdef CONFIG_USB_BT
+	uint32_t start_addr = 0x00175000;
+	#else
+	uint32_t start_addr = 0x00170000;
+	#endif
 	u32 patch_addr = start_addr;
 	u32 patch_cnt = sizeof(patch_tbl_8800d80)/sizeof(u32)/2;
 	int cnt = 0;
@@ -2337,7 +2341,11 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
 	#ifndef CONFIG_ROM_PATCH_EN
 	#ifdef CONFIG_DOWNLOAD_FW
 	if (testmode == 0)
+		#ifdef CONFIG_USB_BT
+		ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_BT_NAME);
+		#else
 		ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_NAME);
+		#endif
 	else
 		ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_RF_FW_NAME);
 	if (ret)

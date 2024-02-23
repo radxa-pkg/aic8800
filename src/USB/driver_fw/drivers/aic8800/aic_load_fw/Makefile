@@ -5,6 +5,8 @@ CONFIG_USB_MSG_EP = y
 CONFIG_USB_NO_TRANS_DMA_MAP = n
 CONFIG_M2D_OTA_AUTO_SUPPORT = n
 CONFIG_LINK_DET_5G = y
+CONFIG_FOR_IPCAM = n
+
 # Need to set fw path in BOARD_KERNEL_CMDLINE
 CONFIG_USE_FW_REQUEST = n
 CONFIG_PREALLOC_RX_SKB = n
@@ -30,6 +32,7 @@ ccflags-$(CONFIG_USB_MSG_EP) += -DCONFIG_USB_MSG_EP
 ccflags-$(CONFIG_USB_NO_TRANS_DMA_MAP) += -DCONFIG_USB_NO_TRANS_DMA_MAP
 ccflags-$(CONFIG_M2D_OTA_AUTO_SUPPORT) += -DCONFIG_M2D_OTA_AUTO_SUPPORT
 ccflags-$(CONFIG_LINK_DET_5G) += -DCONFIG_LINK_DET_5G
+ccflags-$(CONFIG_FOR_IPCAM) += -DCONFIG_FOR_IPCAM
 ccflags-$(CONFIG_USE_FW_REQUEST) += -DCONFIG_USE_FW_REQUEST
 ccflags-$(CONFIG_PREALLOC_RX_SKB) += -DCONFIG_PREALLOC_RX_SKB
 ccflags-$(CONFIG_PREALLOC_TXQ) += -DCONFIG_PREALLOC_TXQ
@@ -82,8 +85,8 @@ ccflags-$(CONFIG_PLATFORM_UBUNTU) += -DCONFIG_PLATFORM_UBUNTU
 KDIR  := /lib/modules/$(shell uname -r)/build
 PWD   := $(shell pwd)
 KVER := $(shell uname -r)
-MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
-ARCH := x86_64
+#MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+ARCH := arm64
 CROSS_COMPILE :=
 endif
 

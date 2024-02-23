@@ -2690,7 +2690,7 @@ void system_config_8800dc(struct rwnx_hw *rwnx_hw){
 		AICWFDBG(LOGERROR, "%x rd fail: %d\n", mem_addr, ret);
         return;
     }
-    chip_id = (u8)(rd_mem_addr_cfm.memdata >> 16);
+    chip_id = rd_mem_addr_cfm.memdata >> 16;
     //printk("%x=%x\n", rd_mem_addr_cfm.memaddr, rd_mem_addr_cfm.memdata);
     if (((rd_mem_addr_cfm.memdata >> 25) & 0x01UL) == 0x00UL) {
         chip_mcu_id = 1;

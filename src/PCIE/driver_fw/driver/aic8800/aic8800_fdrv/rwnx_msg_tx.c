@@ -1155,6 +1155,134 @@ int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_v
 	return error;
 }
 
+int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id, int32_t *param, int32_t *param_out)
+{
+	struct mm_set_acs_txop_req *req0;
+	struct mm_set_channel_access_req *req1;
+	struct mm_set_mac_timescale_req *req2;
+	struct mm_set_cca_threshold_req *req3;
+	struct mm_set_bwmode_req *req4;
+
+	int error = 0;
+
+	switch (hwconfig_id)
+	{
+	    case ACS_TXOP_REQ:
+		/* Build the ACS_TXOP_REQ message */
+		req0= rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_acs_txop_req) );
+		if (!req0)
+		    return -ENOMEM;
+		req0->hwconfig_id = hwconfig_id;
+		req0->txop_be = param[0];
+		req0->txop_bk = param[1];
+		req0->txop_vi = param[2];
+		req0->txop_vo = param[3];
+		printk("set_acs_txop_req: be: %x,bk: %x,vi: %x,vo: %x\n",
+                        req0->txop_be, req0->txop_bk, req0->txop_vi, req0->txop_vo);
+		/* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, req0, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
+		break;
+
+	    case CHANNEL_ACCESS_REQ:
+		/* Build the CHANNEL_ACCESS_REQ message */
+		req1 = rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_channel_access_req));
+		if (!req1)
+		    return -ENOMEM;
+		req1->hwconfig_id = hwconfig_id;
+		req1->edca[0] = param[0];
+		req1->edca[1] = param[1];
+		req1->edca[2] =	param[2];
+		req1->edca[3] = param[3];
+		req1->vif_idx = param[4];
+		req1->retry_cnt = param[5];
+		req1->rts_en = param[6];
+		req1->long_nav_en = param[7];
+		req1->cfe_en = param[8];
+		req1->rc_retry_cnt[0] = param[9];
+		req1->rc_retry_cnt[1] = param[10];
+		req1->rc_retry_cnt[2] = param[11];
+		req1->ccademod_th = param[12];
+		printk("set_channel_access_req:edca[]= %x %x %x %x\nvif_idx: %x, retry_cnt: %x, rts_en: %x, long_nav_en: %x, cfe_en: %x, rc_retry_cnt: %x:%x:%x, ccademod_th = %d\n",
+			req1->edca[0], req1->edca[1], req1->edca[2], req1->edca[3], req1->vif_idx, req1->retry_cnt, req1->rts_en, req1->long_nav_en, req1->cfe_en, req1->rc_retry_cnt[0],req1->rc_retry_cnt[1], req1->rc_retry_cnt[2], req1->ccademod_th);
+		/* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, req1, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
+		break;
+
+	    case MAC_TIMESCALE_REQ:
+		/* Build the MAC_TIMESCALE_REQ message */
+		req2 = rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_mac_timescale_req));
+		if (!req2)
+		    return -ENOMEM;
+		req2->hwconfig_id = hwconfig_id;
+		req2->sifsA_time = param[0];
+		req2->sifsB_time = param[1];
+		req2->slot_time = param[2];
+		req2->rx_startdelay_ofdm = param[3];
+		req2->rx_startdelay_long = param[4];
+		req2->rx_startdelay_short = param[5];
+		printk("set_mac_timescale_req:sifsA_time: %x, sifsB_time: %x, slot_time: %x, rx_startdelay ofdm:%x long %x short %x\n",
+			req2->sifsA_time, req2->sifsB_time, req2->slot_time, req2->rx_startdelay_ofdm, req2->rx_startdelay_long, req2->rx_startdelay_short);
+		/* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, req2, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
+		break;
+
+	    case CCA_THRESHOLD_REQ:
+		/* Build the CCA_THRESHOLD_REQ message */
+		req3 = rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_cca_threshold_req));
+		if (!req3)
+		    return -ENOMEM;
+		req3->hwconfig_id = hwconfig_id;
+	        req3->auto_cca_en = param[0];
+		req3->cca20p_rise_th = param[1];
+		req3->cca20s_rise_th = param[2];
+		req3->cca20p_fall_th = param[3];
+		req3->cca20s_fall_th = param[4];
+		printk("cca_threshold_req: auto_cca_en:%d\ncca20p_rise_th = %d\ncca20s_rise_th = %d\ncca20p_fall_th = %d\ncca20s_fall_th = %d\n",
+			req3->auto_cca_en, req3->cca20p_rise_th, req3->cca20s_rise_th, req3->cca20p_fall_th, req3->cca20s_fall_th);
+		/* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, req3, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
+		break;
+	    case BWMODE_REQ:
+		/* Build the SET_BWMODE_REQ message */
+		req4 = rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_set_bwmode_req));
+		if (!req4)
+		    return -ENOMEM;
+		req4->hwconfig_id = hwconfig_id;
+		req4->bwmode = param[0];
+		printk("bwmode :%d\n", req4->bwmode);
+                /* Send the MM_SET_VENDOR_HWCONFIG_CFM  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, req4, 1, MM_SET_VENDOR_HWCONFIG_CFM, NULL);
+		break;
+        case CHIP_TEMP_GET_REQ:
+        //if ((rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DC) ||
+        //    (rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DW))
+        {
+            struct mm_get_chip_temp_req *req;
+            struct mm_set_vendor_hwconfig_cfm cfm = {0,};
+            /* Build the CHIP_TEMP_GET_REQ message */
+            req = rwnx_msg_zalloc(MM_SET_VENDOR_HWCONFIG_REQ, TASK_MM, DRV_TASK_ID, sizeof(struct mm_get_chip_temp_req));
+            if (!req)
+                return -ENOMEM;
+            req->hwconfig_id = hwconfig_id;
+            /* Send the MM_SET_VENDOR_HWCONFIG_REQ  message to UMAC FW */
+            error = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_VENDOR_HWCONFIG_CFM, &cfm);
+            if (!error) {
+                if (param_out) {
+                    param_out[0] = (int32_t)cfm.chip_temp_cfm.degree;
+                }
+                printk("get_chip_temp degree=%d\n", cfm.chip_temp_cfm.degree);
+            } else {
+                printk("get_chip_temp err=%d\n", error);
+            }
+        }
+        break;
+	    default:
+		return -ENOMEM;
+	}
+    return error;
+}
+
+
 int rwnx_send_get_fw_version_req(struct rwnx_hw *rwnx_hw, struct mm_get_fw_version_cfm *cfm)
 {
     void *req;

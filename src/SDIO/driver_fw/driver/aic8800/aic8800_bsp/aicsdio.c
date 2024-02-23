@@ -183,15 +183,7 @@ int aicbsp_set_subsys(int subsys, int state)
 			aicbsp_sdio_release(aicbsp_sdiodev);
 #endif
 
-#ifdef CONFIG_PLATFORM_ROCKCHIP
-#ifdef CONFIG_GPIO_WAKEUP
-			//BT_SLEEP:true,BT_WAKEUP:false
-			rfkill_rk_sleep_bt(true);
-			printk("%s BT wake default to SLEEP\r\n", __func__);
-#endif
-#endif
-
-#ifdef CONFIG_PLATFORM_ROCKCHIP2
+#if defined CONFIG_PLATFORM_ROCKCHIP || defined CONFIG_PLATFORM_ROCKCHIP2
 #ifdef CONFIG_GPIO_WAKEUP
 			//BT_SLEEP:true,BT_WAKEUP:false
 			rfkill_rk_sleep_bt(true);

@@ -579,6 +579,7 @@ static int rwnx_prep_dma_tx(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_tx
 	struct rwnx_ipc_buf *ipc_hostdesc_buf = &sw_txhdr->ipc_hostdesc;
 	ipc_hostdesc_buf->size = sizeof(struct txdesc_host);
 	ipc_hostdesc_buf->dma_addr = dma_map_single(rwnx_hw->dev, &sw_txhdr->desc, sizeof(struct txdesc_host), DMA_TO_DEVICE);
+	ipc_hostdesc_buf->addr = (void *)&sw_txhdr->desc;
 
 	wmb();
 
@@ -1501,6 +1502,9 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
         dev_kfree_skb_any(skb);
         skb = newskb;
     }
+
+	if(skb->priority < 3)
+		skb->priority = 0;
 
 #ifdef CONFIG_FILTER_TCP_ACK
 	msgbuf=intf_tcp_alloc_msg(msgbuf);

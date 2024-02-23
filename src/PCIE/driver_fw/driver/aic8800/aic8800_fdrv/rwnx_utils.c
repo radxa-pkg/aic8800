@@ -429,38 +429,38 @@ int rwnx_ipc_rxbuf_alloc(struct rwnx_hw *rwnx_hw)
     struct rwnx_ipc_buf *buf;
     int nb = 0, idx;
 
-	spin_lock_bh(&rwnx_hw->rxbuf_lock);
+    spin_lock_bh(&rwnx_hw->rxbuf_lock);
 
-	idx = rwnx_hw->rxbuf_idx;
+    idx = rwnx_hw->rxbuf_idx;
     while (rwnx_hw->rxbufs[idx].addr && (nb < RWNX_RXBUFF_MAX)) {
-        printk("w %d %x\n", idx, rwnx_hw->rxbufs[idx].addr);
+        printk("w %d %p\n", idx, rwnx_hw->rxbufs[idx].addr);
         idx = ( idx + 1 ) % RWNX_RXBUFF_MAX;
         nb++;
     }
     if (nb == RWNX_RXBUFF_MAX) {
         dev_err(rwnx_hw->dev, "No more free space for rxbuff");
-		printk("No more free space for rxbuff %d %d %d  \n",rwnx_hw->rxbuf_idx,rwnx_hw->rxbuf_cnt,rwnx_hw->ipc_env->rxbuf_idx);
+        printk("No more free space for rxbuff %d %d %d\n", rwnx_hw->rxbuf_idx, atomic_read(&rwnx_hw->rxbuf_cnt), rwnx_hw->ipc_env->rxbuf_idx);
         spin_unlock_bh(&rwnx_hw->rxbuf_lock);
-		return -ENOMEM;
+        return -ENOMEM;
     }
 
     buf = &rwnx_hw->rxbufs[idx];
 
-	//printk("alloc %d\n", idx);
+    //printk("alloc %d\n", idx);
     err = rwnx_ipc_rxskb_alloc(rwnx_hw, buf, rwnx_hw->ipc_env->rxbuf_sz);
     if (err){
-        printk("ipc_rxskb_alloc fail %d %d %d %d \n",rwnx_hw->rxbuf_idx,rwnx_hw->rxbuf_cnt,rwnx_hw->ipc_env->rxbuf_idx,err);
-		spin_unlock_bh(&rwnx_hw->rxbuf_lock);
-		return err;
+        printk("ipc_rxskb_alloc fail %d %d %d %d\n", rwnx_hw->rxbuf_idx, atomic_read(&rwnx_hw->rxbuf_cnt), rwnx_hw->ipc_env->rxbuf_idx, err);
+        spin_unlock_bh(&rwnx_hw->rxbuf_lock);
+        return err;
     }
     /* Save idx so that on next push the free slot will be found quicker */
     rwnx_hw->rxbuf_idx = ( idx + 1 ) % RWNX_RXBUFF_MAX;
-	atomic_inc(&rwnx_hw->rxbuf_cnt);
+    atomic_inc(&rwnx_hw->rxbuf_cnt);
 
     rwnx_ipc_rxskb_reset_pattern(rwnx_hw, buf, offsetof(struct hw_rxhdr, pattern));
     RWNX_RXBUFF_HOSTID_SET(buf, RWNX_RXBUFF_IDX_TO_HOSTID(idx));
     ipc_host_rxbuf_push(rwnx_hw->ipc_env, buf);
-	spin_unlock_bh(&rwnx_hw->rxbuf_lock);
+    spin_unlock_bh(&rwnx_hw->rxbuf_lock);
 
     return 0;
 }
@@ -1195,20 +1195,20 @@ int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
         return -ENOMEM;
     }
 	
-	aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1A0000), rwnx_hw);
-	struct ipc_shared_env_tag *shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1A0000);
+	aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC400), rwnx_hw);
+	struct ipc_shared_env_tag *shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC400);
     res = rwnx_elems_allocs(rwnx_hw);
     if (res) {
         kfree(rwnx_hw->ipc_env);
         rwnx_hw->ipc_env = NULL;
     }
-	printk("sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %x\n", sizeof(struct ipc_shared_env_tag), 
-												(u8 *)&shared_env->host_rxdesc - (u8 *)shared_env, 
+	printk("sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %lx\n", sizeof(struct ipc_shared_env_tag),
+												(u8 *)&shared_env->host_rxdesc - (u8 *)shared_env,
 												(u8 *)&shared_env->host_rxbuf - (u8 *)shared_env,
 												(u8 *)&shared_env->buffered - (u8 *)shared_env,
-												(u8 *)&rwnx_hw->ipc_env->shared->txdesc- (u8 *)shared_env);
-	printk("txdesc size %d \n",sizeof(rwnx_hw->ipc_env->shared->txdesc));
- 
+												(u8 *)&rwnx_hw->ipc_env->shared->txdesc - (u8 *)shared_env);
+	printk("txdesc size %ld\n", sizeof(rwnx_hw->ipc_env->shared->txdesc));
+
 #endif
     rwnx_cmd_mgr_init(rwnx_hw->cmd_mgr);
 

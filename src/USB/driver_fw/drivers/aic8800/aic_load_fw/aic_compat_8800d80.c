@@ -16,7 +16,7 @@ void rwnx_plat_userconfig_parsing(char *buffer, int size);
 void rwnx_release_firmware_common(u32** buffer);
 
 extern int testmode;
-extern int chip_id;
+extern u32 chip_id;
 u8 chip_mcu_id = 0;
 
 typedef u32 (*array2_tbl_t)[2];
@@ -46,7 +46,7 @@ u32 patch_tbl_d80[][2] =
     #else
     {0x00b4, 0xf3010000},
     #endif
-    {0x0170, 0x00000001},//rx aggr counter
+    {0x0170, 0x00000002},//rx aggr counter
 };
 
 //adap test
@@ -235,7 +235,7 @@ int system_config_8800d80(struct aic_usb_dev *usb_dev){
         if (((rd_mem_addr_cfm.memdata >> 25) & 0x01UL) == 0x00UL) {
             chip_mcu_id = 1;
         }
-		chip_id = (u8)(rd_mem_addr_cfm.memdata >> 16);
+		chip_id = rd_mem_addr_cfm.memdata >> 16;
 		printk("chip_id=%x, chip_mcu_id = %d\n", chip_id, chip_mcu_id);
     #if 1
 		syscfg_num = sizeof(syscfg_tbl_8800d80) / sizeof(u32) / 2;

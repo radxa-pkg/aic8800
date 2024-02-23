@@ -10,7 +10,11 @@
 #define FW_ADID_BASE_NAME_8800D80           "fw_adid_8800d80.bin"
 #define FW_PATCH_TABLE_NAME_8800D80         "fw_patch_table_8800d80.bin"
 
+#ifdef CONFIG_FOR_IPCAM
+#define FW_BASE_NAME_8800D80_U02            "fmacfw_8800d80_u02_ipc.bin"
+#else
 #define FW_BASE_NAME_8800D80_U02            "fmacfw_8800d80_u02.bin"
+#endif
 #define FW_RF_BASE_NAME_8800D80_U02         "lmacfw_rf_8800d80_u02.bin"
 #define FW_PATCH_BASE_NAME_8800D80_U02      "fw_patch_8800d80_u02.bin"
 #define FW_ADID_BASE_NAME_8800D80_U02       "fw_adid_8800d80_u02.bin"

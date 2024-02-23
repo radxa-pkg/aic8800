@@ -161,6 +161,7 @@ int rwnx_send_dbg_mem_block_write_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
 int rwnx_send_dbg_start_app_req(struct rwnx_hw *rwnx_hw, u32 boot_addr,
 								u32 boot_type);
 int rwnx_send_cfg_rssi_req(struct rwnx_hw *rwnx_hw, u8 vif_index, int rssi_thold, u32 rssi_hyst);
+int rwnx_send_disable_agg_req(struct rwnx_hw *rwnx_hw, u8_l agg_disable, u8_l agg_disable_rx, u8_l sta_idx);
 int rwnx_send_coex_req(struct rwnx_hw *rwnx_hw, u8_l disable_coexnull, u8_l enable_nullcts);
 int rwnx_send_get_sta_info_req(struct rwnx_hw *rwnx_hw, u8_l sta_idx, struct mm_get_sta_info_cfm *cfm);
 int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,

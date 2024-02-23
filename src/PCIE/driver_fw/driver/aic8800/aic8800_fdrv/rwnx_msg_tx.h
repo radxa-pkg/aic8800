@@ -164,6 +164,7 @@ int rwnx_send_coex_req(struct rwnx_hw *rwnx_hw, u8_l disable_coexnull, u8_l enab
 int rwnx_send_get_sta_info_req(struct rwnx_hw *rwnx_hw, u8_l sta_idx, struct mm_get_sta_info_cfm *cfm);
 int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,
 					u8_l fwtrace_redir_en, struct mm_set_stack_start_cfm *cfm);
+int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id, int32_t *param, int32_t *param_out);
 int rwnx_send_get_fw_version_req(struct rwnx_hw *rwnx_hw, struct mm_get_fw_version_cfm *cfm);
 int rwnx_send_txpwr_idx_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_ofst_req(struct rwnx_hw *rwnx_hw);

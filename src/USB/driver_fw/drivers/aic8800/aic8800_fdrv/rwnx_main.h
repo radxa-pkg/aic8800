@@ -30,7 +30,7 @@ typedef struct _compat_android_wifi_priv_cmd {
 int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data);
 void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw);
 extern int testmode;
-extern u8 chip_id;
+extern u32 chip_id;
 extern u8 chip_sub_id;
 extern u8 chip_mcu_id;
 

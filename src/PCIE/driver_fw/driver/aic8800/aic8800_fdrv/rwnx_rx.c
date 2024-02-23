@@ -704,6 +704,12 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
         }
         #endif
     }
+    if (ieee80211_is_deauth(mgmt->frame_control) && rwnx_vif->wdev.iftype == NL80211_IFTYPE_AP) {
+        printk("DEAUTH: sta_idx %d MAC %pM reason:%x\n", rwnx_vif->ap.aic_index, mgmt->sa, mgmt->u.deauth.reason_code);
+    }
+    if (ieee80211_is_disassoc(mgmt->frame_control) && rwnx_vif->wdev.iftype == NL80211_IFTYPE_AP) {
+        printk("DISASSOC: sta_idx %d MAC %pM reason:%x\n", rwnx_vif->ap.aic_index, mgmt->sa, mgmt->u.disassoc.reason_code);
+    }
 #endif
 
 	if (ieee80211_is_mgmt(mgmt->frame_control) &&

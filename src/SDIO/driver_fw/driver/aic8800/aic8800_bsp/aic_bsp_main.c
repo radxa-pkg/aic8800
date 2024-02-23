@@ -157,7 +157,11 @@ struct aicbsp_info_t aicbsp_info = {
 	.hwinfo   = AICBSP_HWINFO_DEFAULT,
 	.cpmode   = AICBSP_CPMODE_DEFAULT,
 	.fwlog_en = AICBSP_FWLOG_EN_DEFAULT,
-	.irqf     = AIC_IRQ_WAKE_FLAG,
+#ifdef CONFIG_IRQ_FALL
+	.irqf     = 1,
+#else
+	.irqf     = 0,
+#endif
 };
 
 struct mutex aicbsp_power_lock;

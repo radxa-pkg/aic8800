@@ -894,7 +894,7 @@ static char *translate_scan(struct rwnx_hw* rwnx_hw,
 	    	start = aicwf_get_iwe_stream_rssi(rwnx_hw, info, scan_re, start, stop, &iwe);
 		return start;
 	} else{
-		return NULL;
+		return start;
 	}	
 }
 

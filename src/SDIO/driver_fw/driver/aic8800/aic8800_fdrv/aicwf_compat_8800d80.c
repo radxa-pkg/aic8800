@@ -24,11 +24,9 @@ int aicwf_set_rf_config_8800d80(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_
 		return -1;
 	}
 
-    if (testmode == 0) {
         if ((ret = rwnx_send_rf_calib_req(rwnx_hw, cfm))) {
-			return -1;
-		}
-    }
+		return -1;
+	}
 
 	return 0 ;
 }

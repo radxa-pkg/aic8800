@@ -25,16 +25,18 @@ u32 syscfg_tbl_8800dc_sdio_u02[][2] = {
     {0x40030084, 0x0011E800},
     {0x40030080, 0x00000001},
     {0x4010001C, 0x00000000},
+};
 #ifdef CONFIG_OOB
-    {0x40504044, 0x2},//oob_enable
-    {0x40500060, 0x03020700},
-    {0x40500040, 0},
-    {0x40100030, 1},
-    {0x40241020, 1},
-    {0x402400f0, 0x340022},
+u32 oobcfg_tbl_8800dc_sdio_u02[][2] = {
+		{0x40504044, 0x2},//oob_enable
+		{0x40500060, 0x03020700},
+		{0x40500040, 0},
+		{0x40100030, 1},
+		{0x40241020, 1},
+		{0x402400f0, 0x340022},
+};
 #endif //CONFIG_OOB
 
-};
 
 u32 syscfg_tbl_masked_8800dc[][3] = {
     //#ifdef CONFIG_PMIC_SETTING
@@ -1698,6 +1700,9 @@ void system_config_8800dc(struct aic_sdio_dev *rwnx_hw)
     int ret, cnt;
     const u32 mem_addr = 0x40500000;
     struct dbg_mem_read_cfm rd_mem_addr_cfm;
+#ifdef CONFIG_OOB
+	int oobcfg_num;
+#endif
 
     ret = rwnx_send_dbg_mem_read_req(rwnx_hw, mem_addr, &rd_mem_addr_cfm);
     if (ret) {
@@ -1747,7 +1752,7 @@ void system_config_8800dc(struct aic_sdio_dev *rwnx_hw)
                     return;
                 }
             }
-        } else if (chip_sub_id == 1) {
+        } else if ((chip_sub_id == 1) || (chip_sub_id == 2)) {
             syscfg_num = sizeof(syscfg_tbl_8800dc_sdio_u02) / sizeof(u32) / 2;
             for (cnt = 0; cnt < syscfg_num; cnt++) {
                 ret = rwnx_send_dbg_mem_write_req(rwnx_hw, syscfg_tbl_8800dc_sdio_u02[cnt][0], syscfg_tbl_8800dc_sdio_u02[cnt][1]);
@@ -1758,7 +1763,18 @@ void system_config_8800dc(struct aic_sdio_dev *rwnx_hw)
             }
         }
     }
-
+#ifdef CONFIG_OOB
+	if ((chip_sub_id == 1) || (chip_sub_id == 2)) {
+		oobcfg_num = sizeof(oobcfg_tbl_8800dc_sdio_u02) / sizeof(u32) / 2;
+        for (cnt = 0; cnt < oobcfg_num; cnt++) {
+			ret = rwnx_send_dbg_mem_write_req(rwnx_hw, oobcfg_tbl_8800dc_sdio_u02[cnt][0], oobcfg_tbl_8800dc_sdio_u02[cnt][1]);
+			if (ret) {
+				AICWFDBG(LOGERROR, "%x write fail: %d\n", oobcfg_tbl_8800dc_sdio_u02[cnt][0], ret);
+				return;
+            }
+       }
+	}
+#endif
     if (IS_CHIP_ID_H()) {
         syscfg_num = sizeof(syscfg_tbl_masked_8800dc_h) / sizeof(u32) / 3;
         p_syscfg_msk_tbl = syscfg_tbl_masked_8800dc_h;

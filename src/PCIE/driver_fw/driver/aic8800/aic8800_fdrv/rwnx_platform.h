@@ -39,6 +39,7 @@
 #define FW_RAM_PATCH_BASE_ADDR_8800D80_U02 0x0020B43c
 
 #define RWNX_PCIE_FW_NAME                   "fmacfw_8800D80_pcie.bin"
+#define RWNX_PCIE_FW_BT_NAME                "fmacfwbt_8800D80_pcie.bin"
 #define RWNX_PCIE_RF_FW_NAME                "lmacfw_rf_pcie.bin"
 #define FW_PATCH_BASE_NAME_8800D80_U02      "fw_patch_8800d80_u02.bin"
 #define FW_ADID_BASE_NAME_8800D80_U02       "fw_adid_8800d80_u02.bin"

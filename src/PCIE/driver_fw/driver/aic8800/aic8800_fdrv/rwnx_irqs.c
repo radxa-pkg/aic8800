@@ -21,10 +21,6 @@ extern void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
 
 u8 data_cnt = 0;
 u8 debug_print = 1;
-u8 cnt=0;
-u8 idx=0;
-u8 tx_cnt=0;
-u16 tx_idx=0;
 
 /**
  * rwnx_irq_hdlr - IRQ handler
@@ -33,10 +29,10 @@ u16 tx_idx=0;
  */
 irqreturn_t rwnx_irq_hdlr(int irq, void *dev_id)
 {
-	struct rwnx_hw *rwnx_hw = (struct rwnx_hw *)dev_id;
-	disable_irq_nosync(irq);
-	tasklet_schedule(&rwnx_hw->task);
-	return IRQ_HANDLED;
+    struct rwnx_hw *rwnx_hw = (struct rwnx_hw *)dev_id;
+    disable_irq_nosync(irq);
+    tasklet_schedule(&rwnx_hw->task);
+    return IRQ_HANDLED;
 }
 
 /**
@@ -52,21 +48,21 @@ void rwnx_task(unsigned long data)
     struct rwnx_plat *rwnx_plat = rwnx_hw->plat;
 
     uint32_t status;
-	bool rxdata_pause = false;
-	uint32_t rxdata_successive_cnt = 0;
-	bool txdata_pause = false;
-	uint32_t txdata_successive_cnt = 0;
+    bool rxdata_pause = false;
+    uint32_t rxdata_successive_cnt = 0;
+    bool txdata_pause = false;
+    uint32_t txdata_successive_cnt = 0;
 
-	if(rwnx_hw->pci_suspending) {
-		printk("%s pci_suspending return\n", __func__);
-		if(rwnx_hw->is_irq_disable) {
-			rwnx_hw->is_irq_disable = 0;
-			enable_irq(rwnx_hw->pcidev->pci_dev->irq);
-		}
-		return;
-	}
+    if(rwnx_hw->pci_suspending) {
+        printk("%s pci_suspending return\n", __func__);
+        if(rwnx_hw->is_irq_disable) {
+            rwnx_hw->is_irq_disable = 0;
+            enable_irq(rwnx_hw->pcidev->pci_dev->irq);
+        }
+        return;
+    }
 
-	status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET);
+    status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET);
 
     //printk("task status = %x \n",status);
     while(status) {
@@ -118,15 +114,15 @@ void rwnx_task(unsigned long data)
 
                 /* Reset the msg buffer and re-use it */
                 msg->pattern = 0;
-		//wmb();
+                //wmb();
 
                 dma_sync_single_for_device(&rwnx_hw->pcidev->pci_dev->dev, buf->dma_addr, sizeof(struct ipc_e2a_msg), DMA_TO_DEVICE);
                 /* Push back the buffer to the LMAC */
                 ipc_host_msgbuf_push(rwnx_hw->ipc_env, buf);
 
                 buf = rwnx_hw->ipc_env->msgbuf[rwnx_hw->ipc_env->msgbuf_idx];
-                if(!buf)
-                break;
+                if (!buf)
+                    break;
                 msg = buf->addr;
             }
         } 
@@ -139,8 +135,8 @@ void rwnx_task(unsigned long data)
             struct sk_buff *skb ;
 
             volatile struct ipc_shared_rx_buf *rxbuf = &rwnx_hw->ipc_env->shared->host_rxbuf[data_cnt];
-			rxdata_successive_cnt = 0;
-			rxdata_pause = false;
+            rxdata_successive_cnt = 0;
+            rxdata_pause = false;
 
             while(1) {
                 //hostid = rxbuf->hostid;
@@ -150,30 +146,20 @@ void rwnx_task(unsigned long data)
                     break;
                 buf = &rwnx_hw->rxbufs[data_cnt];
                 //if(debug_print)
-                	//printk("rx %x, %d, %x\n", rxbuf->pattern, data_cnt, ipc_buf->dma_addr);
+                    //printk("rx %x, %d, %x\n", rxbuf->pattern, data_cnt, ipc_buf->dma_addr);
 
                 if(rxbuf->pattern != PCIE_RXDATA_COMP_PATTERN) {
-                    if(idx == (data_cnt - 1))
-                        cnt++;
-                    if(cnt >= 3) {
-                    //    printk("trigger\n");
-                    //  *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar2_vaddr + 0x800f0) = 0x12345678;
-                    }
                     break;
                 }
                 if(rxdata_successive_cnt >= 10 ){
-					if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
-						rxdata_pause = true;
-						break;
-					}
-				}
+                    if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                        rxdata_pause = true;
+                        break;
+                    }
+                }
 
                 rxbuf->pattern = 0;
                 wmb();
-
-
-                idx = data_cnt;
-                cnt = 0;
 
                 dma_sync_single_for_cpu(&rwnx_hw->pcidev->pci_dev->dev, ipc_buf->dma_addr, 64+1554, DMA_FROM_DEVICE);
                 skb = (struct sk_buff *)ipc_buf->addr;
@@ -181,7 +167,7 @@ void rwnx_task(unsigned long data)
                 //printk("rx data:cnt=%d, skb=%p, dma=%lx, data0,1=%x, %x, idx=%d\n", data_cnt, ipc_buf->addr, ipc_buf->dma_addr, skb->data[0], skb->data[1], hostid-1 );
                 //rwnx_data_dump("rx data", skb->data + 60, 64);
                 //if(debug_print)
-                	//printk("rx %d\n",data_cnt);
+                    //printk("rx %d\n",data_cnt);
 
                 skb_put(skb, ((skb->data[1]<<8) |skb->data[0] )+ 60);
                 struct hw_rxhdr *hw_rxhdr = (struct hw_rxhdr *)skb->data;
@@ -191,58 +177,41 @@ void rwnx_task(unsigned long data)
                 }
                 rwnx_rxdataind_aicwf(rwnx_hw, skb, (void *)rwnx_hw->pcidev->rx_priv);
                 rwnx_hw->stats.last_rx = jiffies;
-				rxdata_successive_cnt++;
+                rxdata_successive_cnt++;
 
                 //rwnx_ipc_rxbuf_dealloc(rwnx_hw, ipc_buf);
                 if (buf->addr) {
-					dma_unmap_single(rwnx_hw->dev, buf->dma_addr, buf->size, DMA_FROM_DEVICE);
-                	buf->addr = NULL;
+                    dma_unmap_single(rwnx_hw->dev, buf->dma_addr, buf->size, DMA_FROM_DEVICE);
+                    buf->addr = NULL;
                 }
 
-				atomic_dec(&rwnx_hw->rxbuf_cnt);
+                atomic_dec(&rwnx_hw->rxbuf_cnt);
                 data_cnt++;
                 if(data_cnt == IPC_RXBUF_CNT)
                     data_cnt = 0;
 
                 rwnx_ipc_rxbuf_alloc(rwnx_hw);
                 rxbuf = &rwnx_hw->ipc_env->shared->host_rxbuf[data_cnt];
-            }	
-			for(;atomic_read(&rwnx_hw->rxbuf_cnt) < rwnx_hw->ipc_env->rxbuf_nb;){
-				if(rwnx_ipc_rxbuf_alloc(rwnx_hw)){
-					printk("rxbuf alloc fail,now rxbuf_cnt = %d \n",atomic_read(&rwnx_hw->rxbuf_cnt));
-					if(atomic_read(&rwnx_hw->rxbuf_cnt) < 254)
-						complete(&rwnx_hw->pcidev->bus_if->busrx_trgg);
-					break;
-				}
-			}
-        }
-
-        uint32_t txcfm_idx1 = rwnx_hw->ipc_env->txcfm_idx;
-        volatile struct txdesc_host *txdesc1 = &rwnx_hw->ipc_env->shared->txdesc[txcfm_idx1];
-        volatile uint32_t ready = txdesc1->ready;
-        wmb();
-        //printk("idx=%d, %x,st=%x\n", txcfm_idx1, ready, status);
-
-        if(status == PCIE_TXC_DATA_BIT && ready != PCIE_TXDATA_COMP_PATTERN) {
-            if(tx_idx == txcfm_idx1) {
-                //tx_cnt++;
-                //if(tx_cnt == 2) 
-                {
-                    *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar2_vaddr + 0x800f0) = 0x12345678;
-                    printk("trigger txc\n");
+            }
+            for(;atomic_read(&rwnx_hw->rxbuf_cnt) < rwnx_hw->ipc_env->rxbuf_nb;){
+                if(rwnx_ipc_rxbuf_alloc(rwnx_hw)){
+                    printk("rxbuf alloc fail,now rxbuf_cnt = %d \n",atomic_read(&rwnx_hw->rxbuf_cnt));
+                    if(atomic_read(&rwnx_hw->rxbuf_cnt) < 254)
+                        complete(&rwnx_hw->pcidev->bus_if->busrx_trgg);
+                    break;
                 }
             }
-            tx_idx = txcfm_idx1;
         }
+
         if(status & PCIE_TXC_DATA_BIT || txdata_pause)
         {
             uint32_t txcfm_idx = rwnx_hw->ipc_env->txcfm_idx;
             volatile struct txdesc_host *txdesc = &rwnx_hw->ipc_env->shared->txdesc[txcfm_idx];
             //volatile unsigned int *ack = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x35208);
             //ack[0] = 0x4;
-            ready = txdesc->ready;
-			txdata_successive_cnt = 0;
-			txdata_pause = false;
+            volatile uint32_t ready = txdesc->ready;
+            txdata_successive_cnt = 0;
+            txdata_pause = false;
 
             wmb();
 
@@ -255,17 +224,17 @@ void rwnx_task(unsigned long data)
                     struct sk_buff *skb_tmp = sw_txhdr->skb;
 
                     if(txdata_successive_cnt >= 10 ){
-						if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
-							//printk("m%d\n",txcfm_idx);
-							txdata_pause = true;
-							break;
-						}
-					}
+                        if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                            //printk("m%d\n",txcfm_idx);
+                            txdata_pause = true;
+                            break;
+                        }
+                    }
 
                     //printk("cfm dma=0x%lx, txcfm_idx=%d, sw_txhdr=%p, skb=%p\n", sw_txhdr->ipc_desc.dma_addr, txcfm_idx, sw_txhdr, sw_txhdr->skb);
                     //printk("done:%d\n",txcfm_idx);
                     //if(debug_print)
-                    	//printk("1 txc %d, sw_txhdr=%p, skb=%p\n", txcfm_idx, sw_txhdr, sw_txhdr->skb);
+                        //printk("1 txc %d, sw_txhdr=%p, skb=%p\n", txcfm_idx, sw_txhdr, sw_txhdr->skb);
 
                     if(!sw_txhdr->need_cfm || sw_txhdr->cfmd) {
                         rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
@@ -279,9 +248,9 @@ void rwnx_task(unsigned long data)
                     rwnx_hw->ipc_env->txcfm[txcfm_idx] = NULL;
                     txcfm_idx++;
                     if (txcfm_idx == IPC_TXDMA_DESC_CNT)
-                    	txcfm_idx = 0;
+                        txcfm_idx = 0;
 
-					txdata_successive_cnt++;
+                    txdata_successive_cnt++;
                     atomic_dec(&rwnx_hw->txdata_cnt);
                     rwnx_hw->ipc_env->txcfm_idx = txcfm_idx;
 
@@ -289,24 +258,24 @@ void rwnx_task(unsigned long data)
                     ready = txdesc->ready;
                     wmb();
                 }else{
-			//printk("n%d\n",txcfm_idx);
+                    //printk("n%d\n",txcfm_idx);
                     break;
-		}
+                }
             }
         }
 
         status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET);
     }
 
-	//printk("d%d\n",atomic_read(&rwnx_hw->txdata_cnt_push));
+    //printk("d%d\n",atomic_read(&rwnx_hw->txdata_cnt_push));
     if (atomic_read(&rwnx_hw->txdata_cnt) <64 && rwnx_hw->fc) {
         struct rwnx_vif *rwnx_vif;
         rwnx_hw->fc = 0;
         AICWFDBG(LOGINFO,"fcr\n");
         list_for_each_entry(rwnx_vif, &rwnx_hw->vifs, list) {
-	  if (!rwnx_vif || !rwnx_vif->ndev || !rwnx_vif->up)
-	      continue;
-          netif_tx_wake_all_queues(rwnx_vif->ndev);
+            if (!rwnx_vif || !rwnx_vif->ndev || !rwnx_vif->up)
+                continue;
+            netif_tx_wake_all_queues(rwnx_vif->ndev);
         }
     }
 
@@ -331,10 +300,10 @@ void rwnx_txrestart_task(unsigned long data)
 {
     struct rwnx_hw *rwnx_hw = (struct rwnx_hw *)data;
 
-	#if 1
-	//printk("%s\n", __func__);
+    #if 1
+    //printk("%s\n", __func__);
     spin_lock_bh(&rwnx_hw->tx_lock);
     rwnx_hwq_process_all(rwnx_hw);
     spin_unlock_bh(&rwnx_hw->tx_lock);
-	#endif
+    #endif
 }

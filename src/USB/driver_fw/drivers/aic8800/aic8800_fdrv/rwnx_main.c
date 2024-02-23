@@ -1233,7 +1233,6 @@ static int rwnx_open(struct net_device *dev)
 			break;
 		}
 	}
-
     // Check if it is the first opened VIF
     if (rwnx_hw->vif_started == 0)
     {
@@ -1612,6 +1611,8 @@ enum {
     RDWR_EFUSE_PWROFSTFINE,
     RDWR_EFUSE_SDIOCFG,
     RDWR_EFUSE_USBVIDPID,
+    SET_SRRC,
+    SET_FSS,
 
     #ifdef CONFIG_USB_BT
     BT_CMD_BASE = 0x100,
@@ -1988,6 +1989,26 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
                 func = command_strtoul(argv[1], NULL, 10);
                 printk("set notch: %d\n", func);
                 rwnx_send_rftest_req(p_rwnx_hw, SET_NOTCH, sizeof(func), (u8_l *)&func, NULL);
+            } else {
+                printk("wrong args\n");
+                bytes_written = -EINVAL;
+                break;
+            }
+        } else if (strcasecmp(argv[0], "SET_SRRC") == 0) {
+            if (argc > 1) {
+                func = command_strtoul(argv[1], NULL, 10);
+                printk("set srrc: %d\n", func);
+                rwnx_send_rftest_req(p_rwnx_hw, SET_SRRC, sizeof(func), (u8_l *)&func, NULL);
+            } else {
+                printk("wrong args\n");
+                bytes_written = -EINVAL;
+                break;
+            }
+        } else if (strcasecmp(argv[0], "SET_FSS") == 0) {
+            if (argc > 1) {
+                func = command_strtoul(argv[1], NULL, 10);
+                printk("set fss: %d\n", func);
+                rwnx_send_rftest_req(p_rwnx_hw, SET_FSS, sizeof(func), (u8_l *)&func, NULL);
             } else {
                 printk("wrong args\n");
                 bytes_written = -EINVAL;
@@ -8848,7 +8869,7 @@ struct aic_feature_t {
 #define CHIP_REV_U02        0x3
 #define CHIP_REV_U03        0x7
 #define CHIP_SUB_REV_U04    0x20
-u8 chip_id = 0;
+u32 chip_id = 0;
 u8 chip_sub_id = 0; // rom_id for 8800dc
 u8 chip_mcu_id = 0;
 
@@ -8922,7 +8943,7 @@ static void system_config_8800(struct rwnx_hw *rwnx_hw){
 		AICWFDBG(LOGERROR, "%x rd fail: %d\n", mem_addr, ret);
         return;
     }
-    chip_id = (u8)(rd_mem_addr_cfm.memdata >> 16);
+    chip_id = rd_mem_addr_cfm.memdata >> 16;
     //printk("%x=%x\n", rd_mem_addr_cfm.memaddr, rd_mem_addr_cfm.memdata);
     ret = rwnx_send_dbg_mem_read_req(rwnx_hw, 0x00000004, &rd_mem_addr_cfm);
     if (ret) {
@@ -9193,6 +9214,20 @@ int rwnx_ic_rf_init(struct rwnx_hw *rwnx_hw){
 #endif
 	return 0;
 }
+void aic_ipc_setting(struct rwnx_vif *rwnx_vif){
+    struct rwnx_hw *rwnx_hw = rwnx_vif->rwnx_hw;
+	uint32_t hw_edca = 1;
+	uint32_t hw_cca = 3;
+	int32_t param[13];
+	int32_t cca[5]= {0x10, 0, 0, 0, 0};
+
+	param[0] = 0; param[1] = 0x5e222; param[2] = 0; param[3] = 0;
+	param[4] = rwnx_vif->vif_index;
+	param[5] = 0x1e; param[6] = 0; param[7] = 0; param[8] =0;param[9] = 0x5;param[10] = 0x5;param[11] = 0x5;param[12] = 0;
+	rwnx_send_vendor_hwconfig_req(rwnx_hw, hw_edca, param, NULL);
+	rwnx_send_vendor_hwconfig_req(rwnx_hw, hw_cca, cca, NULL);
+}
+
 
 extern void *aicwf_prealloc_txq_alloc(size_t size);
 extern int aicwf_vendor_init(struct wiphy *wiphy);
@@ -9593,6 +9628,9 @@ if((g_rwnx_plat->usbdev->chipid == PRODUCT_ID_AIC8801) ||
         rwnx_hw->is_p2p_alive = 0;
         rwnx_hw->is_p2p_connected = 0;
         atomic_set(&rwnx_hw->p2p_alive_timer_count, 0);
+#endif
+#ifdef CONFIG_FOR_IPCAM
+		aic_ipc_setting(vif);
 #endif
 
     return 0;
