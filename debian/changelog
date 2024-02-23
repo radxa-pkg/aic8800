@@ -1,3 +1,13 @@
+aic8800 (3.0+git20240116.ec460377-1) jammy; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * feat: rename aic8800-dkms to aic8800-sdio-dkms
+  * feat: add aic8800-usb-dkms
+  * feat: add aic8800-pcie-dkms
+  * feat: update to aic8800d_linux_sdk_V3.0_2024_0116_for_oms
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Fri, 23 Feb 2024 10:18:03 +0800
+
 aic8800 (3.0+git20231212.15dcf017-1) jammy; urgency=medium
 
   [ dependabot[bot] ]

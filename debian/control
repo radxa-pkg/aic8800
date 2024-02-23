@@ -14,11 +14,11 @@ Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
-Provides: aic8800-dkms (= 3.0+git20231212.15dcf017-2)
-Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2),
+Provides: aic8800-dkms
+Conflicts: aic8800-dkms (<< 3.0+git20240116.ec460377-1),
            aic8800-usb-dkms,
            aic8800-pcie-dkms,
-Replaces: aic8800-dkms (<< 3.0+git20231212.15dcf017-2)
+Replaces: aic8800-dkms (<< 3.0+git20240116.ec460377-1)
 Description: dkms sources for Aicsemi aic8800 SDIO Wi-Fi driver
  This package provides the dkms source code for Aicsemi
  aic8800 SDIO Wi-Fi driver.
@@ -28,7 +28,7 @@ Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
-Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2),
+Conflicts: aic8800-dkms (<< 3.0+git20240116.ec460377-1),
            aic8800-sdio-dkms,
            aic8800-pcie-dkms,
 Description: dkms sources for Aicsemi aic8800 USB Wi-Fi driver
@@ -40,7 +40,7 @@ Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
-Conflicts: aic8800-dkms (<< 3.0+git20231212.15dcf017-2),
+Conflicts: aic8800-dkms (<< 3.0+git20240116.ec460377-1),
            aic8800-sdio-dkms,
            aic8800-usb-dkms,
 Description: dkms sources for Aicsemi aic8800 PCIe Wi-Fi driver
