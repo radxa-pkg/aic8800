@@ -1,4 +1,6 @@
-fix-firmware-path.patch
+fix-sdio-firmware-path.patch
 fix-sdio-fall-through.patch
 fix-debug-file-with-no-debug-symbols.patch
 fix-pcie-build.patch
+fix-pcie-firmware-path.patch
+fix-usb-firmware-path.patch
