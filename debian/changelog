@@ -1,3 +1,10 @@
+aic8800 (3.0+git20240116.ec460377-3) jammy; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * Use distinct firmware path for each device variant
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Mon, 04 Mar 2024 19:11:45 +0800
+
 aic8800 (3.0+git20240116.ec460377-2) jammy; urgency=medium
 
   [ ZHANG Yuntian ]
