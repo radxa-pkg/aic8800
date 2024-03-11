@@ -64,8 +64,12 @@ clean-aicrf-test:
 #
 .PHONY: dch
 dch: debian/changelog
-	gbp dch --debian-branch=main
+	EDITOR=true gbp dch --debian-branch=main --multimaint-merge --commit --release --dch-opt=--upstream
 
 .PHONY: deb
 deb: debian
 	debuild --no-lintian --lintian-hook "lintian --fail-on error,warning --suppress-tags bad-distribution-in-changes-file -- %p_%v_*.changes" --no-sign -b -aarm64 -Pcross
+
+.PHONY: release
+release:
+	gh workflow run .github/workflows/new_version.yml
