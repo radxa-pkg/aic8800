@@ -4,3 +4,4 @@ fix-debug-file-with-no-debug-symbols.patch
 fix-pcie-build.patch
 fix-pcie-firmware-path.patch
 fix-usb-firmware-path.patch
+fix-linux-6.1-build.patch
