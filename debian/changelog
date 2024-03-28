@@ -1,3 +1,14 @@
+aic8800 (3.0+git20240116.ec460377-4) jammy; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * feat: ci: update dependency and add release.yml
+  * fix: add patch to allow building with Linux 6.1.0+
+  * feat: allow multiple dkms packages to coexist
+  * fix: detect Rockchip kernel and their shenanigans
+  * fix: ci: update build command
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Thu, 28 Mar 2024 08:34:32 +0000
+
 aic8800 (3.0+git20240116.ec460377-3) jammy; urgency=medium
 
   [ ZHANG Yuntian ]
