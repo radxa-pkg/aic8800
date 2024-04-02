@@ -1,3 +1,13 @@
+aic8800 (3.0+git20240116.ec460377-5) jammy; urgency=medium
+
+  [ CodeChenL ]
+  * feat: add aic8800-firmware
+  * fix: remove duplicate firmware
+  * fix: fix  some package issues with reviewer
+  * fix: place explicit depends up front
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 02 Apr 2024 08:22:56 +0000
+
 aic8800 (3.0+git20240116.ec460377-4) jammy; urgency=medium
 
   [ ZHANG Yuntian ]
