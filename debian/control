@@ -14,6 +14,7 @@ Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
+         aic8800-firmware (= ${binary:Version}),
 Provides: aic8800-dkms (= 3.0+git20240116.ec460377-1)
 Conflicts: aic8800-dkms (<< 3.0+git20240116.ec460377-1),
            aic8800-usb-dkms,
@@ -28,6 +29,7 @@ Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
+         aic8800-firmware (= ${binary:Version}),
 Conflicts: aic8800-dkms (<< 3.0+git20240116.ec460377-1),
            aic8800-sdio-dkms,
            aic8800-pcie-dkms,
@@ -40,6 +42,7 @@ Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
+         aic8800-firmware (= ${binary:Version}),
 Conflicts: aic8800-dkms (<< 3.0+git20240116.ec460377-1),
            aic8800-sdio-dkms,
            aic8800-usb-dkms,
@@ -56,3 +59,13 @@ Depends: ${shlibs:Depends},
 Description: Aicsemi RF test tools
  This Package provides Bluetooth and Wi-Fi test tools
  from Aicsemi aic8800 Wi-Fi driver.
+
+Package: aic8800-firmware
+Architecture: any
+Section: misc
+Priority: optional
+Depends: ${misc:Depends},
+Description: Aicsemi aic8800 supplemental firmware
+ This package contains firmwares that are not
+ shipped by Debian.
+

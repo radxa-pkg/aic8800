@@ -2,6 +2,7 @@
 /debhelper-build-stamp
 /files
 /aic8800-*-dkms
+/aic8800-firmware
 /aicrf-test
 /*.debhelper.log
 /*.debhelper
