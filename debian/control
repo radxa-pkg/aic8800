@@ -66,6 +66,5 @@ Section: misc
 Priority: optional
 Depends: ${misc:Depends},
 Description: Aicsemi aic8800 supplemental firmware
- This package contains firmwares that are not
+ This package contains Aicsemi aic8800 firmware that are not
  shipped by Debian.
-
