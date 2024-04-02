@@ -1,1 +1,3 @@
-firmware lib/
+src/PCIE/driver_fw/fw/* /lib/firmware/aic8800_fw/PCIE/
+src/SDIO/driver_fw/fw/* /lib/firmware/aic8800_fw/SDIO/
+src/USB/driver_fw/fw/* /lib/firmware/aic8800_fw/USB/
