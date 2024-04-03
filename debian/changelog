@@ -1,3 +1,10 @@
+aic8800 (3.0+git20240116.ec460377-6) jammy; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * feat: add aic_btusb module
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Wed, 03 Apr 2024 08:40:30 +0000
+
 aic8800 (3.0+git20240116.ec460377-5) jammy; urgency=medium
 
   [ CodeChenL ]
