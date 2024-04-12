@@ -6,3 +6,4 @@ fix-pcie-firmware-path.patch
 fix-usb-firmware-path.patch
 fix-linux-6.1-build.patch
 fix-aic_btusb.patch
+fix-linux-6.7-build.patch
