@@ -61,7 +61,7 @@ Description: Aicsemi RF test tools
  from Aicsemi aic8800 Wi-Fi driver.
 
 Package: aic8800-firmware
-Architecture: any
+Architecture: all
 Section: misc
 Priority: optional
 Depends: ${misc:Depends},
