@@ -39,6 +39,14 @@ typedef struct {
 #define AIC_PATCH_OFST(mem) ((size_t) &((aic_patch_t *)0)->mem)
 #define AIC_PATCH_ADDR(mem) ((u32) (aic_patch_str_base + AIC_PATCH_OFST(mem)))
 
+#define USER_CHAN_MAX_TXPWR_EN_FLAG     (0x01U << 1)
+#define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
+
+#define CFG_USER_CHAN_MAX_TXPWR_EN  0
+#define CFG_USER_TX_USE_ANA_F       0
+
+#define CFG_USER_EXT_FLAGS_EN   (CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
+
 u32 patch_tbl_d80[][2] =
 {
     #ifdef USE_5G
@@ -46,7 +54,22 @@ u32 patch_tbl_d80[][2] =
     #else
     {0x00b4, 0xf3010000},
     #endif
-    {0x0170, 0x00000002},//rx aggr counter
+#ifdef CONFIG_PLATFORM_HI
+    {0x0170, 0x00000001},//rx aggr counter
+#else
+    {0x0170, 0x0000000A},//rx aggr counter
+#endif
+
+    #if CFG_USER_EXT_FLAGS_EN
+    {0x0188, 0x00000001
+        #if CFG_USER_CHAN_MAX_TXPWR_EN
+        | USER_CHAN_MAX_TXPWR_EN_FLAG
+        #endif
+        #if CFG_USER_TX_USE_ANA_F
+        | USER_TX_USE_ANA_F_FLAG
+        #endif
+    }, // user_ext_flags
+    #endif
 };
 
 //adap test
@@ -67,11 +90,16 @@ u32 syscfg_tbl_8800d80[][2] = {
 
 extern int adap_test;
 
+#define NEW_PATCH_BUFFER_MAP    1
+
 int aicwf_patch_config_8800d80(struct aic_usb_dev *usb_dev)
 {
     u32 rd_patch_addr;
     u32 aic_patch_addr;
     u32 config_base, aic_patch_str_base;
+    #if (NEW_PATCH_BUFFER_MAP)
+    u32 patch_buff_addr, patch_buff_base, rd_version_addr, rd_version_val;
+    #endif
     uint32_t start_addr = 0x001D7000;
     u32 patch_addr = start_addr;
     u32 patch_cnt = sizeof(patch_tbl_d80) / 4 / 2;
@@ -107,6 +135,32 @@ int aicwf_patch_config_8800d80(struct aic_usb_dev *usb_dev)
     }
     AICWFDBG(LOGERROR, "%x=%x\n", rd_patch_addr_cfm.memaddr, rd_patch_addr_cfm.memdata);
     aic_patch_str_base = rd_patch_addr_cfm.memdata;
+
+    #if (NEW_PATCH_BUFFER_MAP)
+    if (chip_id == CHIP_REV_U01) {
+        rd_version_addr = RAM_FMAC_FW_ADDR_8800D80 + 0x01C;
+    } else {
+        rd_version_addr = RAM_FMAC_FW_ADDR_8800D80_U02 + 0x01C;
+    }
+    if ((ret = rwnx_send_dbg_mem_read_req(usb_dev, rd_version_addr, &rd_patch_addr_cfm))) {
+        AICWFDBG(LOGERROR, "version val[0x%x] rd fail: %d\n", rd_version_addr, ret);
+        return ret;
+    }
+    rd_version_val = rd_patch_addr_cfm.memdata;
+    AICWFDBG(LOGINFO, "rd_version_val=%08X\n", rd_version_val);
+    usb_dev->fw_version_uint = rd_version_val;
+    if (rd_version_val > 0x06090100) {
+        patch_buff_addr = rd_patch_addr + 12;
+        ret = rwnx_send_dbg_mem_read_req(usb_dev, patch_buff_addr, &rd_patch_addr_cfm);
+        if (ret) {
+            AICWFDBG(LOGERROR, "patch buf rd fail\n");
+            return ret;
+        }
+        AICWFDBG(LOGINFO, "%x=%x\n", rd_patch_addr_cfm.memaddr, rd_patch_addr_cfm.memdata);
+        patch_buff_base = rd_patch_addr_cfm.memdata;
+        patch_addr = start_addr = patch_buff_base;
+    }
+    #endif
 
     if ((ret = rwnx_send_dbg_mem_write_req(usb_dev, AIC_PATCH_ADDR(magic_num), AIC_PATCH_MAGIG_NUM))) {
         AICWFDBG(LOGERROR, "maigic_num[0x%x] write fail: %d\n", AIC_PATCH_ADDR(magic_num), ret);

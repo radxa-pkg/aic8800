@@ -131,7 +131,6 @@ void rwnx_task(unsigned long data)
         {
             u32_l hostid;
             struct rwnx_ipc_buf *ipc_buf;
-            struct rwnx_ipc_buf *buf;
             struct sk_buff *skb ;
 
             volatile struct ipc_shared_rx_buf *rxbuf = &rwnx_hw->ipc_env->shared->host_rxbuf[data_cnt];
@@ -144,7 +143,6 @@ void rwnx_task(unsigned long data)
 
                 if(!ipc_buf)
                     break;
-                buf = &rwnx_hw->rxbufs[data_cnt];
                 //if(debug_print)
                     //printk("rx %x, %d, %x\n", rxbuf->pattern, data_cnt, ipc_buf->dma_addr);
 
@@ -170,20 +168,22 @@ void rwnx_task(unsigned long data)
                     //printk("rx %d\n",data_cnt);
 
                 skb_put(skb, ((skb->data[1]<<8) |skb->data[0] )+ 60);
+
+                if (ipc_buf->addr) {
+                    dma_unmap_single(rwnx_hw->dev, ipc_buf->dma_addr, ipc_buf->size, DMA_FROM_DEVICE);
+                    ipc_buf->addr = NULL;
+                }
+
+                #ifdef AICWF_RX_REORDER
                 struct hw_rxhdr *hw_rxhdr = (struct hw_rxhdr *)skb->data;
                 if(hw_rxhdr->is_monitor_vif) {
                     printk("rx data:cnt=%d, skb=%p, dma=%lx, len=%x, %x\n", data_cnt, ipc_buf->addr, ipc_buf->dma_addr, skb->data[1], skb->data[0] );
                     rwnx_data_dump("data:", skb->data - 128, 128 + 64);
                 }
+                #endif
                 rwnx_rxdataind_aicwf(rwnx_hw, skb, (void *)rwnx_hw->pcidev->rx_priv);
                 rwnx_hw->stats.last_rx = jiffies;
                 rxdata_successive_cnt++;
-
-                //rwnx_ipc_rxbuf_dealloc(rwnx_hw, ipc_buf);
-                if (buf->addr) {
-                    dma_unmap_single(rwnx_hw->dev, buf->dma_addr, buf->size, DMA_FROM_DEVICE);
-                    buf->addr = NULL;
-                }
 
                 atomic_dec(&rwnx_hw->rxbuf_cnt);
                 data_cnt++;
@@ -206,59 +206,59 @@ void rwnx_task(unsigned long data)
         if(status & PCIE_TXC_DATA_BIT || txdata_pause)
         {
             uint32_t txcfm_idx = rwnx_hw->ipc_env->txcfm_idx;
+            struct rwnx_sw_txhdr *sw_txhdr = (struct rwnx_sw_txhdr *)rwnx_hw->ipc_env->txcfm[txcfm_idx];
             volatile struct txdesc_host *txdesc = &rwnx_hw->ipc_env->shared->txdesc[txcfm_idx];
-            //volatile unsigned int *ack = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x35208);
-            //ack[0] = 0x4;
-            volatile uint32_t ready = txdesc->ready;
+            volatile uint32_t ready = 0;
             txdata_successive_cnt = 0;
             txdata_pause = false;
 
-            wmb();
+            if (sw_txhdr != NULL) {
+                ready = txdesc->ready;
+                rmb();
+            }
 
             //printk("data cpl cfm: idx=%d, ready=%x\n", txcfm_idx, txdesc->ready);
-            while(ready == PCIE_TXDATA_COMP_PATTERN) {
-                struct rwnx_sw_txhdr *sw_txhdr = (struct rwnx_sw_txhdr *)rwnx_hw->ipc_env->txcfm[txcfm_idx];
-                struct rwnx_ipc_buf *txcfm_buf;
-                if(sw_txhdr != NULL) {
-                    txcfm_buf = &sw_txhdr->ipc_desc;
-                    struct sk_buff *skb_tmp = sw_txhdr->skb;
+            while((sw_txhdr != NULL) && (ready == PCIE_TXDATA_COMP_PATTERN)) {
+                struct rwnx_ipc_buf *txcfm_buf = &sw_txhdr->ipc_desc;
+                struct sk_buff *skb_tmp = sw_txhdr->skb;
 
-                    if(txdata_successive_cnt >= 10 ){
-                        if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
-                            //printk("m%d\n",txcfm_idx);
-                            txdata_pause = true;
-                            break;
-                        }
+                if(txdata_successive_cnt >= 10 ){
+                    if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                        //printk("m%d\n",txcfm_idx);
+                        txdata_pause = true;
+                        break;
                     }
+                }
 
-                    //printk("cfm dma=0x%lx, txcfm_idx=%d, sw_txhdr=%p, skb=%p\n", sw_txhdr->ipc_desc.dma_addr, txcfm_idx, sw_txhdr, sw_txhdr->skb);
-                    //printk("done:%d\n",txcfm_idx);
-                    //if(debug_print)
-                        //printk("1 txc %d, sw_txhdr=%p, skb=%p\n", txcfm_idx, sw_txhdr, sw_txhdr->skb);
+                //printk("cfm dma=0x%lx, txcfm_idx=%d, sw_txhdr=%p, skb=%p\n", sw_txhdr->ipc_desc.dma_addr, txcfm_idx, sw_txhdr, sw_txhdr->skb);
+                //printk("done:%d\n",txcfm_idx);
+                //if(debug_print)
+                    //printk("1 txc %d, sw_txhdr=%p, skb=%p\n", txcfm_idx, sw_txhdr, sw_txhdr->skb);
 
-                    if(!sw_txhdr->need_cfm || sw_txhdr->cfmd) {
-                        rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
-                        dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
-                        kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
-                        skb_pull(skb_tmp, RWNX_TX_HEADROOM);
-                        consume_skb(skb_tmp);
-                    }
-                    rwnx_hw->stats.last_tx = jiffies;
+                if(!sw_txhdr->need_cfm || sw_txhdr->cfmd) {
+                    rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
+                    dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
+                    kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+                    skb_pull(skb_tmp, RWNX_TX_HEADROOM);
+                    consume_skb(skb_tmp);
+                }
+                rwnx_hw->stats.last_tx = jiffies;
 
-                    rwnx_hw->ipc_env->txcfm[txcfm_idx] = NULL;
-                    txcfm_idx++;
-                    if (txcfm_idx == IPC_TXDMA_DESC_CNT)
-                        txcfm_idx = 0;
+                rwnx_hw->ipc_env->txcfm[txcfm_idx] = NULL;
+                txcfm_idx++;
+                if (txcfm_idx == IPC_TXDMA_DESC_CNT)
+                    txcfm_idx = 0;
 
-                    txdata_successive_cnt++;
-                    atomic_dec(&rwnx_hw->txdata_cnt);
-                    rwnx_hw->ipc_env->txcfm_idx = txcfm_idx;
+                txdata_successive_cnt++;
+                atomic_dec(&rwnx_hw->txdata_cnt);
+                rwnx_hw->ipc_env->txcfm_idx = txcfm_idx;
 
+                sw_txhdr = (struct rwnx_sw_txhdr *)rwnx_hw->ipc_env->txcfm[txcfm_idx];
+                if (sw_txhdr != NULL) {
                     txdesc = &rwnx_hw->ipc_env->shared->txdesc[txcfm_idx];
                     ready = txdesc->ready;
-                    wmb();
-                }else{
-                    //printk("n%d\n",txcfm_idx);
+                    rmb();
+                } else {
                     break;
                 }
             }

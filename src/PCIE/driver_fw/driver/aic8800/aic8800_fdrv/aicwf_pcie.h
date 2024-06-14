@@ -21,6 +21,8 @@ struct aic_pci_dev {
 	u8 *pci_bar2_vaddr;
 	u8 *pci_bar3_vaddr;
 
+	u32 fw_version_uint;
+
 	spinlock_t txmsg_lock;
 	spinlock_t ws_lock;
 };

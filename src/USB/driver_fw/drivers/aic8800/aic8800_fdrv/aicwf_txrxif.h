@@ -209,6 +209,19 @@ struct aicwf_rx_priv {
 #else
 	struct frame_queue rxq;
 #endif
+#ifdef CONFIG_USB_RX_REASSEMBLE
+    struct sk_buff *rx_reassemble_skb;
+    u32 rx_reassemble_total_len;
+    u32 rx_reassemble_cur_len;
+    u32 rx_reassemble_total_frags;
+    u32 rx_reassemble_cur_frags;
+
+    struct sk_buff *rx_msg_reassemble_skb;
+    u32 rx_msg_reassemble_total_len;
+    u32 rx_msg_reassemble_cur_len;
+    u32 rx_msg_reassemble_total_frags;
+    u32 rx_msg_reassemble_cur_frags;
+#endif
 
 #ifdef CONFIG_USB_MSG_IN_EP
 	atomic_t msg_rx_cnt;

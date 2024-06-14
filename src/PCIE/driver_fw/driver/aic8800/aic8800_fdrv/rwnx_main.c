@@ -1035,7 +1035,6 @@ static int rwnx_open(struct net_device *dev)
 	} else {
 		/* Forward the information to the LMAC,
 		 *     p2p value not used in FMAC configuration, iftype is sufficient */
-
 		error = rwnx_send_add_if (rwnx_hw, rwnx_vif->wdev.address, RWNX_VIF_TYPE(rwnx_vif), false, &add_if_cfm);
 		if (error) {
 			printk("add if fail\n");
@@ -1061,7 +1060,6 @@ static int rwnx_open(struct net_device *dev)
             rwnx_hw->is_p2p_alive = 1;
         }
 #endif
-
 	}
 
 	if (RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_MONITOR) {
@@ -1097,12 +1095,12 @@ static int rwnx_close (struct net_device * dev)
 	struct rwnx_hw * rwnx_hw = rwnx_vif->rwnx_hw;
 	int ret;
 
-#if defined (AICWF_USB_SUPPORT) 	
+#if defined (AICWF_USB_SUPPORT)
 	struct aicwf_bus * bus_if = NULL;
 	struct aic_usb_dev * usbdev = NULL;
 	bus_if = dev_get_drvdata (rwnx_hw->dev);
 	usbdev = bus_if->bus_priv.usb;
-#elif defined (AICWF_SDIO_SUPPORT) 
+#elif defined (AICWF_SDIO_SUPPORT)
 	struct aicwf_bus * bus_if = NULL;
 	struct aic_sdio_dev * sdiodev = NULL;
 #elif defined (AICWF_PCIE_SUPPORT)
@@ -1163,7 +1161,7 @@ static int rwnx_close (struct net_device * dev)
 		{
 			if (RWNX_VIF_TYPE (rwnx_vif) == NL80211_IFTYPE_STATION || RWNX_VIF_TYPE (rwnx_vif) == NL80211_IFTYPE_P2P_CLIENT)
 				{
-					cfg80211_disconnected (dev, WLAN_REASON_DEAUTH_LEAVING, 
+					cfg80211_disconnected (dev, WLAN_REASON_DEAUTH_LEAVING,
 						NULL, 0, true, GFP_ATOMIC);
 					netif_tx_stop_all_queues (dev);
 					netif_carrier_off (dev);
@@ -1173,7 +1171,7 @@ static int rwnx_close (struct net_device * dev)
 				{
 					netif_carrier_off (dev);
 				}
-			else 
+			else
 				{
 					netdev_warn (dev, "AP not stopped when disabling interface");
 				}
@@ -1189,7 +1187,7 @@ static int rwnx_close (struct net_device * dev)
 
 		}
 
-#if defined (AICWF_USB_SUPPORT) 	
+#if defined (AICWF_USB_SUPPORT)
 
 	if (usbdev != NULL)
 		{
@@ -1199,7 +1197,7 @@ static int rwnx_close (struct net_device * dev)
 
 #endif
 
-#if defined (AICWF_SDIO_SUPPORT)	
+#if defined (AICWF_SDIO_SUPPORT)
 	bus_if = dev_get_drvdata (rwnx_hw->dev);
 
 	if (bus_if)
@@ -1306,7 +1304,7 @@ static int rwnx_close (struct net_device * dev)
 		}
 
 #ifdef CONFIG_COEX
-	else 
+	else
 		{
 			if (RWNX_VIF_TYPE (rwnx_vif) == NL80211_IFTYPE_AP || RWNX_VIF_TYPE (rwnx_vif) == NL80211_IFTYPE_P2P_GO) {
 				if (testmode == 0)
@@ -1321,7 +1319,7 @@ static int rwnx_close (struct net_device * dev)
 	//open lp mode
 	rwnx_send_me_set_lp_level (g_rwnx_plat->sdiodev->rwnx_hw, 1);
 
-#if defined (CONFIG_SDIO_PWRCTRL) 
+#if defined (CONFIG_SDIO_PWRCTRL)
 	aicwf_sdio_pwr_stctl (g_rwnx_plat->sdiodev, SDIO_SLEEP_ST);
 #endif
 
@@ -2224,7 +2222,7 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 			if (argc > 6) {
                 settx_param.tx_intv_us = command_strtoul(argv[6], NULL, 10);
             } else {
-                settx_param.tx_intv_us = 0;
+                settx_param.tx_intv_us = 10000; // set default val 10ms
             }
             printk("txparam:%d,%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
                 settx_param.mode, settx_param.rate, settx_param.length, settx_param.tx_intv_us);
@@ -2600,7 +2598,27 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
             } else {
                 printk("wrong args\n");
             }
-        }
+        }else if (strcasecmp(argv[0], "GET_TXPWR") == 0) {
+			s8_l power=0;
+			power = get_txpwr_max(power);
+			memcpy(command, &power, 1);
+			bytes_written = 1;
+		} else if (strcasecmp(argv[0], "SET_TXPWR_LOSS") == 0) {
+			if (argc > 1) {
+				s8_l func = (s8_l)command_strtoul(argv[1], NULL, 10);
+				printk("set txpwr loss: %d\n", func);
+				if (1){
+					set_txpwr_loss_ofst(func);
+					rwnx_send_txpwr_lvl_v3_req(g_rwnx_plat->pcidev->rwnx_hw);
+				}else{
+					AICWFDBG(LOGINFO,"error:don't support ,now only support D80");
+				}
+			} else {
+				printk("wrong args\n");
+				bytes_written = -EINVAL;
+				break;
+			}
+		}
         #ifdef CONFIG_RFTEST_USB_BT
         else if (strcasecmp(argv[0], "BT_RESET") == 0) {
             if (argc == 5) {
@@ -3057,7 +3075,11 @@ exit:
 #define IOCTL_HOSTAPD   (SIOCIWFIRSTPRIV+28)
 #define IOCTL_WPAS      (SIOCIWFIRSTPRIV+30)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 static int rwnx_do_ioctl(struct net_device *net, struct ifreq *req, int cmd)
+#else
+static int rwnx_do_ioctl(struct net_device *net, struct ifreq *req, void __user *data, int cmd)
+#endif
 {
 	int ret = 0;
 	///TODO: add ioctl command handler later
@@ -3145,7 +3167,11 @@ static int rwnx_set_mac_address(struct net_device *dev, void *addr)
 static const struct net_device_ops rwnx_netdev_ops = {
 	.ndo_open               = rwnx_open,
 	.ndo_stop               = rwnx_close,
-	.ndo_do_ioctl           = rwnx_do_ioctl,
+#if LINUX_VERSION_CODE <  KERNEL_VERSION(5, 15, 0)
+	.ndo_do_ioctl			= rwnx_do_ioctl,
+#else
+	.ndo_siocdevprivate 	= rwnx_do_ioctl,
+#endif
 	.ndo_start_xmit         = rwnx_start_xmit,
 	.ndo_get_stats          = rwnx_get_stats,
 #ifndef CONFIG_ONE_TXQ
@@ -5234,9 +5260,9 @@ static int rwnx_cfg80211_set_txq_params(struct wiphy *wiphy, struct net_device *
  *	notification by calling cfg80211_ready_on_channel().
  */
 static int
-rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+rwnx_cfg80211_remain_on_channel_(struct wiphy *wiphy, struct wireless_dev *wdev,
 								struct ieee80211_channel *chan,
-								unsigned int duration, u64 *cookie)
+								unsigned int duration, u64 *cookie, bool mgmt_roc_flag)
 {
 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 	//struct rwnx_vif *rwnx_vif = netdev_priv(wdev->netdev);
@@ -5307,7 +5333,7 @@ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
 	roc_elem->wdev = wdev;
 	roc_elem->chan = chan;
 	roc_elem->duration = duration;
-	roc_elem->mgmt_roc = false;
+	roc_elem->mgmt_roc = mgmt_roc_flag;
 	roc_elem->on_chan = false;
 
 	/* Initialize the OFFCHAN TX queue to allow off-channel transmissions */
@@ -5337,6 +5363,16 @@ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	return error;
 }
+
+static int
+rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+								struct ieee80211_channel *chan,
+								unsigned int duration, u64 *cookie)
+{
+	return rwnx_cfg80211_remain_on_channel_(wiphy, wdev, chan, duration, cookie, false);
+}
+
+
 
 /**
  * @cancel_remain_on_channel: Cancel an on-going remain-on-channel operation.
@@ -5551,15 +5587,15 @@ static int rwnx_cfg80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		printk("mgmt rx remain on chan\n");
 
 		/* Start a ROC procedure for 30ms */
-		error = rwnx_cfg80211_remain_on_channel(wiphy, wdev, channel,
-												30, &cookie);
+		error = rwnx_cfg80211_remain_on_channel_(wiphy, wdev, channel,
+												30, &cookie, true);
 		if (error) {
 			printk("mgmt rx chan err\n");
 			return error;
 		}
 		/* Need to keep in mind that RoC has been launched internally in order to
 		 * avoid to call the cfg80211 callback once expired */
-		rwnx_hw->roc_elem->mgmt_roc = true;
+		//rwnx_hw->roc_elem->mgmt_roc = true;
 	}
 
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
@@ -7023,7 +7059,7 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	rwnx_hw->roc_elem = NULL;
 	/* Cookie can not be 0 */
 	rwnx_hw->roc_cookie_cnt = 1;
-	atomic_set(&rwnx_hw->txdata_cnt, 0);	
+	atomic_set(&rwnx_hw->txdata_cnt, 0);
 	atomic_set(&rwnx_hw->txdata_cnt_push, 0);
 	atomic_set(&rwnx_hw->rxbuf_cnt, 0);
 
@@ -7434,7 +7470,7 @@ static int __init rwnx_mod_init(void)
 		aicwf_usb_exit();
 #endif /*AICWF_USB_SUPPORT */
 #ifdef AICWF_PCIE_SUPPORT
-		aicwf_pcie_unregister_drv();	
+		aicwf_pcie_unregister_drv();
 #endif
 		return -ENODEV;
 	}

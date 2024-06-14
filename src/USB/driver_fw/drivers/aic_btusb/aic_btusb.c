@@ -422,36 +422,69 @@ static dev_t bt_devid; /* bt char device number */
 static struct cdev bt_char_dev; /* bt character device structure */
 static struct class *bt_char_class; /* device class for usb char driver */
 static int bt_reset = 0;
+static int aic_queue_cnt(void);
 
 /* HCI device & lock */
 DEFINE_RWLOCK(hci_dev_lock);
 struct hci_dev *ghdev = NULL;
 
-#ifdef CONFIG_SUPPORT_VENDOR_APCF
 static int bypass_event(struct sk_buff *skb)
 {
 	int ret = 0;
+    struct hci_dev *hdev = (struct hci_dev *) skb->dev;
 	u8 *opcode = (u8*)(skb->data);
 	//u8 len = *(opcode+1);
-	u16 sub_opcpde;
+    //printk("bypass_event %x,%x,%x,%x,%x\r\n",opcode[0],opcode[1],opcode[2],opcode[3],opcode[4]);
 
 	switch(*opcode) {
-		case HCI_EV_CMD_COMPLETE:
-			sub_opcpde = ((u16)opcode[3]|(u16)(opcode[4])<<8);
-			if(sub_opcpde == 0xfd57){
-				if(vendor_apcf_sent_done){
-					vendor_apcf_sent_done--;
-					printk("apcf bypass\r\n");
-					ret = 1;
-				}
-			}
+        case HCI_EV_CMD_COMPLETE:
+            {
+                u16 command;
+                command = ((u16)opcode[3]|(u16)(opcode[4])<<8);
+                if (command == 0xc03){
+                    if (SCO_NUM > 0){
+                        SCO_NUM = 0;
+                        hdev->notify(hdev, 0);
+                        set_select_msbc(CODEC_CVSD);
+                    }
+                }
+            }
+#ifdef CONFIG_SUPPORT_VENDOR_APCF
+            {
+                u16 sub_opcpde;
+                sub_opcpde = ((u16)opcode[3]|(u16)(opcode[4])<<8);
+                if(sub_opcpde == 0xfd57){
+                    if(vendor_apcf_sent_done){
+                        vendor_apcf_sent_done--;
+                        printk("apcf bypass\r\n");
+                        ret = 1;
+                    }
+                }
+            }
+#endif//CONFIG_SUPPORT_VENDOR_APCF
 			break;
+        case HCI_EV_LE_Meta:
+            {
+                u8 subevent_code;
+                subevent_code = opcode[2];
+                switch(subevent_code){
+                    case HCI_BLE_ADV_PKT_RPT_EVT:
+                    case HCI_LE_EXTENDED_ADVERTISING_REPORT_EVT:
+                    {
+                        if(aic_queue_cnt() > (QUEUE_SIZE-100)){
+                            printk("more adv report bypass\r\n");
+                            ret = 1;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
 		default:
 			break;
 	}
 	return ret;
 }
-#endif//CONFIG_SUPPORT_VENDOR_APCF
 static void print_event(struct sk_buff *skb)
 {
 #if PRINT_CMD_EVENT
@@ -666,6 +699,24 @@ static void aic_clear_queue(void)
 	spin_unlock_irqrestore(&queue_lock, flags);
 }
 
+static int aic_queue_cnt(void)
+{
+    int ret_cnt = 0;
+	unsigned long flags = 0;
+	
+	spin_lock_irqsave(&queue_lock, flags);
+    if(is_queue_empty()) {
+        ret_cnt = 0;
+    }else{
+        if(aic_skb_queue_rear > aic_skb_queue_front){
+            ret_cnt = aic_skb_queue_rear-aic_skb_queue_front;
+        }else{
+            ret_cnt = aic_skb_queue_rear+QUEUE_SIZE-aic_skb_queue_front;
+        }
+    }
+	spin_unlock_irqrestore(&queue_lock, flags);
+    return ret_cnt;
+}
 /*
  * AicSemi - Integrate from hci_core.c
  */
@@ -935,25 +986,21 @@ static int hci_recv_frame(struct sk_buff *skb)
         if(bt_cb(skb)->pkt_type == HCI_SCODATA_PKT){
             hci_send_to_alsa_ringbuffer(hdev, skb);
         }else{
-#ifdef CONFIG_SUPPORT_VENDOR_APCF
-        	if(bt_cb(skb)->pkt_type == HCI_EVENT_PKT){
+            if(bt_cb(skb)->pkt_type == HCI_EVENT_PKT){
 				if(bypass_event(skb)){
 					kfree_skb(skb);
 					return 0;
 				}
 			}
-#endif //CONFIG_SUPPORT_VENDOR_APCF
 			hci_send_to_stack(hdev, skb);
 		}
 #else
-#ifdef CONFIG_SUPPORT_VENDOR_APCF
 		if(bt_cb(skb)->pkt_type == HCI_EVENT_PKT){
 			if(bypass_event(skb)){
 				kfree_skb(skb);
 				return 0;
 			}
 		}
-#endif //CONFIG_SUPPORT_VENDOR_APCF
 		/* Send copy to the sockets */
 		hci_send_to_stack(hdev, skb);
 #endif
@@ -1543,28 +1590,23 @@ static void btchr_exit(void)
 int send_hci_cmd(firmware_info *fw_info)
 {
 
-    int len = 0;
     int ret_val = -1;
 	int i = 0;
 
-	if(g_chipid == PRODUCT_ID_AIC8801 || g_chipid == PRODUCT_ID_AIC8800D80){
-	    ret_val = usb_bulk_msg(fw_info->udev, fw_info->pipe_out, fw_info->send_pkt, fw_info->pkt_len,
-	            &len, 3000);
-	    if (ret_val || (len != fw_info->pkt_len)) {
-	        AICBT_INFO("Error in send hci cmd = %d,"
-	            "len = %d, size = %d", ret_val, len, fw_info->pkt_len);
-	    }
-	}else if(g_chipid == PRODUCT_ID_AIC8800DC){
-		while((ret_val<0)&&(i++<3))
-		{
-			ret_val = usb_control_msg(
-			   fw_info->udev, fw_info->pipe_out,
-			   0, USB_TYPE_CLASS, 0, 0,
-			   (void *)(fw_info->send_pkt),
-			   fw_info->pkt_len, MSG_TO);
-		}
+    while((ret_val<0)&&(i++<3))
+    {
+        ret_val = usb_control_msg(
+           fw_info->udev, fw_info->pipe_out,
+           0, USB_TYPE_CLASS, 0, 0,
+           (void *)(fw_info->send_pkt),
+           fw_info->pkt_len, MSG_TO);
 
-	}
+        if (ret_val>0) {
+            AICBT_INFO("Right in send hci cmd = %d,""size = %d", ret_val,  fw_info->pkt_len);
+        }else{
+            AICBT_INFO("Error in send hci cmd = %d,""size = %d", ret_val,  fw_info->pkt_len);
+        }
+    }
     return ret_val;
 
 }
@@ -1594,39 +1636,270 @@ int rcv_hci_evt(firmware_info *fw_info)
     }
 }
 
-int set_bt_onoff(firmware_info *fw_info, uint8_t onoff)
+#ifdef CONFIG_BT_WAKEUP_IN_PM
+int set_bt_wakeup_param(firmware_info *fw_info)
 {
     int ret_val;
 
-    AICBT_INFO("%s: %s", __func__, onoff != 0 ? "on" : "off");
+    AICBT_INFO("%s", __func__);
 
-    fw_info->cmd_hdr->opcode = cpu_to_le16(BTOFF_OPCODE);
-    fw_info->cmd_hdr->plen = 1;
-    fw_info->pkt_len = CMD_HDR_LEN + 1;
-    fw_info->send_pkt[CMD_HDR_LEN] = onoff;
+/*
+    data and ad_data_filter_mask instructions for use
+    ex.
+    data[18] = {0x46,0x00,0x00,0xff,0xff,0xff,0xff,0xff,0xff,0x30,0xff,0xff,0xff,0x43,0x52,0x45,0x4c,0x42};
+    mask = 1100 0000 0111 1111 1100 0000 0000 0000 = 0xc07fc000
 
+    data  = 0x46,0x00,0x00,0xff,0xff,0xff,0xff,0xff,0xff,0x30,0xff,0xff,0xff,0x43,0x52,0x45,0x4c,0x42
+    mask =  1      1       0     0     0    0     0     0    0     1      1     1    1    1      1      1      1      1      0     0...... fill 0
+
+    data & mask = "0x46 0x00" 0x00 0x00 0x00 0x00 0x00 0x00 0x00 "0x30 0xff 0xff 0x43 0x52 0x45 0x4c 0x42"
+    using data & mask value condition to wakeup host_wake_bt gpio
+*/
+    struct ble_wakeup_param_t* wakeup_param = (struct ble_wakeup_param_t*)kmalloc(sizeof(struct ble_wakeup_param_t), GFP_KERNEL);
+
+    printk("%s ble scan wakeup \r\n", __func__);
+
+    memset(wakeup_param, 0, sizeof(struct ble_wakeup_param_t));
+    wakeup_param->magic_num = 0x53454C42;//magic_num
+    wakeup_param->delay_scan_to = 1000;//delay start scan time(ms)
+    wakeup_param->reboot_to = 1000;//reboot time(ms):   bit31: 1, ic will reboot when timer is handle; 0 , do not reboot 
+                                   // bit0~30 : time(ms)
+    /******************************************************************/
+    ///gpio_trigger_idx : 0    if wakeup_param->gpio_dft_lvl[0]=0xfe,this idx will be invalid.
+    wakeup_param->gpio_num[0] = 2;////default select gpiob2 for fw_wakeup_host
+    wakeup_param->gpio_dft_lvl[0] = 0;////0:defalut pull down,  1:default pull up
+    ///gpio_trigger_idx : 1    if wakeup_param->gpio_dft_lvl[1]=0xfe,this idx will be invalid.
+    wakeup_param->gpio_num[1] = 3;////default select gpiob2 for fw_wakeup_host
+    wakeup_param->gpio_dft_lvl[1] = 1;////0:defalut pull down,  1:default pull up
+    /********************************************************************/
+    //MAX_AD_FILTER_NUM=5 :num 0
+    {
+        const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+        wakeup_param->ad_filter[0].ad_len = 12;
+        wakeup_param->ad_filter[0].ad_type = 0x09;
+        memcpy(wakeup_param->ad_filter[0].ad_data, data,wakeup_param->ad_filter[0].ad_len-1);// 1111 1111 1110 0000 0000 0000 0000 0000 //0xffe00000
+        wakeup_param->ad_filter[0].ad_data_mask = 0xffe00000;
+        wakeup_param->ad_filter[0].ad_role = ROLE_COMBO|(COMBO_0<<4);
+        wakeup_param->ad_filter[0].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
+    }
+    /********************************************************************/
+    //MAX_AD_FILTER_NUM=5 :num 1
+    {
+        const uint8_t data[2] = {0x12,0x18};
+        wakeup_param->ad_filter[1].ad_len = 3;
+        wakeup_param->ad_filter[1].ad_type = 0x3;
+        memcpy(wakeup_param->ad_filter[1].ad_data, data,wakeup_param->ad_filter[1].ad_len-1);// 1100 0000 0000 0000 0000 0000 0000 0000 //0xc0000000
+        wakeup_param->ad_filter[1].ad_data_mask = 0xc0000000;
+        wakeup_param->ad_filter[1].ad_role = ROLE_COMBO|(COMBO_0<<4);
+        wakeup_param->ad_filter[1].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
+    }
+    /********************************************************************/
+    //MAX_AD_FILTER_NUM=5 :num 2
+    {
+        //const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+        wakeup_param->ad_filter[2].ad_len = 0;
+        wakeup_param->ad_filter[2].ad_type = 0;
+        //memcpy(wakeup_param->ad_filter[2].ad_data, data,wakeup_param->ad_filter[2].ad_len-1);// 1100 0000 0111 1111 1100 0000 0000 0000 //0xc07fc000
+        wakeup_param->ad_filter[2].ad_data_mask = 0;
+        wakeup_param->ad_filter[2].ad_role = ROLE_ONLY;
+        wakeup_param->ad_filter[2].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
+    }
+    /********************************************************************/
+    //MAX_AD_FILTER_NUM=5 :num 3
+    {
+        //const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+        wakeup_param->ad_filter[3].ad_len = 0;
+        wakeup_param->ad_filter[3].ad_type = 0;
+        //memcpy(wakeup_param->ad_filter[2].ad_data, data,wakeup_param->ad_filter[2].ad_len-1);// 1100 0000 0111 1111 1100 0000 0000 0000 //0xc07fc000
+        wakeup_param->ad_filter[3].ad_data_mask = 0;
+        wakeup_param->ad_filter[3].ad_role = ROLE_COMBO|(COMBO_1<<4);
+        wakeup_param->ad_filter[3].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
+    }
+    /********************************************************************/
+    //MAX_AD_FILTER_NUM=5 :num 4
+    {
+        //const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+        wakeup_param->ad_filter[4].ad_len = 0;
+        wakeup_param->ad_filter[4].ad_type = 0x09;
+        //memcpy(wakeup_param->ad_filter[4].ad_data, data,wakeup_param->ad_filter[4].ad_len-1);// 1111 1111 1110 0000 0000 0000 0000 0000 //0xffe00000
+        wakeup_param->ad_filter[4].ad_data_mask = 0xffe00000;
+        wakeup_param->ad_filter[4].ad_role = ROLE_COMBO|(COMBO_1<<4);
+        wakeup_param->ad_filter[4].gpio_trigger_idx = TG_IDX_0|TG_IDX_1;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
+    }
+
+
+
+    fw_info->cmd_hdr->opcode = cpu_to_le16(HCI_VSC_SET_ADFILTER_PT_CMD);
+    fw_info->cmd_hdr->plen = sizeof(struct ble_wakeup_param_t);
+    fw_info->pkt_len = CMD_HDR_LEN + sizeof(struct ble_wakeup_param_t);
+    memcpy(fw_info->req_para,wakeup_param,sizeof(struct ble_wakeup_param_t));
     ret_val = send_hci_cmd(fw_info);
     if (ret_val < 0) {
-        AICBT_ERR("%s: Failed to send bt %s cmd, errno %d",
-                __func__, onoff != 0 ? "on" : "off", ret_val);
+        AICBT_ERR("%s: Failed to send bt wakeup param, errno %d",
+                __func__, ret_val);
         return ret_val;
     }
 
     ret_val = rcv_hci_evt(fw_info);
     if (ret_val < 0) {
-        AICBT_ERR("%s: Failed to receive bt %s event, errno %d",
-                __func__, onoff != 0 ? "on" : "off", ret_val);
+        AICBT_ERR("%s: Failed to receive bt event, errno %d",
+                __func__, ret_val);
         return ret_val;
     }
 
     return ret_val;
 }
 
+int reset_bt_from_wakeup_process(firmware_info *fw_info)
+{
+    int ret_val;
+
+    AICBT_INFO("%s", __func__);
+
+    fw_info->cmd_hdr->opcode = cpu_to_le16(HCI_VSC_RESET_ADFILTER_PROCESS_PT_CMD);
+    fw_info->cmd_hdr->plen = 0;
+    fw_info->pkt_len = CMD_HDR_LEN;
+
+    ret_val = send_hci_cmd(fw_info);
+    if (ret_val < 0) {
+        AICBT_ERR("%s: Failed to send bt reset wakeup process, errno %d",
+                __func__, ret_val);
+        return ret_val;
+    }
+
+    ret_val = rcv_hci_evt(fw_info);
+    if (ret_val < 0) {
+        AICBT_ERR("%s: Failed to receive bt event, errno %d",
+                __func__, ret_val);
+        return ret_val;
+    }
+
+    return ret_val;
+}
+#endif
 //for 8800DC start
 u32 fwcfg_tbl[][2] = {
     {0x40200028, 0x0021047e},
     {0x40200024, 0x0000011d},
 };
+
+//Crystal provided by CPU (start)
+int hci_send_dbg_rd_mem_cmd(firmware_info* fw_info, u32 addr){
+	struct hci_dbg_rd_mem_cmd *rd_cmd;
+	struct hci_dbg_rd_mem_cmd_evt *evt_para;
+
+	int ret_val = -1;
+	
+	rd_cmd = (struct hci_dbg_rd_mem_cmd *)(fw_info->req_para);
+	if (!rd_cmd)
+		return -ENOMEM;
+	
+	rd_cmd->start_addr = addr;
+	rd_cmd->type = 32;
+	rd_cmd->length = 4;
+	fw_info->cmd_hdr->opcode = cpu_to_le16(HCI_VSC_DBG_RD_MEM_CMD);
+	fw_info->cmd_hdr->plen = sizeof(struct hci_dbg_rd_mem_cmd);
+	fw_info->pkt_len = CMD_HDR_LEN + sizeof(struct hci_dbg_rd_mem_cmd);
+	
+	ret_val = send_hci_cmd(fw_info);
+	if (ret_val < 0) {
+		printk("%s: Failed to send hci cmd 0x%04x, errno %d",
+				__func__, fw_info->cmd_hdr->opcode, ret_val);
+		return ret_val;
+	}
+	
+	ret_val = rcv_hci_evt(fw_info);
+	if (ret_val < 0) {
+		printk("%s: Failed to receive hci event, errno %d",
+				__func__, ret_val);
+		return ret_val;
+	}
+	
+	evt_para = (struct hci_dbg_rd_mem_cmd_evt *)(fw_info->rsp_para);
+	
+	printk("%s: fw status = 0x%04x, length %d, %x %x %x %x",
+			__func__, evt_para->status, evt_para->length,
+			evt_para->data[0],
+			evt_para->data[1],
+			evt_para->data[2],
+			evt_para->data[3]);
+
+	return 0;
+}
+
+int set_bbpll_config(firmware_info* fw_info){
+	int ret_val = -1;
+	struct fw_status *evt_status;
+    struct hci_dbg_rd_mem_cmd_evt *evt_para;
+	struct aicbt_patch_table_cmd *patch_table_cmd;
+
+	//Read crystal provided by CPU or not.
+	ret_val = hci_send_dbg_rd_mem_cmd(fw_info, 0x40500148);
+	if(ret_val < 0){
+		printk("%s error ret_val:%d\r\n", __func__, ret_val);
+		return ret_val;
+	}
+	evt_para = (struct hci_dbg_rd_mem_cmd_evt *)(fw_info->rsp_para);
+	
+	if(!(evt_para->data[0] & 0x01)){
+		printk("%s Crystal not provided by CPU \r\n", __func__);
+		return 0;
+	}else{
+		printk("%s Crystal provided by CPU \r\n", __func__);
+		
+		//Read 0x40505010 value to check bbpll set or not.
+		ret_val = hci_send_dbg_rd_mem_cmd(fw_info, 0x40505010);
+		if(ret_val < 0){
+			printk("%s error ret_val:%d\r\n", __func__, ret_val);
+			return ret_val;
+		}
+		evt_para = (struct hci_dbg_rd_mem_cmd_evt *)(fw_info->rsp_para);
+		if((evt_para->data[3] >> 5) == 3){
+			printk("%s Not need to set \r\n", __func__);
+			return 0;
+		}else{
+			patch_table_cmd = (struct aicbt_patch_table_cmd *)(fw_info->req_para);
+			patch_table_cmd->patch_num = 1;
+			patch_table_cmd->patch_table_addr[0] = 0x40505010;
+			evt_para->data[3] |= ((0x1 << 5) | (0x1 << 6)); 
+			evt_para->data[3] &= (~(0x1 << 7));
+			patch_table_cmd->patch_table_data[0] = 0;
+			patch_table_cmd->patch_table_data[0] = evt_para->data[3] << 24;
+			patch_table_cmd->patch_table_data[0] |= evt_para->data[2] << 16;
+			patch_table_cmd->patch_table_data[0] |= evt_para->data[1] << 8;
+			patch_table_cmd->patch_table_data[0] |= evt_para->data[0];
+			//printk("%s patch_table_cmd->patch_table_data[0]:%x \r\n", __func__,
+				//patch_table_cmd->patch_table_data[0]);
+		}
+//		patch_table_cmd->patch_table_data[0] = 0x7C301010;
+		
+		fw_info->cmd_hdr->opcode = cpu_to_le16(HCI_VSC_UPDATE_PT_CMD);
+		fw_info->cmd_hdr->plen = HCI_VSC_UPDATE_PT_SIZE;
+		fw_info->pkt_len = fw_info->cmd_hdr->plen + 3;
+		ret_val = send_hci_cmd(fw_info);
+		if (ret_val < 0) {
+			AICBT_ERR("%s: rcv_hci_evt err %d", __func__, ret_val);
+			return ret_val;
+		}
+		ret_val = rcv_hci_evt(fw_info);
+		if (ret_val < 0) {
+			printk("%s: Failed to receive hci event, errno %d",
+					__func__, ret_val);
+			return ret_val;
+		}
+		evt_status = (struct fw_status *)fw_info->rsp_para;
+		ret_val = evt_status->status;
+		if (0 != evt_status->status) {
+			ret_val = -1;
+		} else {
+			ret_val = 0;
+		}	
+	}
+	
+	return ret_val;
+}
+//Crystal provided by CPU (end)
+
 
 int fw_config(firmware_info* fw_info)
 {
@@ -1706,6 +1979,11 @@ int fw_config(firmware_info* fw_info)
             }
 
         }
+		
+		//Crystal provided by CPU (start)
+		ret_val = set_bbpll_config(fw_info);
+		//Crystal provided by CPU (end)
+		
     }
     return ret_val;
 }
@@ -2581,13 +2859,8 @@ firmware_info *firmware_info_init(struct usb_interface *intf)
 
     fw_info->intf = intf;
     fw_info->udev = udev;
-if(g_chipid == PRODUCT_ID_AIC8801 || g_chipid == PRODUCT_ID_AIC8800D80){
-    fw_info->pipe_in = usb_rcvbulkpipe(fw_info->udev, BULK_EP);
-	fw_info->pipe_out = usb_rcvbulkpipe(fw_info->udev, CTRL_EP);
-}else if(g_chipid == PRODUCT_ID_AIC8800DC){
     fw_info->pipe_in = usb_rcvintpipe(fw_info->udev, INTR_EP);
     fw_info->pipe_out = usb_sndctrlpipe(fw_info->udev, CTRL_EP);
-}
     fw_info->cmd_hdr = (struct hci_command_hdr *)(fw_info->send_pkt);
     fw_info->evt_hdr = (struct hci_event_hdr *)(fw_info->rcv_pkt);
     fw_info->cmd_cmp = (struct hci_ev_cmd_complete *)(fw_info->rcv_pkt + EVT_HDR_LEN);
@@ -2693,7 +2966,7 @@ void check_sco_event(struct urb *urb)
         air_mode = *(opcode + 18);
 		printk("%s status:%d,air_mode:%d \r\n", __func__, status,air_mode);
         if (status == 0) {
-            hdev->conn_hash.sco_num++;
+            SCO_NUM++;
 			hdev->notify(hdev, 0);
             //schedule_work(&data->work);
             if (air_mode == 0x03) {
@@ -2706,7 +2979,7 @@ void check_sco_event(struct urb *urb)
         status = *(opcode + 2);
         handle = *(opcode + 3) | *(opcode + 4) << 8;
         if (status == 0 && sco_handle == handle) {
-            hdev->conn_hash.sco_num--;
+            SCO_NUM--;
 			hdev->notify(hdev, 0);
             set_select_msbc(CODEC_CVSD);
             //schedule_work(&data->work);
@@ -3505,7 +3778,7 @@ static int snd_send_sco_frame(struct sk_buff *skb)
     if (!hdev && !test_bit(HCI_RUNNING, &hdev->flags))
         return -EBUSY;
 
-    if (!data->isoc_tx_ep || hdev->conn_hash.sco_num < 1) {
+    if (!data->isoc_tx_ep || !SCO_NUM) {
         kfree(skb);
         return -ENODEV;
     }
@@ -3716,13 +3989,14 @@ int btusb_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 
 		usb_fill_bulk_urb(urb, data->udev, pipe,
 			skb->data, skb->len, btusb_tx_complete, skb);
+        urb->transfer_flags |= URB_ZERO_PACKET;
 
         hdev->stat.acl_tx++;
         break;
 
     case HCI_SCODATA_PKT:
         print_sco(skb, 1);
-        if (!data->isoc_tx_ep || SCO_NUM < 1) {
+        if (!data->isoc_tx_ep || !SCO_NUM) {
             kfree(skb);
             return -ENODEV;
         }
@@ -4844,17 +5118,18 @@ static void btusb_disconnect(struct usb_interface *intf)
 static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 {
     struct btusb_data *data = usb_get_intfdata(intf);
-    //firmware_info *fw_info = data->fw_info;
+    firmware_info *fw_info = data->fw_info;
 
     AICBT_INFO("%s: event 0x%x, suspend count %d", __func__,
             message.event, data->suspend_count);
 
     if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
         return 0;
-#if 0
-    if (!test_bit(HCI_RUNNING, &data->hdev->flags))
-        set_bt_onoff(fw_info, 1);
-#endif
+
+    #ifdef CONFIG_BT_WAKEUP_IN_PM
+    set_bt_wakeup_param(fw_info);
+    #endif
+
     if (data->suspend_count++)
         return 0;
 
@@ -4934,6 +5209,9 @@ static int btusb_resume(struct usb_interface *intf)
             AICBT_WARN("%s: Failed to initialize fw info", __func__);
         }
     }
+    #ifdef CONFIG_BT_WAKEUP_IN_PM
+    reset_bt_from_wakeup_process(data->fw_info);
+    #endif
 
     #if 1
     if (test_bit(BTUSB_INTR_RUNNING, &data->flags)) {
@@ -5028,6 +5306,9 @@ static void __exit btusb_exit(void)
         btchr_exit();
 #endif
     usb_deregister(&btusb_driver);
+#if CONFIG_BLUEDROID
+    aic_clear_queue();
+#endif
 }
 
 module_init(btusb_init);

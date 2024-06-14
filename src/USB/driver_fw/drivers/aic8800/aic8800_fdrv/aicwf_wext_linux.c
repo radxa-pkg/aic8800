@@ -400,7 +400,7 @@ static char *aicwf_get_iwe_stream_mac_addr(struct rwnx_hw* rwnx_hw,
 	iwe->cmd = SIOCGIWAP;
 	iwe->u.ap_addr.sa_family = ARPHRD_ETHER;
 
-	if(scan_re->bss && scan_re->bss->bssid){
+	if(scan_re->bss && &scan_re->bss->bssid[0]){
 	memcpy(iwe->u.ap_addr.sa_data, scan_re->bss->bssid, ETH_ALEN);
 	}
 

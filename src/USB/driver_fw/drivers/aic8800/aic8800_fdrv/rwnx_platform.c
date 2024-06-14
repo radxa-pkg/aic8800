@@ -60,6 +60,7 @@ typedef struct
     txpwr_lvl_conf_t txpwr_lvl;
     txpwr_lvl_conf_v2_t txpwr_lvl_v2;
     txpwr_lvl_conf_v3_t txpwr_lvl_v3;
+    txpwr_lvl_adj_conf_t txpwr_lvl_adj;
     txpwr_loss_conf_t txpwr_loss;
     txpwr_ofst_conf_t txpwr_ofst;
     txpwr_ofst2x_conf_t txpwr_ofst2x;
@@ -148,6 +149,29 @@ userconfig_info_t userconfig_info = {
     },
 };
 
+#ifdef CONFIG_POWER_LIMIT
+#define POWER_LIMIT_INVALID_VAL     POWER_LEVEL_INVALID_VAL
+
+#define POWER_LIMIT_CC_MATCHED_BIT  (0x1U << 0)
+
+typedef struct
+{
+    u8_l ch_cnt_2g4;
+    u8_l ch_cnt_5g;
+    u8_l ch_num_2g4[MAC_DOMAINCHANNEL_24G_MAX];
+    u8_l ch_num_5g[MAC_DOMAINCHANNEL_5G_MAX];
+    s8_l max_pwr_2g4[MAC_DOMAINCHANNEL_24G_MAX];
+    s8_l max_pwr_5g[MAC_DOMAINCHANNEL_5G_MAX];
+} txpwr_lmt_info_t;
+
+typedef struct
+{
+    u32_l flags;
+    txpwr_lmt_info_t txpwr_lmt;
+} powerlimit_info_t;
+
+powerlimit_info_t powerlimit_info = {0,};
+#endif
 
 #ifndef CONFIG_ROM_PATCH_EN
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0))
@@ -1796,6 +1820,23 @@ void get_userconfig_txpwr_lvl_v3_in_fdrv(txpwr_lvl_conf_v3_t *txpwr_lvl_v3)
     AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs11_5g:%d\r\n",    __func__, txpwr_lvl_v3->pwrlvl_11ax_5g[11]);
 }
 
+void get_userconfig_txpwr_lvl_adj_in_fdrv(txpwr_lvl_adj_conf_t *txpwr_lvl_adj)
+{
+    *txpwr_lvl_adj = userconfig_info.txpwr_lvl_adj;
+
+    AICWFDBG(LOGINFO, "%s:enable:%d\r\n",                   __func__, txpwr_lvl_adj->enable);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_2g4_chan_1_4:%d\r\n",     __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_2g4[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_2g4_chan_5_9:%d\r\n",     __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_2g4[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_2g4_chan_10_13:%d\r\n",   __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_2g4[2]);
+
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_42:%d\r\n",       __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_58:%d\r\n",       __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_106:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_122:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_138:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_155:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[5]);
+}
+
 
 void get_userconfig_txpwr_ofst_in_fdrv(txpwr_ofst_conf_t *txpwr_ofst)
 {
@@ -2056,13 +2097,33 @@ void rwnx_plat_nvram_set_value(char *command, char *value)
         userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[10] = rwnx_atoi(value);
     } else if (!strcmp(command,     "lvl_11ax_mcs11_5g")) {
         userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[11] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_enable")) {
+        userconfig_info.txpwr_lvl_adj.enable = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_1_4")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_5_9")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_10_13")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[2] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_42")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_58")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_106")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[2] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_122")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[3] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_138")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[4] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_155")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[5] = rwnx_atoi(value);
     } else if (!strcmp(command, "loss_enable")) {
         userconfig_info.txpwr_loss.loss_enable = rwnx_atoi(value);
     } else if (!strcmp(command, "loss_value")) {
         userconfig_info.txpwr_loss.loss_value = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_enable")) {
         userconfig_info.txpwr_ofst.enable = rwnx_atoi(value);
-	userconfig_info.txpwr_ofst2x.enable = rwnx_atoi(value);
+        userconfig_info.txpwr_ofst2x.enable = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_chan_1_4")) {
         userconfig_info.txpwr_ofst.chan_1_4 = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_chan_5_9")) {
@@ -2208,6 +2269,397 @@ void rwnx_plat_userconfig_parsing(char *buffer, int size)
     }
 }
 
+#ifdef CONFIG_POWER_LIMIT
+#define GetLineFromBuffer(buffer)   strsep(&buffer, "\n")
+
+int isAllSpaceOrTab(uint8_t *data, uint8_t size)
+{
+    uint8_t cnt = 0, NumOfSpaceAndTab = 0;
+    while (size > cnt) {
+        if (data[cnt] == ' ' || data[cnt] == '\t' || data[cnt] == '\0')
+            ++NumOfSpaceAndTab;
+        ++cnt;
+    }
+    return size == NumOfSpaceAndTab;
+}
+
+int IsCommentString(char *szStr)
+{
+    if (*szStr == '#' && *(szStr + 1) == ' ')
+        return 1;
+    else
+        return 0;
+}
+
+int ParseQualifiedString(char *In, u32 *Start, char *Out, char LeftQualifier, char RightQualifier)
+{
+    u32 i = 0, j = 0;
+    char c = In[(*Start)++];
+    if (c != LeftQualifier)
+        return 0;
+    i = (*Start);
+    c = In[(*Start)++];
+    while (c != RightQualifier && c != '\0')
+        c = In[(*Start)++];
+    if (c == '\0')
+        return 0;
+    j = (*Start) - 2;
+    strncpy((char *)Out, (const char *)(In + i), j - i + 1);
+    return 1;
+}
+
+int GetU1ByteIntegerFromStringInDecimal(char *Str, u8 *pInt)
+{
+    u16 i = 0;
+    *pInt = 0;
+    while (Str[i] != '\0') {
+        if (Str[i] >= '0' && Str[i] <= '9') {
+            *pInt *= 10;
+            *pInt += (Str[i] - '0');
+        } else
+            return 0;
+        ++i;
+    }
+    return 1;
+}
+int GetS1ByteIntegerFromStringInDecimal(char *str, s8 *val)
+{
+    u8 negative = 0;
+    u16 i = 0;
+    *val = 0;
+    while (str[i] != '\0') {
+        if (i == 0 && (str[i] == '+' || str[i] == '-')) {
+            if (str[i] == '-')
+                negative = 1;
+        } else if (str[i] >= '0' && str[i] <= '9') {
+            *val *= 10;
+            *val += (str[i] - '0');
+        } else
+            return 0;
+        ++i;
+    }
+    if (negative)
+        *val = -*val;
+    return 1;
+}
+
+void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
+{
+#define LD_STAGE_EXC_MAPPING    0
+#define LD_STAGE_TAB_DEFINE     1
+#define LD_STAGE_TAB_START      2
+#define LD_STAGE_COLUMN_DEFINE  3
+#define LD_STAGE_CH_ROW         4
+
+    uint8_t loadingStage = LD_STAGE_EXC_MAPPING;
+    uint32_t i = 0, forCnt = 0;
+    uint32_t i_cc;
+    char *szLine, *ptmp;
+    char band[10], colNumBuf[10];
+    uint8_t colNum = 0, colNum_cc = 255, band_cc = 0;
+    // clear powerlimit info at first
+    memset((void *)&powerlimit_info, 0, sizeof(powerlimit_info_t));
+    ptmp = buffer;
+    for (szLine = GetLineFromBuffer(ptmp); szLine != NULL; szLine = GetLineFromBuffer(ptmp)) {
+        if (isAllSpaceOrTab(szLine, sizeof(*szLine)))
+            continue;
+        if (IsCommentString(szLine))
+            continue;
+
+        if (loadingStage == LD_STAGE_EXC_MAPPING) {
+            if (szLine[0] == '#' || szLine[1] == '#') {
+                loadingStage = LD_STAGE_TAB_DEFINE;
+            } else {
+                continue;
+            }
+        }
+
+        if (loadingStage == LD_STAGE_TAB_DEFINE) {
+            /* read "##	2.4G" */
+            if (szLine[0] != '#' || szLine[1] != '#')
+                continue;
+
+            /* skip the space */
+            i = 2;
+            while (szLine[i] == ' ' || szLine[i] == '\t')
+                ++i;
+
+            szLine[--i] = ' '; /* return the space in front of the regulation info */
+
+            /* Parse the label of the table */
+            memset((void *)band, 0, 10);
+            if (!ParseQualifiedString(szLine, &i, band, ' ', ',')) {
+                AICWFDBG(LOGERROR, "Fail to parse band!\n");
+                goto exit;
+            }
+            if (strncmp(band, "2.4G", 4) == 0) {
+                band_cc = PHY_BAND_2G4;
+            } else if (strncmp(band, "5G", 2) == 0) {
+                band_cc = PHY_BAND_5G;
+            }
+            memset((void *) colNumBuf, 0, 10);
+            if (!ParseQualifiedString(szLine, &i, colNumBuf, '#', '#')) {
+                AICWFDBG(LOGERROR, "Fail to parse column number!\n");
+                goto exit;
+            }
+            if (!GetU1ByteIntegerFromStringInDecimal(colNumBuf, &colNum)) {
+                AICWFDBG(LOGERROR, "Column number \"%s\" is not unsigned decimal\n", colNumBuf);
+                goto exit;
+            }
+            if (colNum == 0) {
+                AICWFDBG(LOGERROR, "Column number is 0\n");
+                goto exit;
+            }
+
+            AICWFDBG(LOGINFO, "band=%s(%d)\n", band, band_cc);
+            loadingStage = LD_STAGE_TAB_START;
+        } else if (loadingStage == LD_STAGE_TAB_START) {
+            /* read "##	START" */
+            if (szLine[0] != '#' || szLine[1] != '#')
+                continue;
+
+            /* skip the space */
+            i = 2;
+            while (szLine[i] == ' ' || szLine[i] == '\t')
+                ++i;
+
+            if (strncmp((u8 *)(szLine + i), "START", 5)) {
+                AICWFDBG(LOGERROR, "Missing \"##   START\" label\n");
+                goto exit;
+            }
+
+            loadingStage = LD_STAGE_COLUMN_DEFINE;
+        } else if (loadingStage == LD_STAGE_COLUMN_DEFINE) {
+            /* read "##	CN	US" */
+            if (szLine[0] != '#' || szLine[1] != '#')
+                continue;
+
+            /* skip the space */
+            i = 2;
+            while (szLine[i] == ' ' || szLine[i] == '\t')
+                ++i;
+
+            for (forCnt = 0; forCnt < colNum; forCnt++) {
+                /* skip the space */
+                while (szLine[i] == ' ' || szLine[i] == '\t')
+                    i++;
+                i_cc = i;
+
+                while (szLine[i] != ' ' && szLine[i] != '\t' && szLine[i] != '\0')
+                    i++;
+
+                if ((i - i_cc) != 2) {
+                    AICWFDBG(LOGERROR, "CC len err\n");
+                    goto exit;
+                } else if ((szLine[i_cc] == cc[0]) && (szLine[i_cc + 1] == cc[1])) {
+                    AICWFDBG(LOGINFO, "CC matched: %s, col=%d\n", cc, forCnt);
+                    colNum_cc = forCnt;
+                    powerlimit_info.flags |= POWER_LIMIT_CC_MATCHED_BIT;
+                    break;
+                }
+            }
+
+            loadingStage = LD_STAGE_CH_ROW;
+        } else if (loadingStage == LD_STAGE_CH_ROW) {
+            char channel[10] = {0}, powerLimit[10] = {0};
+            u8 channel_num, powerLimit_val, cnt = 0;
+
+            /* the table ends */
+            if (szLine[0] == '#' && szLine[1] == '#') {
+                i = 2;
+                while (szLine[i] == ' ' || szLine[i] == '\t')
+                    ++i;
+
+                if (strncmp((u8 *)(szLine + i), "END", 3) == 0) {
+                    loadingStage = LD_STAGE_TAB_DEFINE;
+                    colNum = 0;
+                    continue;
+                } else {
+                    AICWFDBG(LOGERROR, "Missing \"##   END\" label\n");
+                    goto exit;
+                }
+            }
+
+            if ((szLine[0] != 'c' && szLine[0] != 'C') ||
+                (szLine[1] != 'h' && szLine[1] != 'H')
+            ) {
+                AICWFDBG(LOGERROR, "Wrong channel prefix: '%c','%c'(%d,%d)\n", szLine[0], szLine[1], szLine[0], szLine[1]);
+                continue;
+            }
+            i = 2;/* move to the  location behind 'h' */
+
+            /* load the channel number */
+            cnt = 0;
+            while (szLine[i] >= '0' && szLine[i] <= '9') {
+                channel[cnt] = szLine[i];
+                ++cnt;
+                ++i;
+            }
+
+            for (forCnt = 0; forCnt < colNum; ++forCnt) {
+                /* skip the space between channel number and the power limit value */
+                while (szLine[i] == ' ' || szLine[i] == '\t')
+                    ++i;
+
+                /* load the power limit value */
+                memset((void *)powerLimit, 0, 10);
+
+                if (szLine[i] == 'N' && szLine[i + 1] == 'A') {
+                    /*
+                    * means channel not available
+                    */
+                    sprintf(powerLimit, "%d", POWER_LIMIT_INVALID_VAL);
+                    i += 2;
+                } else if ((szLine[i] >= '0' && szLine[i] <= '9')
+                    || szLine[i] == '+' || szLine[i] == '-'
+                ) {
+                    /* case of dBm value */
+                    cnt = 0;
+                    while ((szLine[i] >= '0' && szLine[i] <= '9')
+                        || szLine[i] == '+' || szLine[i] == '-'
+                    ) {
+                        powerLimit[cnt] = szLine[i];
+                        ++cnt;
+                        ++i;
+                    }
+                } else {
+                    AICWFDBG(LOGERROR, "Wrong limit expression \"%c%c\"(%d, %d)\n"
+                        , szLine[i], szLine[i + 1], szLine[i], szLine[i + 1]);
+                    goto exit;
+                }
+
+                if (forCnt == colNum_cc) {
+                    /* store the power limit value */
+                    if (GetU1ByteIntegerFromStringInDecimal((char *)channel, &channel_num) == 0
+                        || GetS1ByteIntegerFromStringInDecimal((char *)powerLimit, &powerLimit_val) == 0
+                    ) {
+                        AICWFDBG(LOGERROR, "Illegal index of power limit table [ch %s][val %s]\n", channel, powerLimit);
+                        goto exit;
+                    }
+
+                    if (band_cc == PHY_BAND_2G4) {
+                        uint8_t cur_idx = powerlimit_info.txpwr_lmt.ch_cnt_2g4;
+                        AICWFDBG(LOGINFO, "[%d]: ch=%s, pwr=%s\n", cur_idx, channel, powerLimit);
+                        if (cur_idx < MAC_DOMAINCHANNEL_24G_MAX) {
+                            powerlimit_info.txpwr_lmt.ch_num_2g4[cur_idx] = channel_num;
+                            powerlimit_info.txpwr_lmt.max_pwr_2g4[cur_idx] = powerLimit_val;
+                            powerlimit_info.txpwr_lmt.ch_cnt_2g4++;
+                        } else {
+                            AICWFDBG(LOGERROR, "band %d chan_cnt reached %d\n", band_cc, MAC_DOMAINCHANNEL_24G_MAX);
+                            AICWFDBG(LOGERROR, "channel=%s(%d) powerLimit=%s(%d)\n", channel, channel_num, powerLimit, powerLimit_val);
+                        }
+                    } else if (band_cc == PHY_BAND_5G) {
+                        uint8_t cur_idx = powerlimit_info.txpwr_lmt.ch_cnt_5g;
+                        AICWFDBG(LOGINFO, "[%d]: ch=%s, pwr=%s\n", cur_idx, channel, powerLimit);
+                        if (cur_idx < MAC_DOMAINCHANNEL_5G_MAX) {
+                            powerlimit_info.txpwr_lmt.ch_num_5g[cur_idx] = channel_num;
+                            powerlimit_info.txpwr_lmt.max_pwr_5g[cur_idx] = powerLimit_val;
+                            powerlimit_info.txpwr_lmt.ch_cnt_5g++;
+                        } else {
+                            AICWFDBG(LOGERROR, "band %d chan_cnt reached %d\n", band_cc, MAC_DOMAINCHANNEL_5G_MAX);
+                            AICWFDBG(LOGERROR, "channel=%s(%d) powerLimit=%s(%d)\n", channel, channel_num, powerLimit, powerLimit_val);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+exit:
+    return;
+}
+
+/// 5G lower bound freq
+#define PHY_FREQ_5G 5000
+
+uint16_t phy_channel_to_freq(uint8_t band, int channel)
+{
+    if ((band == PHY_BAND_2G4) && (channel >= 1) && (channel <= 14)) {
+        if (channel == 14)
+            return 2484;
+        else
+            return 2407 + channel * 5;
+    } else if ((band == PHY_BAND_5G) && (channel >= 1) && (channel <= 165)) {
+        return PHY_FREQ_5G + channel * 5;
+    }
+    return 0;
+}
+
+int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq)
+{
+    int8_t ret = POWER_LIMIT_INVALID_VAL;
+    uint8_t idx;
+    if (powerlimit_info.flags & POWER_LIMIT_CC_MATCHED_BIT) {
+        if (band == PHY_BAND_2G4) {
+            uint8_t idx_cnt = powerlimit_info.txpwr_lmt.ch_cnt_2g4;
+            for (idx = 0; idx < idx_cnt; idx++) {
+                int ch_num = powerlimit_info.txpwr_lmt.ch_num_2g4[idx];
+                uint16_t freq_tmp = phy_channel_to_freq(PHY_BAND_2G4, ch_num);
+                if (freq == freq_tmp) {
+                    ret = powerlimit_info.txpwr_lmt.max_pwr_2g4[idx];
+                    //AICWFDBG(LOGINFO, "[%d]: ch=%d(freq=%d), pwr=%d\n", idx, ch_num, freq, ret);
+                    break;
+                }
+            }
+            if (idx == idx_cnt) {
+                AICWFDBG(LOGERROR, "powerlimit search failed: band=%d freq=%d\n", band, freq);
+            }
+        } else if (band == PHY_BAND_5G) {
+            uint8_t idx_cnt = powerlimit_info.txpwr_lmt.ch_cnt_5g;
+            for (idx = 0; idx < idx_cnt; idx++) {
+                int ch_num = powerlimit_info.txpwr_lmt.ch_num_5g[idx];
+                uint16_t freq_tmp = phy_channel_to_freq(PHY_BAND_5G, ch_num);
+                if (freq == freq_tmp) {
+                    ret = powerlimit_info.txpwr_lmt.max_pwr_5g[idx];
+                    //AICWFDBG(LOGINFO, "[%d]: ch=%d(freq=%d), pwr=%d\n", idx, ch_num, freq, ret);
+                    break;
+                }
+            }
+            if (idx == idx_cnt) {
+                AICWFDBG(LOGERROR, "powerlimit search failed: band=%d freq=%d\n", band, freq);
+            }
+        }
+    }
+    return ret;
+}
+
+int8_t get_powerlimit_by_chnum(uint8_t chnum)
+{
+    int8_t ret = POWER_LIMIT_INVALID_VAL;
+    uint8_t idx;
+    if (powerlimit_info.flags & POWER_LIMIT_CC_MATCHED_BIT) {
+        if (chnum <= 14) {
+            uint8_t idx_cnt = powerlimit_info.txpwr_lmt.ch_cnt_2g4;
+            for (idx = 0; idx < idx_cnt; idx++) {
+                uint8_t ch_num = powerlimit_info.txpwr_lmt.ch_num_2g4[idx];
+                if (chnum == ch_num) {
+                    ret = powerlimit_info.txpwr_lmt.max_pwr_2g4[idx];
+                    //AICWFDBG(LOGINFO, "[%d]: ch=%d, pwr=%d\n", idx, ch_num, ret);
+                    break;
+                }
+            }
+            if (idx == idx_cnt) {
+                AICWFDBG(LOGERROR, "powerlimit search failed: chnum=%d\n", chnum);
+            }
+        } else if (chnum <= 165) {
+            uint8_t idx_cnt = powerlimit_info.txpwr_lmt.ch_cnt_5g;
+            for (idx = 0; idx < idx_cnt; idx++) {
+                int ch_num = powerlimit_info.txpwr_lmt.ch_num_5g[idx];
+                if (chnum == ch_num) {
+                    ret = powerlimit_info.txpwr_lmt.max_pwr_5g[idx];
+                    //AICWFDBG(LOGINFO, "[%d]: ch=%d, pwr=%d\n", idx, ch_num, ret);
+                    break;
+                }
+            }
+            if (idx == idx_cnt) {
+                AICWFDBG(LOGERROR, "powerlimit search failed: chnum=%d\n", chnum);
+            }
+        }
+    }
+    return ret;
+}
+#endif
+
 /**
  * rwnx_plat_userconfig_load  ---Load aic_userconfig.txt
  *@filename name of config
@@ -2216,8 +2668,14 @@ static int rwnx_plat_userconfig_load(struct rwnx_hw *rwnx_hw) {
 
 	if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DC){
 		rwnx_plat_userconfig_load_8800dc(rwnx_hw);
+        #ifdef CONFIG_POWER_LIMIT
+        rwnx_plat_powerlimit_load_8800dcdw(rwnx_hw, PRODUCT_ID_AIC8800DC);
+        #endif
 	}else if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DW){
         rwnx_plat_userconfig_load_8800dw(rwnx_hw);
+        #ifdef CONFIG_POWER_LIMIT
+        rwnx_plat_powerlimit_load_8800dcdw(rwnx_hw, PRODUCT_ID_AIC8800DW);
+        #endif
     }else if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800D81){
         rwnx_plat_userconfig_load_8800d80(rwnx_hw);
     }

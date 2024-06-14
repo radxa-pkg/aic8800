@@ -27,7 +27,11 @@ const struct aicbsp_firmware fw_u02[] = {
 		.bt_adid       = "fw_adid.bin",
 		.bt_patch      = "fw_patch.bin",
 		.bt_table      = "fw_patch_table.bin",
+		#ifdef CONFIG_SDIO_BT
+		.wl_fw         = "fmacfwbt.bin"
+		#else
 		.wl_fw         = "fmacfw.bin"
+		#endif
 	},
 	[AICBSP_CPMODE_TEST] = {
 		.desc          = "rf test mode(sdio u02)",
@@ -46,6 +50,8 @@ const struct aicbsp_firmware fw_u03[] = {
 		.bt_table      = "fw_patch_table_u03.bin",
 		#ifdef CONFIG_MCU_MESSAGE
 		.wl_fw         = "fmacfw_8800m_custmsg.bin"
+		#elif defined(CONFIG_SDIO_BT)
+		.wl_fw         = "fmacfwbt.bin"
 		#else
 		.wl_fw         = "fmacfw.bin"
 		#endif
@@ -140,7 +146,11 @@ const struct aicbsp_firmware fw_8800d80_u02[] = {
 		.bt_adid       = "fw_adid_8800d80_u02.bin",
 		.bt_patch      = "fw_patch_8800d80_u02.bin",
 		.bt_table      = "fw_patch_table_8800d80_u02.bin",
+	#ifdef CONFIG_SDIO_BT
+		.wl_fw         = "fmacfwbt_8800d80_u02.bin"
+	#else
 		.wl_fw         = "fmacfw_8800d80_u02.bin"
+	#endif
 	},
 
 	[AICBSP_CPMODE_TEST] = {
@@ -347,7 +357,7 @@ static int __init aicbsp_init(void)
 	}
 
 	mutex_init(&aicbsp_power_lock);
-#ifdef CONFIG_PLATFORM_ROCKCHIP
+#if defined CONFIG_PLATFORM_ROCKCHIP || defined CONFIG_PLATFORM_ROCKCHIP2
 	aicbsp_set_subsys(AIC_BLUETOOTH, AIC_PWR_ON);
 #endif
 	return 0;
@@ -358,7 +368,7 @@ extern struct aic_sdio_dev *aicbsp_sdiodev;
 
 static void __exit aicbsp_exit(void)
 {
-#ifdef CONFIG_PLATFORM_ROCKCHIP
+#if defined CONFIG_PLATFORM_ROCKCHIP || defined CONFIG_PLATFORM_ROCKCHIP2
     if(aicbsp_sdiodev){
     	aicbsp_sdio_exit();
     }

@@ -1392,7 +1392,11 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
     he_cap->he_cap_elem.phy_cap_info[9] |= IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_COMP_SIGB |
                                            IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_NON_COMP_SIGB;
     #endif
-    mcs_map = rwnx_hw->mod_params->he_mcs_map;
+	if (rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8801 || rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DC ||
+        rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DW)
+        mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map, IEEE80211_HE_MCS_SUPPORT_0_9);
+	else
+		mcs_map = rwnx_hw->mod_params->he_mcs_map;
     //mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map, IEEE80211_HE_MCS_SUPPORT_0_9);
     memset(&he_cap->he_mcs_nss_supp, 0, sizeof(he_cap->he_mcs_nss_supp));
     for (i = 0; i < nss; i++) {
@@ -1502,7 +1506,11 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	    he_cap->he_cap_elem.phy_cap_info[9] |= IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_COMP_SIGB |
 	                                           IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_NON_COMP_SIGB;
 	    #endif
-	    mcs_map = rwnx_hw->mod_params->he_mcs_map;
+		if (rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8801 || rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DC ||
+			rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DW)
+			mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map, IEEE80211_HE_MCS_SUPPORT_0_9);
+		else
+			mcs_map = rwnx_hw->mod_params->he_mcs_map;
 	    //mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map, IEEE80211_HE_MCS_SUPPORT_0_9);
 	    memset(&he_cap->he_mcs_nss_supp, 0, sizeof(he_cap->he_mcs_nss_supp));
 	    for (i = 0; i < nss; i++) {

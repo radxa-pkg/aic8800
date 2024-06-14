@@ -210,6 +210,7 @@ struct aic_usb_dev {
     u16 chipid;
     bool tbusy;
     bool app_cmp;
+    u32 fw_version_uint;
 };
 
 extern void aicwf_usb_exit(void);

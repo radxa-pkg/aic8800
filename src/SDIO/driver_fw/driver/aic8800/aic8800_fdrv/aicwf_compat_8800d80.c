@@ -20,6 +20,10 @@ int aicwf_set_rf_config_8800d80(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_
 		return -1;
 	}
 
+	if ((ret = rwnx_send_txpwr_lvl_adj_req(rwnx_hw))) {
+		return -1;
+	}
+
 	if ((ret = rwnx_send_txpwr_ofst2x_req(rwnx_hw))) {
 		return -1;
 	}

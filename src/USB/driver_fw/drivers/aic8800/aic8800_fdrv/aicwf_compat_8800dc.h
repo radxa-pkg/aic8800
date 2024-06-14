@@ -44,4 +44,7 @@ int aicwf_plat_patch_load_8800dc(struct rwnx_hw *rwnx_hw);
 int aicwf_plat_rftest_load_8800dc(struct rwnx_hw *rwnx_hw);
 int	rwnx_plat_userconfig_load_8800dc(struct rwnx_hw *rwnx_hw);
 int	rwnx_plat_userconfig_load_8800dw(struct rwnx_hw *rwnx_hw);
+#ifdef CONFIG_POWER_LIMIT
+int rwnx_plat_powerlimit_load_8800dcdw(struct rwnx_hw *rwnx_hw, uint16_t chip_id);
+#endif
 void system_config_8800dc(struct rwnx_hw *rwnx_hw);

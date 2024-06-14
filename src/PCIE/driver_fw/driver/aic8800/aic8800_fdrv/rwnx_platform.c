@@ -57,6 +57,7 @@ typedef struct
     txpwr_lvl_conf_t txpwr_lvl;
     txpwr_lvl_conf_v2_t txpwr_lvl_v2;
     txpwr_lvl_conf_v3_t txpwr_lvl_v3;
+    txpwr_lvl_adj_conf_t txpwr_lvl_adj;
 	txpwr_loss_conf_t txpwr_loss;
     txpwr_ofst_conf_t txpwr_ofst;
 	txpwr_ofst2x_conf_t txpwr_ofst2x;
@@ -164,6 +165,14 @@ typedef struct {
 #define AIC_PATCH_OFST(mem) ((size_t) &((aic_patch_t *)0)->mem)
 #define AIC_PATCH_ADDR(mem) ((u32)(aic_patch_str_base + AIC_PATCH_OFST(mem)))
 
+#define USER_CHAN_MAX_TXPWR_EN_FLAG     (0x01U << 1)
+#define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
+
+#define CFG_USER_CHAN_MAX_TXPWR_EN  0
+#define CFG_USER_TX_USE_ANA_F       0
+
+#define CFG_USER_EXT_FLAGS_EN   (CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
+
 u32 adaptivity_patch_tbl_8800d80[][2] = {
 	{0x000C, 0x0000320A}, //linkloss_thd
 	{0x009C, 0x00000000}, //ac_param_conf
@@ -171,6 +180,16 @@ u32 adaptivity_patch_tbl_8800d80[][2] = {
 };
 
 u32 patch_tbl_8800d80[][2] = {
+    #if CFG_USER_EXT_FLAGS_EN
+    {0x0188, 0x00000001
+        #if CFG_USER_CHAN_MAX_TXPWR_EN
+        | USER_CHAN_MAX_TXPWR_EN_FLAG
+        #endif
+        #if CFG_USER_TX_USE_ANA_F
+        | USER_TX_USE_ANA_F_FLAG
+        #endif
+    }, // user_ext_flags
+    #endif
 };
 
 #ifdef CONFIG_RWNX_TL4
@@ -571,7 +590,7 @@ int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr)
 	if (testmode == 0)
 		mdelay(500);
 	else
-		mdelay(3000);
+		mdelay(5000);
 
 	return err;
 }
@@ -675,6 +694,68 @@ void get_userconfig_xtal_cap(xtal_cap_conf_t *xtal_cap)
     AICWFDBG(LOGINFO, "%s:xtal_cap     :%d\r\n", __func__, xtal_cap->xtal_cap);
     AICWFDBG(LOGINFO, "%s:xtal_cap_fine:%d\r\n", __func__, xtal_cap->xtal_cap_fine);
 }
+
+s8_l get_txpwr_max(s8_l power){
+	int i=0;
+
+	for (i = 0; i <= 11; i++){
+		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11b_11ag_2g4[i])
+			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11b_11ag_2g4[i];
+	}
+    for (i = 0; i <= 9; i++){
+		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11n_11ac_2g4[i])
+			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11n_11ac_2g4[i];
+    }
+    for (i = 0; i <= 11; i++){
+		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_2g4[i])
+			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_2g4[i];
+    }
+	for (i = 0; i <= 11; i++){
+		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11a_5g[i])
+			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11a_5g[i];
+	}
+    for (i = 0; i <= 9; i++){
+		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11n_11ac_5g[i])
+			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11n_11ac_5g[i];
+    }
+	for (i = 0; i <= 11; i++){
+		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[i])
+			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[i];
+	}
+
+	if(userconfig_info.txpwr_loss.loss_enable == 1)
+		power += userconfig_info.txpwr_loss.loss_value;
+
+	printk("%s:txpwr_max:%d \r\n",__func__,power);
+	return power;
+}
+
+void set_txpwr_loss_ofst(s8_l value)
+{
+	int i=0;
+
+	for (i = 0; i <= 11; i++){
+		userconfig_info.txpwr_lvl_v3.pwrlvl_11b_11ag_2g4[i] += value;
+	}
+	for (i = 0; i <= 9; i++){
+		userconfig_info.txpwr_lvl_v3.pwrlvl_11n_11ac_2g4[i] += value;
+	}
+	for (i = 0; i <= 11; i++){
+		userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_2g4[i] += value;
+	}
+	for (i = 0; i <= 11; i++){
+		userconfig_info.txpwr_lvl_v3.pwrlvl_11a_5g[i] += value;
+	}
+	for (i = 0; i <= 9; i++){
+		userconfig_info.txpwr_lvl_v3.pwrlvl_11n_11ac_5g[i] += value;
+	}
+	for (i = 0; i <= 11; i++){
+		userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[i] += value;
+	}
+
+	printk("%s:value:%d\r\n", __func__, value);
+}
+
 
 
 #define MATCH_NODE(type, node, cfg_key) {cfg_key, offsetof(type, node)}
@@ -1087,6 +1168,26 @@ void rwnx_plat_nvram_set_value_v3(char *command, char *value)
         userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[10] = rwnx_atoi(value);
     } else if (!strcmp(command,     "lvl_11ax_mcs11_5g")) {
         userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[11] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_enable")) {
+        userconfig_info.txpwr_lvl_adj.enable = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_1_4")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_5_9")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_10_13")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[2] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_42")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_58")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_106")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[2] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_122")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[3] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_138")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[4] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_155")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[5] = rwnx_atoi(value);
     } else if (!strcmp(command, "loss_enable")) {
         userconfig_info.txpwr_loss.loss_enable = rwnx_atoi(value);
     } else if (!strcmp(command, "loss_value")) {
@@ -1552,11 +1653,17 @@ int rwnx_plat_userconfig_upload_android(struct rwnx_hw *rwnx_hw, char *fw_path, 
 
 }
 extern int adap_test;
+
+#define NEW_PATCH_BUFFER_MAP    1
+
 int patch_config(struct rwnx_hw *rwnx_hw)
 {
 	const u32 rd_patch_addr = RAM_FMAC_FW_ADDR + 0x0198;
 	u32 aic_patch_addr;
 	u32 config_base, aic_patch_str_base;
+	#if (NEW_PATCH_BUFFER_MAP)
+	u32 patch_buff_addr, patch_buff_base, rd_version_addr, rd_version_val;
+	#endif
 	#ifdef CONFIG_USB_BT
 	uint32_t start_addr = 0x00175000;
 	#else
@@ -1578,6 +1685,19 @@ int patch_config(struct rwnx_hw *rwnx_hw)
 	config_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + rd_patch_addr));
 	aic_patch_str_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + aic_patch_addr));
 	AICWFDBG(LOGINFO, "%s: cfg_base:%x,patch_str_base:%x,adap_test=%d\n", __func__, config_base, aic_patch_str_base, adap_test);
+
+	#if (NEW_PATCH_BUFFER_MAP)
+	rd_version_addr = RAM_FMAC_FW_ADDR + 0x01C;
+	rd_version_val = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + rd_version_addr));
+	AICWFDBG(LOGINFO, "rd_version_val=%08X\n", rd_version_val);
+	rwnx_hw->pcidev->fw_version_uint = rd_version_val;
+	if (rd_version_val > 0x06090100) {
+		patch_buff_addr = rd_patch_addr + 12;
+		patch_buff_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + patch_buff_addr));
+		patch_addr = start_addr = patch_buff_base;
+		AICWFDBG(LOGINFO, "%s: patch_buff_base:%x\n", __func__, patch_buff_base);
+	}
+	#endif
 
 	volatile u32 *patch_0 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(magic_num));
 	volatile u32 *patch_1 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(magic_num_2));
@@ -1987,6 +2107,23 @@ void get_userconfig_txpwr_lvl_v3_in_fdrv(txpwr_lvl_conf_v3_t *txpwr_lvl_v3)
     AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs9_5g:%d\r\n",     __func__, txpwr_lvl_v3->pwrlvl_11ax_5g[9]);
     AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs10_5g:%d\r\n",    __func__, txpwr_lvl_v3->pwrlvl_11ax_5g[10]);
     AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs11_5g:%d\r\n",    __func__, txpwr_lvl_v3->pwrlvl_11ax_5g[11]);
+}
+
+void get_userconfig_txpwr_lvl_adj_in_fdrv(txpwr_lvl_adj_conf_t *txpwr_lvl_adj)
+{
+    *txpwr_lvl_adj = userconfig_info.txpwr_lvl_adj;
+
+    AICWFDBG(LOGINFO, "%s:enable:%d\r\n",                   __func__, txpwr_lvl_adj->enable);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_2g4_chan_1_4:%d\r\n",     __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_2g4[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_2g4_chan_5_9:%d\r\n",     __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_2g4[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_2g4_chan_10_13:%d\r\n",   __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_2g4[2]);
+
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_42:%d\r\n",       __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_58:%d\r\n",       __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_106:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_122:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_138:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_adj_5g_chan_155:%d\r\n",      __func__, txpwr_lvl_adj->pwrlvl_adj_tbl_5g[5]);
 }
 
 void get_userconfig_txpwr_loss(txpwr_loss_conf_t *txpwr_loss)

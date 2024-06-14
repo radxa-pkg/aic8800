@@ -399,6 +399,9 @@ enum mm_msg_tag
     MM_SET_VENDOR_SWCONFIG_REQ,
     MM_SET_VENDOR_SWCONFIG_CFM,
 
+    MM_SET_TXPWR_LVL_ADJ_REQ,
+    MM_SET_TXPWR_LVL_ADJ_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -1337,6 +1340,13 @@ typedef struct
     s8_l pwrlvl_11ax_5g[12];
 } txpwr_lvl_conf_v3_t;
 
+typedef struct
+{
+    u8_l enable;
+    s8_l pwrlvl_adj_tbl_2g4[3];
+    s8_l pwrlvl_adj_tbl_5g[6];
+} txpwr_lvl_adj_conf_t;
+
 struct mm_set_txpwr_lvl_req
 {
   union {
@@ -1344,6 +1354,11 @@ struct mm_set_txpwr_lvl_req
     txpwr_lvl_conf_v2_t txpwr_lvl_v2;
     txpwr_lvl_conf_v3_t txpwr_lvl_v3;
   };
+};
+
+struct mm_set_txpwr_lvl_adj_req
+{
+    txpwr_lvl_adj_conf_t txpwr_lvl_adj;
 };
 
 typedef struct
@@ -2070,6 +2085,9 @@ enum vendor_swconfig_tag
     BCN_CFG_REQ = 0,
     TEMP_COMP_SET_REQ,
     TEMP_COMP_GET_REQ,
+    EXT_FLAGS_SET_REQ,
+    EXT_FLAGS_GET_REQ,
+    EXT_FLAGS_MASK_SET_REQ,
 };
 
 struct mm_set_bcn_cfg_req
@@ -2106,12 +2124,40 @@ struct mm_get_temp_comp_cfm
     s8_l degree;
 };
 
+struct mm_set_ext_flags_req
+{
+    u32_l user_flags;
+};
+
+struct mm_set_ext_flags_cfm
+{
+    u32_l user_flags;
+};
+
+struct mm_get_ext_flags_cfm
+{
+    u32_l user_flags;
+};
+
+struct mm_mask_set_ext_flags_req
+{
+    u32_l user_flags_mask;
+    u32_l user_flags_val;
+};
+
+struct mm_mask_set_ext_flags_cfm
+{
+    u32_l user_flags;
+};
+
 struct mm_set_vendor_swconfig_req
 {
     u32_l swconfig_id;
     union {
         struct mm_set_bcn_cfg_req bcn_cfg_req;
         struct mm_set_temp_comp_req temp_comp_set_req;
+        struct mm_set_ext_flags_req ext_flags_set_req;
+        struct mm_mask_set_ext_flags_req ext_flags_mask_set_req;
     };
 };
 
@@ -2122,6 +2168,9 @@ struct mm_set_vendor_swconfig_cfm
         struct mm_set_bcn_cfg_cfm bcn_cfg_cfm;
         struct mm_set_temp_comp_cfm temp_comp_set_cfm;
         struct mm_get_temp_comp_cfm temp_comp_get_cfm;
+        struct mm_set_ext_flags_cfm ext_flags_set_cfm;
+        struct mm_get_ext_flags_cfm ext_flags_get_cfm;
+        struct mm_mask_set_ext_flags_cfm ext_flags_mask_set_cfm;
     };
 };
 
@@ -2879,6 +2928,20 @@ enum dbg_msg_tag
     DBG_GPIO_INIT_REQ,
     DBG_GPIO_INIT_CFM,
 
+    /// EF usrdata read request
+    DBG_EF_USRDATA_READ_REQ,
+    /// EF usrdata read confirm
+    DBG_EF_USRDATA_READ_CFM,
+    /// Memory block read request
+    DBG_MEM_BLOCK_READ_REQ,
+    /// Memory block read confirm
+    DBG_MEM_BLOCK_READ_CFM,
+
+    DBG_PWM_INIT_REQ,
+    DBG_PWM_INIT_CFM,
+    DBG_PWM_DEINIT_REQ,
+    DBG_PWM_DEINIT_CFM,
+
     /// Max number of Debug messages
     DBG_MAX,
 };
@@ -3012,9 +3075,9 @@ struct dbg_start_app_cfm
 enum {
     HOST_START_APP_AUTO = 1,
     HOST_START_APP_CUSTOM,
-#ifdef CONFIG_USB_BT
+//#ifdef CONFIG_USB_BT
     HOST_START_APP_REBOOT,
-#endif // (CONFIG_USB_BT)
+//#endif // (CONFIG_USB_BT)
 	HOST_START_APP_FNCALL = 4,
 	HOST_START_APP_DUMMY  = 5,
 };

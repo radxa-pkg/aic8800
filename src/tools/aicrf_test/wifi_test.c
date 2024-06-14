@@ -539,6 +539,8 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
         usr_data[2] = *(unsigned int *)&priv_cmd.buf[8];
         printf("done: efuse usrdata:\n [0]=0x%08x\n [1]=0x%08x\n [2]=0x%08x\n",
             usr_data[0], usr_data[1], usr_data[2]);
+    } else if (strcasecmp(argV[2], "RDWR_EFUSE_HE_OFF") == 0) {
+        printf("EFUSE_HE_OFF: %d\n", priv_cmd.buf[0]);
     } else if (strcasecmp(argV[2], "GET_BT_RX_RESULT") == 0) {
         printf("done: get bt rx total=%d, ok=%d, err=%d\n", *(unsigned int *)priv_cmd.buf,
             *(unsigned int *)&priv_cmd.buf[4],

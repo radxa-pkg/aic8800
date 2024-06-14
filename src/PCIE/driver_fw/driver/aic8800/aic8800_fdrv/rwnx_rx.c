@@ -2275,10 +2275,12 @@ u8 rwnx_rxdataind_aicwf(struct rwnx_hw *rwnx_hw, void *hostid, void *rx_priv)
 
 	hw_rxhdr = (struct hw_rxhdr *)skb->data;
 
+	#ifdef AICWF_RX_REORDER
 	if (hw_rxhdr->is_monitor_vif) {
 		status = RX_STAT_MONITOR;
 		printk("monitor rx\n");
 	}
+	#endif
 
 	if (hw_rxhdr->flags_upload)
 		status |= RX_STAT_FORWARD;

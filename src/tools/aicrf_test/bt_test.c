@@ -34,7 +34,7 @@
 #define PARTY 'N'
 #define STOP '1'
 #define SOFTWARE_HANDSHAKE 0
-#define HARDWARE_HANDSHAKE 0
+#define HARDWARE_HANDSHAKE 1
 
 //socket param
 #define BT_HCI_TOOL_PORT 5001
@@ -114,6 +114,9 @@ enum{
 
     scpc_start,
     scpc_stop,
+
+    le_tx,
+    le_rx,
 };
 
 struct bt_test_args_t{
@@ -126,9 +129,12 @@ struct bt_test_args_t{
     int tx_pwr;
     int len;
     uint8_t addr[6];
+    int le_phy;
+    int mod_idx;
 }bt_test_args={
     .whitening = 0x01,
-    .addr = { 0x7E, 0x96, 0xC6, 0x6B, 0x1C, 0x0A },
+    .addr = { 0x0A, 0x1C, 0x6B, 0xC6, 0x96, 0x7E },
+    .le_phy = 0x01,
 };
 
 void helper(){
@@ -137,18 +143,20 @@ void helper(){
     printf("\t<-c> to send hci cmd to interface.\n");
     printf("\t<-w> to send wlan cmd to interface.\n");
     printf("\t<-H> to send hci cmd to interface with human readable options.\n");
-    printf("\t     <command> [<args>]\n");
+    printf("\t     <command> [<args> ...]\n");
     printf("\t     Tx test commands:\n");
-    printf("\t       txDH1 | txDH3 | txDH5 | tx2DH1 | tx2DH3 | tx2DH5 | tx3DH1 | tx3DH3 | tx3DH5\n");
+    printf("\t       txDH1 | txDH3 | txDH5 | tx2DH1 | tx2DH3 | tx2DH5 | tx3DH1 | tx3DH3 | tx3DH5 | txstop | le_tx\n");
     printf("\t     Rx test commands:\n");
-    printf("\t       rxDH1 | rxDH3 | rxDH5 | rx2DH1 | rx2DH3 | rx2DH5 | rx3DH1 | rx3DH3 | rx3DH5\n");
+    printf("\t       rxDH1 | rxDH3 | rxDH5 | rx2DH1 | rx2DH3 | rx2DH5 | rx3DH1 | rx3DH3 | rx3DH5 | rxstop | le_rx\n");
     printf("\t     Args:\n");
-    printf("\t       [patt <pattern>]\n");
+    printf("\t       [patt | pkt_pld <pattern>]\n");
     printf("\t       [en_hop | dis_hop]\n");
     printf("\t       [chnl <decimal channel>]\n");
     printf("\t       [en_wht | dis_wht]\n");
     printf("\t       [len <decimal packet length>]\n");
     printf("\t       [addr <hex MAC address>]\n");
+    printf("\t       [le_phy <phy>]\n");
+    printf("\t       [mod_idx <modulation index>]\n");
     printf("\t     Single carrier test command:\n");
     printf("\t       scpc (start | stop)\n");
     printf("\t     Args:\n");
@@ -268,6 +276,9 @@ int parse_cmd_line(int argc, char **argv){
                     bt_test_args.type = tx3DH5;
                     bt_test_args.len = maxLth_3DH5;
                     bt_test_args.is_edr = TRUE;
+                } else if (ARG_IS("le_tx")){
+                    bt_test_args.type = le_tx;
+                    bt_test_args.len = 0xFF;
                 }
                 else
                 if (ARG_IS("rxstop")){
@@ -307,6 +318,9 @@ int parse_cmd_line(int argc, char **argv){
                     bt_test_args.type = rx3DH5;
                     bt_test_args.len = maxLth_3DH5;
                     bt_test_args.is_edr = TRUE;
+                } else if (ARG_IS("le_rx")){
+                    bt_test_args.type = le_rx;
+                    bt_test_args.len = 0xFF;
                 }
                 else
                 if (ARG_IS("scpc")){
@@ -323,7 +337,7 @@ int parse_cmd_line(int argc, char **argv){
                     }
                 }
                 else
-                if (ARG_IS("patt")){
+                if (ARG_IS("patt") || ARG_IS("pkt_pld")){
                     if (command_counter+1>=command_number)
                     {
                         return ERR;
@@ -423,6 +437,36 @@ int parse_cmd_line(int argc, char **argv){
                     char** discard = NULL;
                     
                     bt_test_args.tx_pwr = strtol(argv[command_counter], discard,10);
+                }
+                else
+                if (ARG_IS("le_phy")){
+                    if (command_counter+1>=command_number)
+                    {
+                        return ERR;
+                    }
+                    command_counter++;
+                    if (ARG_IS("01")){
+                        bt_test_args.le_phy = 0x01;
+                    } else if (ARG_IS("02")){
+                        bt_test_args.le_phy = 0x02;
+                    } else if (ARG_IS("03")){
+                        bt_test_args.le_phy = 0x03;
+                    } else if (ARG_IS("04")){
+                        bt_test_args.le_phy = 0x04;
+                    }
+                }
+                else
+                if (ARG_IS("mod_idx")){
+                    if (command_counter+1>=command_number)
+                    {
+                        return ERR;
+                    }
+                    command_counter++;
+                    if (ARG_IS("00")){
+                        bt_test_args.mod_idx = 0x00;
+                    } else if (ARG_IS("01")){
+                        bt_test_args.mod_idx = 0x01;
+                    } 
                 }
                 command_counter++;
             }
@@ -798,25 +842,25 @@ void send_raw_hci_command(){
             r_hci_command[r_hci_command_len++] = bt_test_args.whitening;
             r_hci_command[r_hci_command_len++] = (bt_test_args.len & 0xFF);
             r_hci_command[r_hci_command_len++] = ((bt_test_args.len >> 8) & 0xFF);
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[0];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[1];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[2];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[3];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[4];
             r_hci_command[r_hci_command_len++] = bt_test_args.addr[5];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[4];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[3];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[2];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[1];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[0];
         } else {
             r_hci_command[r_hci_command_len++] = (bt_test_args.len & 0xFF);
             r_hci_command[r_hci_command_len++] = ((bt_test_args.len >> 8) & 0xFF);
             r_hci_command[r_hci_command_len++] = bt_test_args.whitening;
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[0];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[1];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[2];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[3];
-            r_hci_command[r_hci_command_len++] = bt_test_args.addr[4];
             r_hci_command[r_hci_command_len++] = bt_test_args.addr[5];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[4];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[3];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[2];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[1];
+            r_hci_command[r_hci_command_len++] = bt_test_args.addr[0];
         }
     } else if (bt_test_args.type == scpc_start){
-	uint8_t i = 0;
+	    uint8_t i = 0;
         r_hci_command[r_hci_command_len++] = 0x01;
         r_hci_command[r_hci_command_len++] = 0xC6;
         r_hci_command[r_hci_command_len++] = 0xFC;
@@ -828,7 +872,7 @@ void send_raw_hci_command(){
             r_hci_command[r_hci_command_len++] = 0x00;
         }
     } else if (bt_test_args.type == scpc_stop){
-	uint8_t i = 0;
+	    uint8_t i = 0;
         r_hci_command[r_hci_command_len++] = 0x01;
         r_hci_command[r_hci_command_len++] = 0xC6;
         r_hci_command[r_hci_command_len++] = 0xFC;
@@ -839,6 +883,23 @@ void send_raw_hci_command(){
         for (i=0;i<11;i++){
             r_hci_command[r_hci_command_len++] = 0x00;
         }
+    } else if (bt_test_args.type == le_tx){
+        r_hci_command[r_hci_command_len++] = 0x01;
+        r_hci_command[r_hci_command_len++] = 0x34;
+        r_hci_command[r_hci_command_len++] = 0x20;
+        r_hci_command[r_hci_command_len++] = 0x04;
+        r_hci_command[r_hci_command_len++] = bt_test_args.channel;
+        r_hci_command[r_hci_command_len++] = (bt_test_args.len & 0xFF);
+        r_hci_command[r_hci_command_len++] = bt_test_args.pattern;
+        r_hci_command[r_hci_command_len++] = bt_test_args.le_phy;
+    } else if (bt_test_args.type == le_rx){
+        r_hci_command[r_hci_command_len++] = 0x01;
+        r_hci_command[r_hci_command_len++] = 0x33;
+        r_hci_command[r_hci_command_len++] = 0x20;
+        r_hci_command[r_hci_command_len++] = 0x03;
+        r_hci_command[r_hci_command_len++] = bt_test_args.channel;
+        r_hci_command[r_hci_command_len++] = bt_test_args.le_phy;
+        r_hci_command[r_hci_command_len++] = bt_test_args.mod_idx;
     }
     send_to_server(r_hci_command, r_hci_command_len);
 }

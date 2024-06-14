@@ -7,9 +7,9 @@ BOARD_HAVE_BLUETOOTH := true
 BOARD_HAVE_BLUETOOTH_AIC := true
 BOARD_HAVE_BLUETOOTH_AIC_COEX := true
 
-ifneq ($(filter atv box, $(strip $(TARGET_BOARD_PLATFORM_PRODUCT))), )
+#ifneq ($(filter atv box, $(strip $(TARGET_BOARD_PLATFORM_PRODUCT))), )
 BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(CUR_PATH)/bluetooth
-endif
+#endif
 ifneq ($(filter rk3328, $(strip $(TARGET_BOARD_PLATFORM))), )
 PRODUCT_COPY_FILES += \
 	$(CUR_PATH)/vendor/etc/bluetooth/aicbt_S0.conf:vendor/etc/bluetooth/aicbt.conf

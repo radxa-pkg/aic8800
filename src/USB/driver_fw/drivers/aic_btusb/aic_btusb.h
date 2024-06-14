@@ -45,6 +45,7 @@
 
 //#define CONFIG_SCO_OVER_HCI
 #define CONFIG_USB_AIC_UART_SCO_DRIVER
+//#define CONFIG_BT_WAKEUP_IN_PM
 
 #ifdef CONFIG_SCO_OVER_HCI
 #include <linux/usb/audio.h>
@@ -544,6 +545,34 @@ static inline void hci_set_drvdata(struct hci_dev *hdev, void *data)
 #define HCI_EV_REMOTE_HOST_FEATURES    0x3d
 #define HCI_EV_LE_Meta 0x3e
 
+/* ULP Event sub code */
+#define HCI_BLE_CONN_COMPLETE_EVT 0x01
+#define HCI_BLE_ADV_PKT_RPT_EVT 0x02
+#define HCI_BLE_LL_CONN_PARAM_UPD_EVT 0x03
+#define HCI_BLE_READ_REMOTE_FEAT_CMPL_EVT 0x04
+#define HCI_BLE_LTK_REQ_EVT 0x05
+#define HCI_BLE_RC_PARAM_REQ_EVT 0x06
+#define HCI_BLE_DATA_LENGTH_CHANGE_EVT 0x07
+#define HCI_BLE_ENHANCED_CONN_COMPLETE_EVT 0x0a
+#define HCI_BLE_DIRECT_ADV_EVT 0x0b
+#define HCI_BLE_PHY_UPDATE_COMPLETE_EVT 0x0c
+#define HCI_LE_EXTENDED_ADVERTISING_REPORT_EVT 0x0D
+#define HCI_BLE_PERIODIC_ADV_SYNC_EST_EVT      0x0E
+#define HCI_BLE_PERIODIC_ADV_REPORT_EVT        0x0F
+#define HCI_BLE_PERIODIC_ADV_SYNC_LOST_EVT     0x10
+#define HCI_BLE_SCAN_TIMEOUT_EVT               0x11
+#define HCI_LE_ADVERTISING_SET_TERMINATED_EVT 0x12
+#define HCI_BLE_SCAN_REQ_RX_EVT                0x13
+#define HCI_BLE_CIS_EST_EVT 0x19
+#define HCI_BLE_CIS_REQ_EVT 0x1a
+#define HCI_BLE_CREATE_BIG_CPL_EVT 0x1b
+#define HCI_BLE_TERM_BIG_CPL_EVT 0x1c
+#define HCI_BLE_BIG_SYNC_EST_EVT 0x1d
+#define HCI_BLE_BIG_SYNC_LOST_EVT 0x1e
+#define HCI_BLE_REQ_PEER_SCA_CPL_EVT 0x1f
+
+#define HCI_VENDOR_SPECIFIC_EVT 0xFF /* Vendor specific events */
+
 #define CONFIG_MAC_OFFSET_GEN_1_2       (0x3C)      //MAC's OFFSET in config/efuse for aic generation 1~2 bluetooth chip
 #define CONFIG_MAC_OFFSET_GEN_3PLUS     (0x44)      //MAC's OFFSET in config/efuse for aic generation 3+ bluetooth chip
 
@@ -645,8 +674,9 @@ typedef struct {
 #define PATCH_SEG_MAX    252
 #define DATA_END        0x80
 #define DOWNLOAD_OPCODE    0xfc02
-#define HCI_VSC_UPDATE_PT_CMD          0xFC75
-#define BTOFF_OPCODE    0xfc28
+#define HCI_VSC_UPDATE_PT_CMD                   0xFC75
+#define HCI_VSC_SET_ADFILTER_PT_CMD             0xFDAB
+#define HCI_VSC_RESET_ADFILTER_PROCESS_PT_CMD   0xFDAC
 #define TRUE            1
 #define FALSE            0
 #define CMD_HDR_LEN        sizeof(struct hci_command_hdr)
@@ -691,6 +721,46 @@ struct fw_status {
 #define HCI_PT_MAX_LEN                      31
 
 #define HCI_VSC_DBG_RD_MEM_CMD              0xFC01
+
+#define MAX_AD_FILTER_NUM        5// Max AD Filter num
+#define MAX_GPIO_TRIGGER_NUM     2// Max user config num of gpio
+#define MAX_ROLE_COMNO_IDX_NUM   2// Max num of ad role type combo,form( enum gpio_combo_idx) 
+
+#define AD_ROLE_FLAG         0x0f
+#define ROLE_COMBO_IDX_FLAG  0xf0
+
+enum ad_role_type {
+    ROLE_ONLY,// ROLE_ONLY will trigger wake up immediately.
+    ROLE_COMBO,//ROLE_COMBO will trigger When all the conditions (ad_role == ROLE_COMBO,and ad_filter is matching)are met.
+};
+
+enum gpio_combo_idx {
+    COMBO_0,
+    COMBO_1,
+};
+
+enum gpio_trigger_bit {
+    TG_IDX_0 = (1<<0),
+    TG_IDX_1 = (1<<1),
+};
+
+struct wakeup_ad_data_filter {
+    uint32_t ad_data_mask;
+    uint8_t gpio_trigger_idx;
+    uint8_t ad_role;//from enum ad_role_type 
+    uint8_t ad_len;
+    uint8_t ad_type;
+    uint8_t ad_data[31];
+};
+
+struct ble_wakeup_param_t {
+    uint32_t magic_num;// "BLES" = 0x53454C42
+    uint32_t delay_scan_to;// timeout for start scan in ms
+    uint32_t reboot_to;// timeout for reboot in ms
+    uint32_t gpio_num[MAX_GPIO_TRIGGER_NUM];
+    uint32_t gpio_dft_lvl[MAX_GPIO_TRIGGER_NUM];
+    struct wakeup_ad_data_filter ad_filter[MAX_AD_FILTER_NUM];
+};
 
 struct hci_dbg_rd_mem_cmd {
     __le32 start_addr;

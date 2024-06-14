@@ -48,6 +48,8 @@ static void aicbsp_platform_power_off(void);
 
 struct aic_sdio_dev *aicbsp_sdiodev = NULL;
 static struct semaphore *aicbsp_notify_semaphore;
+static struct semaphore *aicbsp_probe_semaphore;
+
 static const struct sdio_device_id aicbsp_sdmmc_ids[];
 static bool aicbsp_load_fw_in_fdrv = false;
 
@@ -333,7 +335,9 @@ static int aicbsp_sdio_probe(struct sdio_func *func,
 	}
 	host->caps |= MMC_CAP_NONREMOVABLE;
 	aicbsp_platform_init(sdiodev);
-
+	
+	up(aicbsp_probe_semaphore);
+	
 	return 0;
 fail:
 	aicwf_sdio_func_deinit(sdiodev);
@@ -388,17 +392,10 @@ static int aicbsp_sdio_suspend(struct device *dev)
 	int err;
 	mmc_pm_flag_t sdio_flags;
 
-#ifdef CONFIG_PLATFORM_ROCKCHIP
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
 #ifdef CONFIG_GPIO_WAKEUP
     //BT_SLEEP:true,BT_WAKEUP:false
     rfkill_rk_sleep_bt(false);
-#endif
-#endif
-
-#ifdef CONFIG_PLATFORM_ROCKCHIP2
-#ifdef CONFIG_GPIO_WAKEUP
-        //BT_SLEEP:true,BT_WAKEUP:false
-        rfkill_rk_sleep_bt(false);
 #endif
 #endif
 
@@ -419,7 +416,7 @@ static int aicbsp_sdio_suspend(struct device *dev)
 		return err;
 	}
 
-#ifdef CONFIG_PLATFORM_ROCKCHIP
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
 #ifdef CONFIG_GPIO_WAKEUP
 		//BT_SLEEP:true,BT_WAKEUP:false
 		rfkill_rk_sleep_bt(true);
@@ -427,21 +424,19 @@ static int aicbsp_sdio_suspend(struct device *dev)
 #endif
 #endif
 
-#ifdef CONFIG_PLATFORM_ROCKCHIP2
-#ifdef CONFIG_GPIO_WAKEUP
-            //BT_SLEEP:true,BT_WAKEUP:false
-            rfkill_rk_sleep_bt(true);
-            printk("%s BT wake to SLEEP\r\n", __func__);
-#endif
-#endif
-
-
 	return 0;
 }
 
 static int aicbsp_sdio_resume(struct device *dev)
 {
 	sdio_dbg("%s\n", __func__);
+
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
+#ifdef CONFIG_GPIO_WAKEUP
+		//BT_SLEEP:true,BT_WAKEUP:false
+		rfkill_rk_sleep_bt(false);
+#endif
+#endif
 
 	return 0;
 }
@@ -570,11 +565,22 @@ static void aicbsp_platform_power_off(void)
 
 int aicbsp_sdio_init(void)
 {
+	struct semaphore aic_chipup_sem;
+
+	sema_init(&aic_chipup_sem, 0);
+	aicbsp_probe_semaphore = &aic_chipup_sem;
+	
 	if (sdio_register_driver(&aicbsp_sdio_driver)) {
 		return -1;
 	} else {
 		//may add mmc_rescan here
 	}
+	if (down_timeout(aicbsp_probe_semaphore, msecs_to_jiffies(2000)) != 0){
+		printk("%s aicbsp_sdio_probe fail\r\n", __func__);
+		return -1;
+	}
+
+	
 	return 0;
 }
 

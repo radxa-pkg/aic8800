@@ -1324,6 +1324,9 @@ int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg)
 	sw_txhdr->amsdu.len = 0;
 	sw_txhdr->amsdu.nb = 0;
 #endif
+	sw_txhdr->raw_frame = 0;
+	sw_txhdr->fixed_rate = 0;
+
 	// Fill-in the descriptor
 	memcpy(&desc->host.eth_dest_addr, eth_t.h_dest, ETH_ALEN);
 	memcpy(&desc->host.eth_src_addr, eth_t.h_source, ETH_ALEN);
@@ -1380,7 +1383,7 @@ int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg)
 	desc->host.packet_addr = sw_txhdr->dma_addr + frame_oft;
 #endif
 #endif
-	//desc->host.hostid = sw_txhdr->dma_addr;
+	desc->host.status_desc_addr = sw_txhdr->dma_addr;
 
 	spin_lock_bh(&rwnx_hw->tx_lock);
 	if (rwnx_txq_queue_skb(skb, txq, rwnx_hw, false))
@@ -1451,6 +1454,9 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
         skb = newskb;
     }
+
+	if(skb->priority < 3)
+		skb->priority = 0;
 
 #ifdef CONFIG_FILTER_TCP_ACK
         msgbuf=intf_tcp_alloc_msg(msgbuf);

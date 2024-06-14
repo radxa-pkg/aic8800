@@ -52,6 +52,9 @@
 #include "aicwf_compat_8800dc.h"
 #include "aicwf_compat_8800d80.h"
 #include "rwnx_wakelock.h"
+#ifdef CONFIG_SDIO_BT
+#include "aic_btsdio.h"
+#endif
 
 
 #define RW_DRV_DESCRIPTION  "RivieraWaves 11nac driver for Linux cfg80211"
@@ -375,7 +378,11 @@ static const struct ieee80211_iface_combination rwnx_combinations[] = {
 	{
 		.limits                 = rwnx_limits,
 		.n_limits               = ARRAY_SIZE(rwnx_limits),
+#ifdef CONFIG_MCC
 		.num_different_channels = NX_CHAN_CTXT_CNT,
+#else
+		.num_different_channels = 1,
+#endif
 		.max_interfaces         = NX_VIRT_DEV_MAX,
 	},
 	/* Keep this combination as the last one */
@@ -971,14 +978,16 @@ static int rwnx_open(struct net_device *dev)
 	   #endif
 
 	   /* Device is now started */
-	   set_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
-	   atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
 	}
 	#ifdef CONFIG_COEX
 	else if ((RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_AP || RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_GO)) {
 	   rwnx_send_coex_req(rwnx_hw, 1, 0);
 	}
 	#endif
+
+	set_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
+	atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
+	AICWFDBG(LOGDEBUG, "%s rwnx_vif->drv_flags:%d\r\n", __func__, (int)rwnx_vif->drv_flags);
 
 	if (RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_CLIENT || RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_GO) {
 		if (!rwnx_hw->is_p2p_alive) {
@@ -1002,8 +1011,10 @@ static int rwnx_open(struct net_device *dev)
 				spin_unlock_bh(&rwnx_hw->cb_lock);
 			}
 			rwnx_hw->is_p2p_alive = 1;
+#ifndef CONFIG_USE_P2P0
 			mod_timer(&rwnx_hw->p2p_alive_timer, jiffies + msecs_to_jiffies(1000));
 			atomic_set(&rwnx_hw->p2p_alive_timer_count, 0);
+#endif
 		}
 	}
 
@@ -1025,7 +1036,6 @@ static int rwnx_open(struct net_device *dev)
 	} else {
 		/* Forward the information to the LMAC,
 		 *     p2p value not used in FMAC configuration, iftype is sufficient */
-
 		error = rwnx_send_add_if (rwnx_hw, rwnx_vif->wdev.address, RWNX_VIF_TYPE(rwnx_vif), false, &add_if_cfm);
 		if (error) {
 			printk("add if fail\n");
@@ -1053,7 +1063,6 @@ static int rwnx_open(struct net_device *dev)
             rwnx_hw->is_p2p_alive = 1;
         }
 #endif
-
 	}
 
 	if (RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_MONITOR) {
@@ -1211,6 +1220,8 @@ static int rwnx_close(struct net_device *dev)
 			}
 #ifdef CONFIG_USE_P2P0
             if(!rwnx_vif->is_p2p_vif || ( rwnx_vif->is_p2p_vif && rwnx_hw->is_p2p_alive)){
+				if (rwnx_vif->is_p2p_vif)
+					rwnx_hw->is_p2p_alive = 0;
 #endif
 			    rwnx_send_remove_if (rwnx_hw, rwnx_vif->vif_index, false);
 #ifdef CONFIG_USE_P2P0
@@ -1255,7 +1266,6 @@ static int rwnx_close(struct net_device *dev)
 			}
 		}
 #endif
-		clear_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
 	}
 #ifdef CONFIG_COEX
 	else {
@@ -1263,6 +1273,8 @@ static int rwnx_close(struct net_device *dev)
 			rwnx_send_coex_req(rwnx_hw, 0, 1);
 	}
 #endif
+	clear_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
+	AICWFDBG(LOGDEBUG, "%s rwnx_vif->drv_flags:%d\r\n", __func__, (int)rwnx_vif->drv_flags);
 
 #ifdef CONFIG_GPIO_WAKEUP
 	//open lp mode
@@ -1321,6 +1333,7 @@ enum {
     RDWR_EFUSE_USBVIDPID,
     SET_SRRC,
     SET_FSS,
+    RDWR_EFUSE_HE_OFF,
 };
 
 typedef struct {
@@ -1547,7 +1560,7 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 			if (argc > 6) {
 				settx_param.tx_intv_us = command_strtoul(argv[6], NULL, 10);
 			} else {
-				settx_param.tx_intv_us = 0;
+				settx_param.tx_intv_us = 10000; // set default val 10ms
 			}
 			AICWFDBG(LOGINFO, "txparam:%d,%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
 				settx_param.mode, settx_param.rate, settx_param.length, settx_param.tx_intv_us);
@@ -1771,6 +1784,37 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 				int rem_cnt = (cfm.rftest_result[1] >> 16) & 0x00FF;
 				addr1 = cfm.rftest_result[1] & 0x0000FFFF;
 				AICWFDBG(LOGINFO, "0x%x,0x%x (remain:%x)\n", addr0, addr1, rem_cnt);
+			} else {
+				addr1 = cfm.rftest_result[1];
+				AICWFDBG(LOGINFO, "0x%x,0x%x\n", addr0, addr1);
+			}
+		} else if (strcasecmp(argv[0], "SET_BT_MAC_ADDR") == 0) {
+			AICWFDBG(LOGINFO, "set_bt_mac_addr\n");
+			if (argc < 7) {
+				AICWFDBG(LOGERROR, "wrong param\n");
+				bytes_written = -EINVAL;
+				break;
+			}
+			mac_addr[5] = command_strtoul(argv[1], NULL, 16);
+			mac_addr[4] = command_strtoul(argv[2], NULL, 16);
+			mac_addr[3] = command_strtoul(argv[3], NULL, 16);
+			mac_addr[2] = command_strtoul(argv[4], NULL, 16);
+			mac_addr[1] = command_strtoul(argv[5], NULL, 16);
+			mac_addr[0] = command_strtoul(argv[6], NULL, 16);
+			AICWFDBG(LOGINFO, "set bt macaddr:%x,%x,%x,%x,%x,%x\n", mac_addr[5], mac_addr[4], mac_addr[3], mac_addr[2], mac_addr[1], mac_addr[0]);
+			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_BT_MAC_ADDR, sizeof(mac_addr), (u8_l *)&mac_addr, NULL);
+		} else if (strcasecmp(argv[0], "GET_BT_MAC_ADDR")==0) {
+			u32_l addr0, addr1;
+			AICWFDBG(LOGINFO, "get bt mac addr\n");
+			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_BT_MAC_ADDR, 0, NULL, &cfm);
+			memcpy(command, &cfm.rftest_result[0], 8);
+			bytes_written = 8;
+			addr0 = cfm.rftest_result[0];
+			if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
+				(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) {
+				int rem_cnt = (cfm.rftest_result[1] >> 16) & 0x00FF;
+				addr1 = cfm.rftest_result[1] & 0x0000FFFF;
+				 AICWFDBG(LOGINFO, "0x%x,0x%x (remain:%x)\n", addr0, addr1, rem_cnt);
 			} else {
 				addr1 = cfm.rftest_result[1];
 				AICWFDBG(LOGINFO, "0x%x,0x%x\n", addr0, addr1);
@@ -2207,6 +2251,19 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 				#ifdef AICWF_SDIO_SUPPORT
 				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_FSS, sizeof(func), &func, NULL);
 				#endif
+			} else {
+				AICWFDBG(LOGERROR, "wrong args\n");
+				bytes_written = -EINVAL;
+				break;
+			}
+		} else if (strcasecmp(argv[0], "RDWR_EFUSE_HE_OFF") == 0) {
+			if (argc > 1) {
+				u8_l func = command_strtoul(argv[1], NULL, 10);
+				AICWFDBG(LOGINFO, "set he off: %d\n", func);
+				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_HE_OFF, sizeof(func), (u8_l *)&func, &cfm);
+				AICWFDBG(LOGINFO, "he_off cfm: %d\n", cfm.rftest_result[0]);
+				memcpy(command, &cfm.rftest_result[0], 4);
+				bytes_written = 4;
 			} else {
 				AICWFDBG(LOGERROR, "wrong args\n");
 				bytes_written = -EINVAL;
@@ -2698,7 +2755,11 @@ exit:
 #define IOCTL_HOSTAPD   (SIOCIWFIRSTPRIV+28)
 #define IOCTL_WPAS      (SIOCIWFIRSTPRIV+30)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 static int rwnx_do_ioctl(struct net_device *net, struct ifreq *req, int cmd)
+#else
+static int rwnx_do_ioctl(struct net_device *net, struct ifreq *req, void __user *data, int cmd)
+#endif
 {
 	int ret = 0;
 	///TODO: add ioctl command handler later
@@ -2786,7 +2847,11 @@ static int rwnx_set_mac_address(struct net_device *dev, void *addr)
 static const struct net_device_ops rwnx_netdev_ops = {
 	.ndo_open               = rwnx_open,
 	.ndo_stop               = rwnx_close,
-	.ndo_do_ioctl           = rwnx_do_ioctl,
+#if LINUX_VERSION_CODE <  KERNEL_VERSION(5, 15, 0)
+	.ndo_do_ioctl			= rwnx_do_ioctl,
+#else
+	.ndo_siocdevprivate 	= rwnx_do_ioctl,
+#endif
 	.ndo_start_xmit         = rwnx_start_xmit,
 	.ndo_get_stats          = rwnx_get_stats,
 #ifndef CONFIG_ONE_TXQ
@@ -4986,9 +5051,9 @@ static int rwnx_cfg80211_set_txq_params(struct wiphy *wiphy, struct net_device *
  *	notification by calling cfg80211_ready_on_channel().
  */
 static int
-rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+rwnx_cfg80211_remain_on_channel_(struct wiphy *wiphy, struct wireless_dev *wdev,
 								struct ieee80211_channel *chan,
-								unsigned int duration, u64 *cookie)
+								unsigned int duration, u64 *cookie, bool mgmt_roc_flag)
 {
 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 	//struct rwnx_vif *rwnx_vif = netdev_priv(wdev->netdev);
@@ -5037,12 +5102,14 @@ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
 			rwnx_hw->vif_table[add_if_cfm.inst_nbr] = rwnx_vif;
 			spin_unlock_bh(&rwnx_hw->cb_lock);
 			rwnx_hw->is_p2p_alive = 1;
+#ifndef CONFIG_USE_P2P0
 			mod_timer(&rwnx_hw->p2p_alive_timer, jiffies + msecs_to_jiffies(1000));
 			atomic_set(&rwnx_hw->p2p_alive_timer_count, 0);
+#endif
 		} else {
 #ifndef CONFIG_USE_P2P0
-                        mod_timer(&rwnx_hw->p2p_alive_timer, jiffies + msecs_to_jiffies(1000));
-                        atomic_set(&rwnx_hw->p2p_alive_timer_count, 0);
+			mod_timer(&rwnx_hw->p2p_alive_timer, jiffies + msecs_to_jiffies(1000));
+			atomic_set(&rwnx_hw->p2p_alive_timer_count, 0);
 #endif
 		}
 	}
@@ -5059,7 +5126,7 @@ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
 	roc_elem->wdev = wdev;
 	roc_elem->chan = chan;
 	roc_elem->duration = duration;
-	roc_elem->mgmt_roc = false;
+	roc_elem->mgmt_roc = mgmt_roc_flag;
 	roc_elem->on_chan = false;
 
 	/* Initialize the OFFCHAN TX queue to allow off-channel transmissions */
@@ -5088,6 +5155,15 @@ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
 	}
 
 	return error;
+}
+
+
+static int
+rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+								struct ieee80211_channel *chan,
+								unsigned int duration, u64 *cookie)
+{
+	return rwnx_cfg80211_remain_on_channel_(wiphy, wdev, chan, duration, cookie, false);
 }
 
 /**
@@ -5308,15 +5384,15 @@ static int rwnx_cfg80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 		printk("mgmt rx remain on chan\n");
 
 		/* Start a ROC procedure for 30ms */
-		error = rwnx_cfg80211_remain_on_channel(wiphy, wdev, channel,
-												30, &cookie);
+		error = rwnx_cfg80211_remain_on_channel_(wiphy, wdev, channel,
+												30, &cookie, true);
 		if (error) {
 			printk("mgmt rx chan err\n");
 			return error;
 		}
 		/* Need to keep in mind that RoC has been launched internally in order to
 		 * avoid to call the cfg80211 callback once expired */
-		rwnx_hw->roc_elem->mgmt_roc = true;
+		//rwnx_hw->roc_elem->mgmt_roc = true;
 	}
 
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
@@ -7092,6 +7168,11 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	//wiphy_info(wiphy, "New interface create %s", vif->ndev->name);
 	AICWFDBG(LOGINFO, "New interface create %s \r\n", vif->ndev->name);
 
+#ifdef CONFIG_SDIO_BT
+	btchr_init();
+	hdev_init();
+#endif
+
 #ifdef  CONFIG_USE_P2P0
 
 	rtnl_lock();
@@ -7177,6 +7258,12 @@ void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw)
 #ifdef CONFIG_DEBUG_FS
 	rwnx_dbgfs_unregister(rwnx_hw);
 #endif
+
+#ifdef CONFIG_SDIO_BT
+	btchr_exit();
+	hdev_exit();
+#endif
+
 	flush_workqueue(rwnx_hw->apmStaloss_wq);
 	destroy_workqueue(rwnx_hw->apmStaloss_wq);
 

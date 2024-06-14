@@ -35,7 +35,7 @@ extern int ble_scan_wakeup_reboot_time;
 extern uint32_t ad_data_filter_mask;
 extern uint32_t gpio_num;//default select gpiob2 for fw_wakeup_host
 extern uint32_t gpio_dft_lvl;//0:defalut pull down,  1:default pull up
-u32 chip_id = 0;
+u8 chip_id = 0;
 u8 chip_sub_id = 0;
 int fw_loaded = 0;
 
@@ -979,6 +979,9 @@ u32 patch_tbl[][2] ={
 #if !defined(CONFIG_LINK_DET_5G)
 {0x0104, 0x00000000}, //link_det_5g
 #endif
+#ifdef CONFIG_USB_SUSPEND_REBOOT_TIME
+{0x0110, 0x03e80001}//reboot time when usb suspend,0001 enables reboot on suspend, default 0x3e8 = 1000ms reboot
+#endif
 };
 
 
@@ -1081,7 +1084,7 @@ static int system_config_8800(struct aic_usb_dev *usb_dev){
         printk("%x rd fail: %d\n", mem_addr, ret);
         return ret;
     }
-    chip_id = rd_mem_addr_cfm.memdata >> 16;
+    chip_id =(u8)(rd_mem_addr_cfm.memdata >> 16);
     //printk("%x=%x\n", rd_mem_addr_cfm.memaddr, rd_mem_addr_cfm.memdata);
     ret = rwnx_send_dbg_mem_read_req(usb_dev, 0x00000004, &rd_mem_addr_cfm);
     if (ret) {

@@ -391,6 +391,12 @@ enum mm_msg_tag {
 
     MM_CFG_RSSI_CFM,
 
+    MM_SET_VENDOR_SWCONFIG_REQ,
+    MM_SET_VENDOR_SWCONFIG_CFM,
+
+    MM_SET_TXPWR_LVL_ADJ_REQ,
+    MM_SET_TXPWR_LVL_ADJ_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -1153,6 +1159,7 @@ struct mm_set_arpoffload_en_cfm {
 struct mm_set_agg_disable_req {
 	u8_l disable;
 	u8_l staidx;
+	u8_l disable_rx;
 };
 
 struct mm_set_coex_req {
@@ -1254,8 +1261,15 @@ typedef struct
 
 typedef struct
 {
+    u8_l enable;
+    s8_l pwrlvl_adj_tbl_2g4[3];
+    s8_l pwrlvl_adj_tbl_5g[6];
+} txpwr_lvl_adj_conf_t;
+
+typedef struct
+{
     u8_l loss_enable;
-    u8_l loss_value;
+    s8_l loss_value;
 } txpwr_loss_conf_t;
 
 struct mm_set_txpwr_lvl_req
@@ -1267,6 +1281,10 @@ struct mm_set_txpwr_lvl_req
   };
 };
 
+struct mm_set_txpwr_lvl_adj_req
+{
+    txpwr_lvl_adj_conf_t txpwr_lvl_adj;
+};
 
 typedef struct {
 	u8_l enable;
@@ -1933,6 +1951,100 @@ struct mm_get_fw_version_cfm
 {
     u8_l fw_version_len;
     u8_l fw_version[63];
+};
+
+enum vendor_swconfig_tag
+{
+    BCN_CFG_REQ = 0,
+    TEMP_COMP_SET_REQ,
+    TEMP_COMP_GET_REQ,
+    EXT_FLAGS_SET_REQ,
+    EXT_FLAGS_GET_REQ,
+    EXT_FLAGS_MASK_SET_REQ,
+};
+
+struct mm_set_bcn_cfg_req
+{
+    /// Ignore or not bcn tim bcmc bit
+    bool_l tim_bcmc_ignored_enable;
+};
+
+struct mm_set_bcn_cfg_cfm
+{
+    /// Request status
+    bool_l tim_bcmc_ignored_status;
+};
+
+struct mm_set_temp_comp_req
+{
+    /// Enable or not temp comp
+    u8_l enable;
+    u8_l reserved[3];
+    u32_l tmr_period_ms;
+};
+
+struct mm_set_temp_comp_cfm
+{
+    /// Request status
+    u8_l status;
+};
+
+struct mm_get_temp_comp_cfm
+{
+    /// Request status
+    u8_l status;
+    /// Temp degree val
+    s8_l degree;
+};
+
+struct mm_set_ext_flags_req
+{
+    u32_l user_flags;
+};
+
+struct mm_set_ext_flags_cfm
+{
+    u32_l user_flags;
+};
+
+struct mm_get_ext_flags_cfm
+{
+    u32_l user_flags;
+};
+
+struct mm_mask_set_ext_flags_req
+{
+    u32_l user_flags_mask;
+    u32_l user_flags_val;
+};
+
+struct mm_mask_set_ext_flags_cfm
+{
+    u32_l user_flags;
+};
+
+struct mm_set_vendor_swconfig_req
+{
+    u32_l swconfig_id;
+    union {
+        struct mm_set_bcn_cfg_req bcn_cfg_req;
+        struct mm_set_temp_comp_req temp_comp_set_req;
+        struct mm_set_ext_flags_req ext_flags_set_req;
+        struct mm_mask_set_ext_flags_req ext_flags_mask_set_req;
+    };
+};
+
+struct mm_set_vendor_swconfig_cfm
+{
+    u32_l swconfig_id;
+    union {
+        struct mm_set_bcn_cfg_cfm bcn_cfg_cfm;
+        struct mm_set_temp_comp_cfm temp_comp_set_cfm;
+        struct mm_get_temp_comp_cfm temp_comp_get_cfm;
+        struct mm_set_ext_flags_cfm ext_flags_set_cfm;
+        struct mm_get_ext_flags_cfm ext_flags_get_cfm;
+        struct mm_mask_set_ext_flags_cfm ext_flags_mask_set_cfm;
+    };
 };
 
 /// Structure containing the parameters of the @ref ME_RC_STATS_REQ message.
@@ -2649,22 +2761,36 @@ enum dbg_msg_tag {
 	/// Memory mask write confirm
 	DBG_MEM_MASK_WRITE_CFM,
 
-        DBG_RFTEST_CMD_REQ,
-        DBG_RFTEST_CMD_CFM,
-        DBG_BINDING_REQ,
-        DBG_BINDING_CFM,
-        DBG_BINDING_IND,
+	DBG_RFTEST_CMD_REQ,
+	DBG_RFTEST_CMD_CFM,
+	DBG_BINDING_REQ,
+	DBG_BINDING_CFM,
+	DBG_BINDING_IND,
 
-        DBG_CUSTOM_MSG_REQ,
-        DBG_CUSTOM_MSG_CFM,
-        DBG_CUSTOM_MSG_IND,
+	DBG_CUSTOM_MSG_REQ,
+	DBG_CUSTOM_MSG_CFM,
+	DBG_CUSTOM_MSG_IND,
 
-        DBG_GPIO_WRITE_REQ,
-        DBG_GPIO_WRITE_CFM,
-        DBG_GPIO_READ_REQ,
-        DBG_GPIO_READ_CFM,
-        DBG_GPIO_INIT_REQ,
-        DBG_GPIO_INIT_CFM,
+	DBG_GPIO_WRITE_REQ,
+	DBG_GPIO_WRITE_CFM,
+	DBG_GPIO_READ_REQ,
+	DBG_GPIO_READ_CFM,
+	DBG_GPIO_INIT_REQ,
+	DBG_GPIO_INIT_CFM,
+
+	/// EF usrdata read request
+	DBG_EF_USRDATA_READ_REQ,
+	/// EF usrdata read confirm
+	DBG_EF_USRDATA_READ_CFM,
+	/// Memory block read request
+	DBG_MEM_BLOCK_READ_REQ,
+	/// Memory block read confirm
+	DBG_MEM_BLOCK_READ_CFM,
+
+	DBG_PWM_INIT_REQ,
+	DBG_PWM_INIT_CFM,
+	DBG_PWM_DEINIT_REQ,
+	DBG_PWM_DEINIT_CFM,
 
 	/// Max number of Debug messages
 	DBG_MAX,

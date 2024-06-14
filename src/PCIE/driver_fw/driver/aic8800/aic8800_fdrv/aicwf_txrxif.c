@@ -531,6 +531,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
 #endif
 }
 
+#ifdef AICWF_RX_REORDER
 static struct recv_msdu *aicwf_rxframe_queue_init(struct list_head *q, int qsize)
 {
 	int i;
@@ -550,6 +551,7 @@ static struct recv_msdu *aicwf_rxframe_queue_init(struct list_head *q, int qsize
 
 	return reqs;
 }
+#endif
 
 struct aicwf_rx_priv *aicwf_rx_init(void *arg)
 {
@@ -596,7 +598,7 @@ struct aicwf_rx_priv *aicwf_rx_init(void *arg)
 	return rx_priv;
 }
 
-
+#ifdef AICWF_RX_REORDER
 static void aicwf_recvframe_queue_deinit(struct list_head *q)
 {
 	struct recv_msdu *req, *next;
@@ -605,6 +607,7 @@ static void aicwf_recvframe_queue_deinit(struct list_head *q)
 		list_del_init(&req->rxframe_list);
 	}
 }
+#endif
 
 void aicwf_rx_deinit(struct aicwf_rx_priv *rx_priv)
 {

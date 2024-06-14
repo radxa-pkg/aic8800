@@ -226,7 +226,7 @@ int main(int argc , char* argv[])
                 ret = Aicbt_Sendcmd(socketfd,optarg);
                 if(ret>=0)
                 {
-                    if(Aickbt_Getevent(socketfd)<0)
+                    if(Aicbt_Getevent(socketfd)<0)
                         printf("Getevent fail\n");
                 }
                 break;

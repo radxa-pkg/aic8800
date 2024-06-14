@@ -1461,8 +1461,8 @@ uint32_t txgain_map[96] =  {
     0x00ffc88b,
     0x00ffc979,
     0x00ffc989,
-    0x00ffca7d,
-    0x00ffca88,
+    0x00ffcc4b,
+    0x00ffcc54,
     0x00ffcc5e,
     0x00ffcc69,
     0x00ffcc78,
@@ -1494,8 +1494,8 @@ uint32_t txgain_map[96] =  {
     0x00ffc88b,
     0x00ffc979,
     0x00ffc989,
-    0x00ffca7d,
-    0x00ffca88,
+    0x00ffcc4b,
+    0x00ffcc54,
     0x00ffcc5e,
     0x00ffcc69,
     0x00ffcc78,
@@ -1564,8 +1564,8 @@ const uint32_t txgain_map_h[96] =
     0xffc879, //8
     0xffc96b, //9
     0xffc979, //10
-    0xffca6b, //11
-    0xffca79, //12
+    0xffcc45, //11
+    0xffcc4d, //12
     0xffcc56, //13
     0xffcc60, //14
     0xffcc6b, //15
@@ -1597,8 +1597,8 @@ const uint32_t txgain_map_h[96] =
     0xffc879, //8
     0xffc96b, //9
     0xffc979, //10
-    0xffca6b, //11
-    0xffca79, //12
+    0xffcc45, //11
+    0xffcc4d, //12
     0xffcc56, //13
     0xffcc60, //14
     0xffcc6b, //15
@@ -1693,6 +1693,47 @@ static u8 chip_id = 0;
 #define CHIP_ID_H_MASK  0xC0
 #define IS_CHIP_ID_H()  ((chip_id & CHIP_ID_H_MASK) == CHIP_ID_H_MASK)
 
+//Crystal provided by CPU (start)
+int set_bbpll_config(struct aic_sdio_dev *rwnx_hw){
+//    {0x40505010, 0x7C301010},//bbpll
+	int ret = 0;
+	struct dbg_mem_read_cfm rd_mem_addr_cfm;
+	
+	//Read crystal provided by CPU or not.
+    ret = rwnx_send_dbg_mem_read_req(rwnx_hw, 0x40500148, &rd_mem_addr_cfm);
+    if (ret) {
+		AICWFDBG(LOGERROR, "%x rd fail: %d\n", 0x40500148, ret);
+        return -1;
+    }
+
+	AICWFDBG(LOGDEBUG, "%s rd_mem_addr_cfm.memdata:%x \r\n", __func__, rd_mem_addr_cfm.memdata);
+	
+	if(!(rd_mem_addr_cfm.memdata & 0x01)){
+		AICWFDBG(LOGINFO, "%s Crystal not provided by CPU \r\n", __func__);
+		return 0;
+	}else{
+		AICWFDBG(LOGINFO, "%s Crystal provided by CPU \r\n", __func__);
+		//Read 0x40505010 value to check bbpll set or not.
+		ret = rwnx_send_dbg_mem_read_req(rwnx_hw, 0x40505010, &rd_mem_addr_cfm);
+		if(ret < 0){
+			AICWFDBG(LOGERROR, "%s error ret_val:%d\r\n", __func__, ret);
+			return -1;
+		}
+
+		if((rd_mem_addr_cfm.memdata >> 29) == 3){
+			AICWFDBG(LOGERROR, "%s Not need to set \r\n", __func__);
+			return 0;
+		}else{
+			rd_mem_addr_cfm.memdata |= ((0x1 << 29) | (0x1 << 30)); 
+			rd_mem_addr_cfm.memdata &= (~(0x1 << 31));
+			rwnx_send_dbg_mem_write_req(rwnx_hw, 0x40505010, rd_mem_addr_cfm.memdata);
+		}
+	}	
+	return 0;
+}
+//Crystal provided by CPU (end)
+
+
 void system_config_8800dc(struct aic_sdio_dev *rwnx_hw)
 {
     int syscfg_num;
@@ -1723,6 +1764,14 @@ void system_config_8800dc(struct aic_sdio_dev *rwnx_hw)
     chip_sub_id = (u8)(rd_mem_addr_cfm.memdata);
     //printk("%x=%x\n", rd_mem_addr_cfm.memaddr, rd_mem_addr_cfm.memdata);
 	AICWFDBG(LOGINFO, "chip_id=%x, chip_sub_id=%x!!\n", chip_id, chip_sub_id);
+
+	//Crystal provided by CPU (start)
+	ret = set_bbpll_config(rwnx_hw);
+    if (ret) {
+		AICWFDBG(LOGERROR, "set_bbpll_config fail: %d\n", ret);
+        return;
+    }
+	//Crystal provided by CPU (end)
 
 
 	ret = rwnx_send_dbg_mem_read_req(rwnx_hw, 0x40500010, &rd_mem_addr_cfm);

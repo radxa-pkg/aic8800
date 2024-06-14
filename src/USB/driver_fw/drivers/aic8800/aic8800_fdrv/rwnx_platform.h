@@ -38,6 +38,8 @@
 #define FW_DPDRESULT_NAME_8800DC        "aic_dpdresult_lite_8800dc.bin"
 #endif
 
+#define POWER_LEVEL_INVALID_VAL     (127)
+
 enum {
     FW_NORMAL_MODE          = 0,
     FW_RFTEST_MODE          = 1,
@@ -127,9 +129,16 @@ int is_file_exist(char* name);
 void get_userconfig_txpwr_lvl_in_fdrv(txpwr_lvl_conf_t *txpwr_lvl);
 void get_userconfig_txpwr_lvl_v2_in_fdrv(txpwr_lvl_conf_v2_t *txpwr_lvl_v2);
 void get_userconfig_txpwr_lvl_v3_in_fdrv(txpwr_lvl_conf_v3_t *txpwr_lvl_v3);
+void get_userconfig_txpwr_lvl_adj_in_fdrv(txpwr_lvl_adj_conf_t *txpwr_lvl_adj);
 void get_userconfig_txpwr_ofst_in_fdrv(txpwr_ofst_conf_t *txpwr_ofst);
 void get_userconfig_txpwr_ofst2x_in_fdrv(txpwr_ofst2x_conf_t *txpwr_ofst2x);
 void get_userconfig_txpwr_loss(txpwr_loss_conf_t *txpwr_loss);
+void rwnx_plat_userconfig_parsing(char *buffer, int size);
+#ifdef CONFIG_POWER_LIMIT
+void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
+int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq);
+int8_t get_powerlimit_by_chnum(uint8_t chnum);
+#endif
 int rwnx_platform_register_drv(void);
 void rwnx_platform_unregister_drv(void);
 
