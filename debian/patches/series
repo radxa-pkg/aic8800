@@ -8,3 +8,4 @@ fix-linux-6.1-build.patch
 fix-aic_btusb.patch
 fix-linux-6.7-build.patch
 fix-linux-6.5-build.patch
+fix-linux-6.9-build.patch
