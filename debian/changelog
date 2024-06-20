@@ -1,3 +1,14 @@
+aic8800 (3.0+git20240327.3561b08f-1) jammy; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * fix: firmware package is cross platform
+  * feat: update to aic8800d_linux_sdk_V3.0_2024_0327_3561b08f
+  * feat: add disclaimer
+  * fix: update for cfg80211_ch_switch* new parameter list
+  * fix: workaround a double free bug
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Thu, 20 Jun 2024 11:26:34 +0800
+
 aic8800 (3.0+git20240116.ec460377-8) jammy; urgency=medium
 
   [ Peiyu Wu ]
