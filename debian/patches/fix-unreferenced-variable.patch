@@ -1,0 +1,14 @@
+diff --git a/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c b/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c
+index f9e7fb5..8029325 100644
+--- a/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c
++++ b/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c
+@@ -5118,7 +5118,9 @@ static void btusb_disconnect(struct usb_interface *intf)
+ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
+ {
+     struct btusb_data *data = usb_get_intfdata(intf);
++#ifdef CONFIG_BT_WAKEUP_IN_PM
+     firmware_info *fw_info = data->fw_info;
++#endif
+ 
+     AICBT_INFO("%s: event 0x%x, suspend count %d", __func__,
+             message.event, data->suspend_count);
