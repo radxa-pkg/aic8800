@@ -10,3 +10,4 @@ fix-linux-6.7-build.patch
 fix-linux-6.5-build.patch
 fix-linux-6.9-build.patch
 0001-fix-workaround-a-double-free-bug.patch
+fix-unreferenced-variable.patch
