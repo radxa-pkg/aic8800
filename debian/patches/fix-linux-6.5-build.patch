@@ -12,3 +12,17 @@ index dc8bc5a..0c81123 100644
  #endif
  	u8 action_code,
  	u8 dialog_token,
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 7c5d9e0..7a4b766 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -5798,6 +5798,9 @@ rwnx_cfg80211_tdls_mgmt(struct wiphy *wiphy,
+ 	const u8 *peer,
+ #else
+ 	u8 *peer,
++#endif
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 5, 0))
++	int link_id,
+ #endif
+ 	u8 action_code,
+ 	u8 dialog_token,
