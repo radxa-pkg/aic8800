@@ -104,3 +104,76 @@ index 146bba6..a4befec 100644
      wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
  
      if (!rwnx_hw->mod_params->custregd)
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_wext_linux.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_wext_linux.c
+index f21ed95..4ed28e6 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_wext_linux.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_wext_linux.c
+@@ -400,7 +400,7 @@ static char *aicwf_get_iwe_stream_mac_addr(struct rwnx_hw* rwnx_hw,
+ 	iwe->cmd = SIOCGIWAP;
+ 	iwe->u.ap_addr.sa_family = ARPHRD_ETHER;
+ 
+-	if(scan_re->bss && &scan_re->bss->bssid[0]){
++	if(scan_re && scan_re->bss){	
+ 	memcpy(iwe->u.ap_addr.sa_data, scan_re->bss->bssid, ETH_ALEN);
+ 	}
+ 
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_pcie.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_pcie.c
+index 6ba9947..6fc52d7 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_pcie.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_pcie.c
+@@ -260,7 +260,7 @@ static int aicwf_disconnect_inform(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwn
+ 	struct net_device *dev;
+ #ifdef AICWF_RX_REORDER
+ 	struct reord_ctrl_info *reord_info, *tmp;
+-	u8 *macaddr;
++	const unsigned char	*macaddr;
+ 	struct aicwf_rx_priv *rx_priv;
+ #endif
+ 
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index 203168a..1fad71a 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -880,7 +880,7 @@ static inline int rwnx_rx_sm_disconnect_ind(struct rwnx_hw *rwnx_hw,
+ 	struct net_device *dev;
+ #ifdef AICWF_RX_REORDER
+ 	struct reord_ctrl_info *reord_info, *tmp;
+-	u8 *macaddr;
++	const unsigned char	*macaddr;
+ 	struct aicwf_rx_priv *rx_priv;
+ #endif
+ 
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 7c5d9e0..22efdee 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3358,8 +3358,14 @@ static struct rwnx_vif *rwnx_interface_add(struct rwnx_hw *rwnx_hw,
+ 	}
+ 
+ 	if (type == NL80211_IFTYPE_AP_VLAN) {
++#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 17, 0)
++		//memcpy(ndev->dev_addr, params->macaddr, ETH_ALEN);
++		eth_hw_addr_set(ndev, params->macaddr);
++		memcpy(vif->wdev.address, params->macaddr, ETH_ALEN);
++#else
+ 		memcpy(ndev->dev_addr, params->macaddr, ETH_ALEN);
+ 		memcpy(vif->wdev.address, params->macaddr, ETH_ALEN);
++#endif
+ 	} else {
+ #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 17, 0)
+ 		unsigned char mac_addr[6];
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
+index 6d33d91..2af7c7c 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
+@@ -1973,8 +1973,8 @@ static ssize_t rwnx_dbgfs_rc_fixed_rate_idx_write(struct file *file,
+     /* Get the station index from MAC address */
+     sscanf(file->f_path.dentry->d_parent->d_iname, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+             &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+-    if (mac == NULL)
+-        return 0;
++    // if (mac == NULL)
++    //     return 0;
+     sta = rwnx_get_sta(priv, mac);
+     if (sta == NULL)
+         return 0;
