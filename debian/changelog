@@ -1,3 +1,16 @@
+aic8800 (3.0+git20240327.3561b08f-2) jammy; urgency=medium
+
+  [ CodeChenL ]
+  * feat: add CODEOWNERS
+  * fix: define fw_info only when use correct config
+  * fix: define missing kernel version macros
+  * fix: update fix-linux-6.1-build.patch
+
+  [ amazingfate ]
+  * fix sdio and pcie build for kernel 6.7
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Mon, 24 Jun 2024 10:32:13 +0000
+
 aic8800 (3.0+git20240327.3561b08f-1) jammy; urgency=medium
 
   [ ZHANG Yuntian ]
