@@ -87,3 +87,126 @@ index 1fad30f..234b567 100644
      if (IS_ERR(bt_char_class)) {
          AICBT_ERR("Failed to create bt char class");
          return PTR_ERR(bt_char_class);
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 7c5d9e0..df53b04 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -774,7 +774,9 @@ static void rwnx_csa_finish(struct work_struct *ws)
+ 		cfg80211_disconnected(vif->ndev, 0, NULL, 0, 0, GFP_KERNEL);
+ 		#endif
+ 	} else {
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0))
+ 		mutex_lock(&vif->wdev.mtx);
++#endif
+ 		__acquire(&vif->wdev.mtx);
+ 		spin_lock_bh(&rwnx_hw->cb_lock);
+ 		rwnx_chanctx_unlink(vif);
+@@ -790,7 +792,9 @@ static void rwnx_csa_finish(struct work_struct *ws)
+ #else
+ 		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef);
+ #endif
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0))
+ 		mutex_unlock(&vif->wdev.mtx);
++#endif
+ 		__release(&vif->wdev.mtx);
+ 	}
+ 	rwnx_del_csa(vif);
+@@ -4960,8 +4964,13 @@ end:
+  * @change_beacon: Change the beacon parameters for an access point mode
+  *	interface. This should reject the call when AP mode wasn't started.
+  */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
++static int rwnx_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *dev,
++									   struct cfg80211_ap_update *params)
++#else
+ static int rwnx_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *dev,
+ 									   struct cfg80211_beacon_data *info)
++#endif
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+ 	struct rwnx_vif *vif = netdev_priv(dev);
+@@ -4974,7 +4983,11 @@ static int rwnx_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *d
+ 	RWNX_DBG(RWNX_FN_ENTRY_STR);
+ 
+ 	// Build the beacon
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
++	bcn_buf = rwnx_build_bcn(bcn, &params->beacon);
++#else
+ 	bcn_buf = rwnx_build_bcn(bcn, info);
++#endif
+ 	if (!bcn_buf)
+ 		return -ENOMEM;
+ 
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 86567f9..9bd5b18 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -770,7 +770,9 @@ static void rwnx_csa_finish(struct work_struct *ws)
+ 		cfg80211_disconnected(vif->ndev, 0, NULL, 0, 0, GFP_KERNEL);
+ 		#endif
+ 	} else {
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0))
+ 		mutex_lock(&vif->wdev.mtx);
++#endif
+ 		__acquire(&vif->wdev.mtx);
+ 		spin_lock_bh(&rwnx_hw->cb_lock);
+ 		rwnx_chanctx_unlink(vif);
+@@ -788,7 +790,9 @@ static void rwnx_csa_finish(struct work_struct *ws)
+ #else
+ 		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef);
+ #endif
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 7, 0))
+ 		mutex_unlock(&vif->wdev.mtx);
++#endif
+ 		__release(&vif->wdev.mtx);
+ 	}
+ 	rwnx_del_csa(vif);
+@@ -4751,8 +4755,13 @@ end:
+  * @change_beacon: Change the beacon parameters for an access point mode
+  *	interface. This should reject the call when AP mode wasn't started.
+  */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
++static int rwnx_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *dev,
++									   struct cfg80211_ap_update *params)
++#else
+ static int rwnx_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *dev,
+ 									   struct cfg80211_beacon_data *info)
++#endif
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+ 	struct rwnx_vif *vif = netdev_priv(dev);
+@@ -4765,7 +4774,11 @@ static int rwnx_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *d
+ 	RWNX_DBG(RWNX_FN_ENTRY_STR);
+ 
+ 	// Build the beacon
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
++	buf = rwnx_build_bcn(bcn, &params->beacon);
++#else
+ 	buf = rwnx_build_bcn(bcn, info);
++#endif
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index 158c18b..bfd7429 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -453,8 +453,18 @@ static bool rwnx_rx_data_skb(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
+ 
+ 	if (amsdu) {
+ 		int count;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
++		ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
++								 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, NULL);
++#else
++		ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
++								RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, false);
++#endif
++#else
+ 		ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
+ 								 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL);
++#endif
+ 
+ 		count = skb_queue_len(&list);
+ 		if (count > ARRAY_SIZE(rwnx_hw->stats.amsdus_rx))
