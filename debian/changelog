@@ -1,3 +1,10 @@
+aic8800 (3.0+git20240327.3561b08f-3) noble; urgency=medium
+
+  [ Mingcong Bai ]
+  * feat: fix build for kernels 6.12, 6.13
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Wed, 05 Feb 2025 11:09:10 +0000
+
 aic8800 (3.0+git20240327.3561b08f-2) jammy; urgency=medium
 
   [ CodeChenL ]
