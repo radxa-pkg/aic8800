@@ -11,3 +11,5 @@ fix-linux-6.5-build.patch
 fix-linux-6.9-build.patch
 0001-fix-workaround-a-double-free-bug.patch
 fix-unreferenced-variable.patch
+fix-linux-6.12-build.patch
+fix-linux-6.13-build.patch
