@@ -1,0 +1,47 @@
+From c062117922b8fcffa82a7093b4d42754aa98e92e Mon Sep 17 00:00:00 2001
+From: Mingcong Bai <jeffbai@aosc.io>
+Date: Wed, 5 Feb 2025 17:23:06 +0800
+Subject: [PATCH] rwnx: adapt to cfg80211_ops.set_monitor_channel() changes
+ since 6.13
+
+Since 9c4f83092775 ("wifi: cfg80211: pass net_device to
+.set_monitor_channel"), member function `int set_monitor_channel' of
+`struct cfg80211_ops' takes an additional `struct net_device *dev'
+parameter.
+
+Adapt to this change for kernels >= 6.13.
+
+Signed-off-by: Mingcong Bai <jeffbai@aosc.io>
+---
+ src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index fc58409..08d41ad 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -5042,6 +5042,9 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
+  * configured at firmware level.
+  */
+ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++											 struct net_device *,
++#endif
+ 											 struct cfg80211_chan_def *chandef)
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -5484,7 +5487,11 @@ static int rwnx_cfg80211_get_channel(struct wiphy *wiphy,
+ 
+ 	if (rwnx_vif->vif_index == rwnx_hw->monitor_vif) {
+ 		//retrieve channel from firmware
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++		rwnx_cfg80211_set_monitor_channel(wiphy, NULL, NULL);
++#else
+ 		rwnx_cfg80211_set_monitor_channel(wiphy, NULL);
++#endif
+ 	}
+ 
+ 	//Check if channel context is valid
+-- 
+2.48.1
+

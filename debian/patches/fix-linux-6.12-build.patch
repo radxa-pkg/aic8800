@@ -1,0 +1,64 @@
+From 61fa704d67cf4368ded05ef42c64b5791637e90e Mon Sep 17 00:00:00 2001
+From: Mingcong Bai <jeffbai@aosc.io>
+Date: Wed, 5 Feb 2025 14:20:42 +0800
+Subject: [PATCH] rwnx: adapt to cfg80211_ops.start_radar_detection() changes
+ since 6.12
+
+Since commit 81f67d60ebf2 ("wifi: cfg80211: handle DFS per link"),
+member function `int start_radar_detection()' of `struct cfg80211_ops'
+takes an additional argument for the link ID, defaulting to 0 for non-per-
+link implementations.
+
+Adapt to this change by adding an additional argument `0' to each call.
+
+Signed-off-by: Mingcong Bai <jeffbai@aosc.io>
+---
+ .../driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c     | 3 +++
+ .../driver_fw/driver/aic8800/aic8800_fdrv/rwnx_radar.c    | 8 ++++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 7c5d9e0..fc58409 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -5619,6 +5619,9 @@ int rwnx_cfg80211_start_radar_detection(struct wiphy *wiphy,
+ 										struct cfg80211_chan_def *chandef
+ 									#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+ 										, u32 cac_time_ms
++									#endif
++									#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0))
++										, int link_id
+ 									#endif
+ 										)
+ {
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_radar.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_radar.c
+index c50f2d2..176a83c 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_radar.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_radar.c
+@@ -1399,7 +1399,11 @@ static void rwnx_radar_cac_work(struct work_struct *ws)
+ 					#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+ 					   &ctxt->chan_def,
+ 					#endif
++					#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
++					   NL80211_RADAR_CAC_FINISHED, GFP_KERNEL, 0);
++					#else
+ 					   NL80211_RADAR_CAC_FINISHED, GFP_KERNEL);
++					#endif
+ 	rwnx_send_apm_stop_cac_req(rwnx_hw, radar->cac_vif);
+ 	rwnx_chanctx_unlink(radar->cac_vif);
+ 
+@@ -1499,7 +1503,11 @@ void rwnx_radar_cancel_cac(struct rwnx_radar *radar)
+ 						#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+ 						   &ctxt->chan_def,
+ 						#endif
++						#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
++						   NL80211_RADAR_CAC_ABORTED, GFP_KERNEL, 0);
++						#else
+ 						   NL80211_RADAR_CAC_ABORTED, GFP_KERNEL);
++						#endif
+ 		rwnx_chanctx_unlink(radar->cac_vif);
+ 	}
+ 
+-- 
+2.48.1
+
