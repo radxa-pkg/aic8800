@@ -42,6 +42,152 @@ index fc58409..08d41ad 100644
  	}
  
  	//Check if channel context is valid
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+index 5d7e6bb..478b556 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+@@ -468,8 +468,12 @@ void rwnx_rx_handle_msg(struct aic_sdio_dev *sdiodev, struct ipc_e2a_msg *msg)
+ }
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ #endif
++#endif
+ 
+ #define MD5(x) x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15]
+ #define MD5PINRT "file md5:%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\r\n"
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 86567f9..a4c760d 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -4833,6 +4833,9 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
+  * configured at firmware level.
+  */
+ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++											 struct net_device *,
++#endif
+ 											 struct cfg80211_chan_def *chandef)
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -5281,7 +5284,11 @@ static int rwnx_cfg80211_get_channel(struct wiphy *wiphy,
+ 
+ 	if (rwnx_vif->vif_index == rwnx_hw->monitor_vif) {
+ 		//retrieve channel from firmware
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++		rwnx_cfg80211_set_monitor_channel(wiphy, NULL, NULL);
++#else
+ 		rwnx_cfg80211_set_monitor_channel(wiphy, NULL);
++#endif
+ 	}
+ 
+ 	//Check if channel context is valid
+@@ -7376,8 +7386,12 @@ static void __exit rwnx_mod_exit(void)
+ 
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ #endif
++#endif
+ 
+ module_init(rwnx_mod_init);
+ module_exit(rwnx_mod_exit);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+index a422ed1..3ddec73 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+@@ -225,8 +225,12 @@ static int rwnx_plat_tl4_fw_upload(struct rwnx_plat *rwnx_plat, u8 *fw_addr,
+ #endif
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ #endif
++#endif
+ 
+ #if 0
+ /**
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+index 2c337d8..1266da0 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -5186,6 +5186,9 @@ cfg80211_chandef_identical(const struct cfg80211_chan_def *chandef1,
+ #endif
+ 
+ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++					     struct net_device *,
++#endif
+                                              struct cfg80211_chan_def *chandef)
+ {
+     struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -5711,7 +5714,11 @@ static int rwnx_cfg80211_get_channel(struct wiphy *wiphy,
+     if (rwnx_vif->vif_index == rwnx_hw->monitor_vif)
+     {
+         //retrieve channel from firmware
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++        rwnx_cfg80211_set_monitor_channel(wiphy, NULL, NULL);
++#else
+         rwnx_cfg80211_set_monitor_channel(wiphy, NULL);
++#endif
+     }
+ 
+     //Check if channel context is valid
+@@ -9873,8 +9883,12 @@ static void __exit rwnx_mod_exit(void)
+ module_init(rwnx_mod_init);
+ module_exit(rwnx_mod_exit);
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ #endif
++#endif
+ MODULE_FIRMWARE(RWNX_CONFIG_FW_NAME);
+ 
+ MODULE_DESCRIPTION(RW_DRV_DESCRIPTION);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
+index be05052..25ecda0 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
+@@ -70,8 +70,12 @@ module_init(aic_bluetooth_mod_init);
+ module_exit(aic_bluetooth_mod_exit);
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ #endif
++#endif
+ 
+ MODULE_FIRMWARE(DRV_CONFIG_FW_NAME);
+ MODULE_DESCRIPTION(DRV_DESCRIPTION);
+diff --git a/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c b/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c
+index f9e7fb5..c8cd1f7 100644
+--- a/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c
++++ b/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.c
+@@ -5319,8 +5319,12 @@ module_param(mp_drv_mode, int, 0644);
+ MODULE_PARM_DESC(mp_drv_mode, "0: NORMAL; 1: MP MODE");
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
+ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+ #endif
++#endif
+ 
+ MODULE_AUTHOR("AicSemi Corporation");
+ MODULE_DESCRIPTION("AicSemi Bluetooth USB driver version");
 -- 
 2.48.1
 

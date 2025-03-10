@@ -19,12 +19,18 @@ diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c b/sr
 index 27e61f0..d6f983e 100644
 --- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
 +++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
-@@ -48,7 +48,7 @@ extern char aic_fw_path[FW_PATH_MAX_LEN];
+@@ -48,7 +48,13 @@ extern char aic_fw_path[FW_PATH_MAX_LEN];
  #define PRINT 2
  #define GET_VALUE 3
  
 -
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
++MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
++#else
 +MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
++#endif
++#endif
  
  struct rwnx_plat *g_rwnx_plat;
  
