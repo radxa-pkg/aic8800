@@ -616,7 +616,6 @@ static inline char *aicwf_get_iwe_stream_rate(struct rwnx_hw* rwnx_hw,
 	u16 vht_data_rate = 0;
 
 	u16 he_cap = false;
-	u8 he_ch_width_set = 0;
 	u8 he_bw = 0;
 
 	/* parsing HT_CAP_IE	 */
