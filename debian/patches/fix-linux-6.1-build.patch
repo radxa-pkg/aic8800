@@ -7,7 +7,7 @@ index 107e151..a8d2e05 100644
                 __func__);
          wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
 +		/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
          wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
          wiphy_apply_custom_regulatory(wiphy, regdomain);
@@ -19,7 +19,7 @@ index 107e151..a8d2e05 100644
  		wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
 -		wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +		/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
 +        wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
  		wiphy_apply_custom_regulatory(wiphy, &rwnx_regdom);
@@ -31,7 +31,7 @@ index 107e151..a8d2e05 100644
  
 -    wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +	/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
 +	wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
      wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
@@ -46,7 +46,7 @@ index 4aa6eba..3d16e63 100644
                 __func__);
          wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
 +		/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
          wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
          wiphy_apply_custom_regulatory(wiphy, regdomain);
@@ -58,7 +58,7 @@ index 4aa6eba..3d16e63 100644
  		wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
 -		wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +		/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
 +        wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
  		wiphy_apply_custom_regulatory(wiphy, &rwnx_regdom);
@@ -72,7 +72,7 @@ index 4aa6eba..3d16e63 100644
 -    wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +    
 +	/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
 +	wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
      wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
@@ -87,7 +87,7 @@ index 146bba6..a4befec 100644
                 __func__);
          wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
 +		/* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
          wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
          wiphy_apply_custom_regulatory(wiphy, regdomain);
@@ -98,7 +98,7 @@ index 146bba6..a4befec 100644
  
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
 +    /* From kernel 6.5.0, this bit is removed and will be reused later */
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 0) || !IS_ENABLED(CONFIG_ROCKCHIP_RKNPU))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0)) && (LINUX_VERSION_CODE < KERNEL_VERSION(6, 1, 39) || LINUX_VERSION_CODE > KERNEL_VERSION(6, 2, 0))
      wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
 +#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(6, 5, 0) */
      wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
