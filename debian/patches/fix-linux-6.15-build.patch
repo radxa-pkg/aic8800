@@ -1,0 +1,248 @@
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 7c5d9e0..8da2dbc 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3835,7 +3835,11 @@ static void rwnx_cfgp2p_stop_p2p_device(struct wiphy *wiphy, struct wireless_dev
+ 	if (rwnx_vif == rwnx_hw->p2p_dev_vif) {
+ 		rwnx_hw->is_p2p_alive = 0;
+ 		if (timer_pending(&rwnx_hw->p2p_alive_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete_sync(&rwnx_hw->p2p_alive_timer);
++#else
+ 			del_timer_sync(&rwnx_hw->p2p_alive_timer);
++#endif
+ 		}
+ 
+ 		if (rwnx_vif->up) {
+@@ -7382,7 +7386,11 @@ void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw)
+ 		list_for_each_entry(defrag_ctrl, &rwnx_hw->defrag_list, list) {
+ 			list_del_init(&defrag_ctrl->list);
+ 			if (timer_pending(&defrag_ctrl->defrag_timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++				timer_delete_sync(&defrag_ctrl->defrag_timer);
++#else
+ 				del_timer_sync(&defrag_ctrl->defrag_timer);
++#endif
+ 			dev_kfree_skb(defrag_ctrl->skb);
+ 			kfree(defrag_ctrl);
+ 		}
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index 158c18b..d07bb2f 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1766,7 +1766,11 @@ int reord_flush_tid(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u8 tid)
+ 	preorder_ctrl->enable = false;
+ 	spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
+ 	if (timer_pending(&preorder_ctrl->reord_timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++		ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++#else
+ 		ret = del_timer_sync(&preorder_ctrl->reord_timer);
++#endif
+ 	cancel_work_sync(&preorder_ctrl->reord_timer_work);
+ 
+ 	return 0;
+@@ -1797,7 +1801,11 @@ void reord_deinit_sta(struct aicwf_rx_priv *rx_priv, struct reord_ctrl_info *reo
+ 		}
+ 		spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
+ 		if (timer_pending(&preorder_ctrl->reord_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++#else
+ 			ret = del_timer_sync(&preorder_ctrl->reord_timer);
++#endif
+ 		}
+ 		cancel_work_sync(&preorder_ctrl->reord_timer_work);
+ 	}
+@@ -2129,7 +2137,11 @@ int reord_process_unit(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u16 s
+ 		}
+ 	} else {
+ 	if (timer_pending(&preorder_ctrl->reord_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			ret = timer_delete(&preorder_ctrl->reord_timer);
++#else
+ 			ret = del_timer(&preorder_ctrl->reord_timer);
++#endif
+ 	}
+ 	}
+ 	
+@@ -2619,7 +2631,11 @@ check_len_update:
+ 							skb_tmp = defrag_info->skb;
+ 							list_del_init(&defrag_info->list);
+ 							if (timer_pending(&defrag_info->defrag_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++								ret = timer_delete(&defrag_info->defrag_timer);
++#else
+ 								ret = del_timer(&defrag_info->defrag_timer);
++#endif
+ 							}
+ 							kfree(defrag_info);
+ 							spin_unlock_bh(&rwnx_hw->defrag_lock);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
+index 4a9707c..98795dc 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
+@@ -1572,7 +1572,11 @@ void aicwf_sdio_pwrctl_timer(struct aic_sdio_dev *sdiodev, uint duration)
+ 	spin_lock_bh(&sdiodev->pwrctl_lock);
+ 	if (!duration) {
+ 		if (timer_pending(&sdiodev->timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete_sync(&sdiodev->timer);
++#else
+ 			del_timer_sync(&sdiodev->timer);
++#endif
+ 	} else {
+ 		sdiodev->active_duration = duration;
+ 		timeout = msecs_to_jiffies(sdiodev->active_duration);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
+index 3ab130a..9f222fa 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
+@@ -2137,7 +2137,11 @@ void aicwf_sdio_pwrctl_timer(struct aic_sdio_dev *sdiodev, uint duration)
+ 	spin_lock_bh(&sdiodev->pwrctl_lock);
+ 	if (!duration) {
+ 		if (timer_pending(&sdiodev->timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete_sync(&sdiodev->timer);
++#else
+ 			del_timer_sync(&sdiodev->timer);
++#endif
+ 	} else {
+ 		sdiodev->active_duration = duration;
+ 		timeout = msecs_to_jiffies(sdiodev->active_duration);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 86567f9..6640401 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3527,7 +3527,11 @@ static void rwnx_cfgp2p_stop_p2p_device(struct wiphy *wiphy, struct wireless_dev
+ 	if (rwnx_vif == rwnx_hw->p2p_dev_vif) {
+ 		rwnx_hw->is_p2p_alive = 0;
+ 		if (timer_pending(&rwnx_hw->p2p_alive_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete_sync(&rwnx_hw->p2p_alive_timer);
++#else
+ 			del_timer_sync(&rwnx_hw->p2p_alive_timer);
++#endif
+ 		}
+ 
+ 		if (rwnx_vif->up) {
+@@ -7249,7 +7253,11 @@ void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw)
+ 		list_for_each_entry(defrag_ctrl, &rwnx_hw->defrag_list, list) {
+ 			list_del_init(&defrag_ctrl->list);
+ 			if (timer_pending(&defrag_ctrl->defrag_timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++				timer_delete_sync(&defrag_ctrl->defrag_timer);
++#else
+ 				del_timer_sync(&defrag_ctrl->defrag_timer);
++#endif
+ 			dev_kfree_skb(defrag_ctrl->skb);
+ 			kfree(defrag_ctrl);
+ 		}
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index d740f14..f665692 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1429,7 +1429,11 @@ int reord_flush_tid(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u8 tid)
+ 	preorder_ctrl->enable = false;
+ 	spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
+ 	if (timer_pending(&preorder_ctrl->reord_timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++		ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++#else
+ 		ret = del_timer_sync(&preorder_ctrl->reord_timer);
++#endif
+ 	cancel_work_sync(&preorder_ctrl->reord_timer_work);
+ 
+ 	return 0;
+@@ -1460,7 +1464,11 @@ void reord_deinit_sta(struct aicwf_rx_priv *rx_priv, struct reord_ctrl_info *reo
+ 		}
+ 		spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
+ 		if (timer_pending(&preorder_ctrl->reord_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++#else
+ 			ret = del_timer_sync(&preorder_ctrl->reord_timer);
++#endif
+ 		}
+ 		cancel_work_sync(&preorder_ctrl->reord_timer_work);
+ 	}
+@@ -1809,7 +1817,11 @@ int reord_process_unit(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u16 s
+ 		}
+ 	} else {
+ 	if (timer_pending(&preorder_ctrl->reord_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			ret = timer_delete(&preorder_ctrl->reord_timer);
++#else
+ 			ret = del_timer(&preorder_ctrl->reord_timer);
++#endif
+ 	}
+ 	}
+ 	
+@@ -2363,7 +2375,11 @@ check_len_update:
+ 							skb_tmp = defrag_info->skb;
+ 							list_del_init(&defrag_info->list);
+ 							if (timer_pending(&defrag_info->defrag_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++								ret = timer_delete(&defrag_info->defrag_timer);
++#else
+ 								ret = del_timer(&defrag_info->defrag_timer);
++#endif
+ 							}
+ 							kfree(defrag_info);
+ 							spin_unlock_bh(&rwnx_hw->defrag_lock);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+index 2c337d8..171b171 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3800,7 +3800,11 @@ static void rwnx_cfgp2p_stop_p2p_device(struct wiphy *wiphy, struct wireless_dev
+ 	if (rwnx_vif == rwnx_hw->p2p_dev_vif) {
+ 		rwnx_hw->is_p2p_alive = 0;
+ 		if (timer_pending(&rwnx_hw->p2p_alive_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete_sync(&rwnx_hw->p2p_alive_timer);
++#else
+ 			del_timer_sync(&rwnx_hw->p2p_alive_timer);
++#endif
+ 		}
+ 		if (rwnx_vif->up) {
+ 			rwnx_send_remove_if(rwnx_hw, rwnx_vif->vif_index, true);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+index bbf21c9..79b5fc2 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1421,7 +1421,11 @@ int reord_flush_tid(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u8 tid)
+     preorder_ctrl->enable = false;
+     spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
+     if (timer_pending(&preorder_ctrl->reord_timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++        ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++#else
+         ret = del_timer_sync(&preorder_ctrl->reord_timer);
++#endif
+     cancel_work_sync(&preorder_ctrl->reord_timer_work);
+ 
+     return 0;
+@@ -1447,7 +1451,11 @@ void reord_deinit_sta(struct aicwf_rx_priv* rx_priv, struct reord_ctrl_info *reo
+ 		if(preorder_ctrl->enable){
+ 			preorder_ctrl->enable = false;
+ 	        if (timer_pending(&preorder_ctrl->reord_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++	            ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++#else
+ 	            ret = del_timer_sync(&preorder_ctrl->reord_timer);
++#endif
+ 	        }
+ 	        cancel_work_sync(&preorder_ctrl->reord_timer_work);
+ 		}
+@@ -1826,7 +1834,11 @@ int reord_process_unit(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u16 s
+         }
+     } else {
+ 		if(timer_pending(&preorder_ctrl->reord_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			ret = timer_delete(&preorder_ctrl->reord_timer);
++#else
+ 	        	ret = del_timer(&preorder_ctrl->reord_timer);
++#endif
+ 		}
+     }
+ 
