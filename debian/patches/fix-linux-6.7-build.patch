@@ -59,7 +59,7 @@ index 41a1e13..3f7a0cf 100644
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 +        ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
-+                                 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, NULL);
++                                 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, 0);
 +#else
 +        ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
 +                                 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, false);
@@ -201,7 +201,7 @@ index 158c18b..bfd7429 100644
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
 +		ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
-+								 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, NULL);
++								 RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, 0);
 +#else
 +		ieee80211_amsdu_to_8023s(skb, &list, rwnx_vif->ndev->dev_addr,
 +								RWNX_VIF_TYPE(rwnx_vif), 0, NULL, NULL, false);
