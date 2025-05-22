@@ -1,3 +1,12 @@
+aic8800 (3.0+git20240327.3561b08f-6) noble; urgency=medium
+
+  [ amazingfate ]
+  * fix cfg80211 api change with REGULATORY_IGNORE_STALE_KICKOFF for 6.1 kernel
+  * fix build for 6.15
+  * fix build with gcc14
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Thu, 22 May 2025 09:31:38 +0000
+
 aic8800 (3.0+git20240327.3561b08f-5) noble; urgency=medium
 
   [ amazingfate ]
