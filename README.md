@@ -1,13 +1,9 @@
 # aic8800
 
-[![Release](https://github.com/radxa-pkg/aic8800/actions/workflows/release.yml/badge.svg)](https://github.com/radxa-pkg/aic8800/actions/workflows/release.yml)
+[![Release](https://github.com/radxa-pkg/aic8800/actions/workflows/release.yaml/badge.svg)](https://github.com/radxa-pkg/aic8800/actions/workflows/release.yaml)
 
-Aicsemi aic8800 Wi-Fi driver
+## Build
 
-## Disclaimer
-
-The code placed under [`src`](src) folder is the unmodified driver release directly from Aicsemi, the wireless chip vendor.
-
-Radxa did not develop this software, and will not support its usage on other hardware or Linux kernels.
-
-We do accept PRs to fix issues with unsupported platforms, as long as the necessary changes are placed under [`debian/patches`](debian/patches) to not interfere with future code upgrades.
+1. `git clone --recurse-submodules https://github.com/radxa-pkg/aic8800.git`
+2. Open in [`devcontainer`](https://code.visualstudio.com/docs/devcontainers/containers)
+3. `make deb`

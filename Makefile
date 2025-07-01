@@ -1,11 +1,18 @@
-PROJECT ?= aic8800
-PREFIX ?= /usr
-BINDIR ?= $(PREFIX)/bin
-LIBDIR ?= $(PREFIX)/lib
-MANDIR ?= $(PREFIX)/share/man
+-include .github/local/Makefile.local
+-include Makefile.extra
 
+PROJECT ?= aic8800
+CUSTOM_DEBUILD_ENV ?= DEB_BUILD_OPTIONS='parallel=1'
+
+.DEFAULT_GOAL := all
 .PHONY: all
 all: build
+
+.PHONY: devcontainer_setup
+devcontainer_setup:
+	sudo dpkg --add-architecture arm64
+	sudo apt-get update
+	sudo apt-get build-dep . -y
 
 #
 # Test
@@ -17,26 +24,18 @@ test:
 # Build
 #
 .PHONY: build
-build: build-doc build-aicrf-test
+build: pre_build main_build post_build
 
-SRC-DOC		:=	.
-DOCS		:=	$(SRC-DOC)/SOURCE
-.PHONY: build-doc
-build-doc: $(DOCS)
+.PHONY: pre_build
+pre_build:
+	# Fix file permissions when created from template
+	chmod +x debian/rules
 
-$(SRC-DOC):
-	mkdir -p $(SRC-DOC)
+.PHONY: main_build
+main_build:
 
-.PHONY: $(SRC-DOC)/SOURCE
-$(SRC-DOC)/SOURCE: $(SRC-DOC)
-	echo -e "git clone $(shell git remote get-url origin)\ngit checkout $(shell git rev-parse HEAD)" > "$@"
-
-SRC-AICRF-TEST	:=	src/tools/aicrf_test/
-BIN-AICRF-TEST	:=	bt_test wifi_test
-BINS-AICRF-TEST	:=	$(addprefix $(SRC-AICRF-TEST),$(BIN-AICRF-TEST))
-.PHONY: build-aicrf-test
-build-aicrf-test: $(BINS-AICRF-TEST)
-	make CROSS_COMPILE=aarch64-linux-gnu- -C $(SRC-AICRF-TEST)
+.PHONY: post_build
+post_build:
 
 #
 # Clean
@@ -45,31 +44,25 @@ build-aicrf-test: $(BINS-AICRF-TEST)
 distclean: clean
 
 .PHONY: clean
-clean: clean-doc clean-deb clean-aicrf-test
-
-.PHONY: clean-doc
-clean-doc:
-	rm -rf $(DOCS)
+clean: clean-deb
 
 .PHONY: clean-deb
 clean-deb:
-	rm -rf debian/.debhelper debian/aic8800-*-dkms debian/aicrf-test debian/debhelper-build-stamp debian/files debian/*.debhelper.log debian/*.*.debhelper debian/*.substvars
-
-.PHONY: clean-aicrf-test
-clean-aicrf-test:
-	make -C $(SRC-AICRF-TEST) -j$(shell nproc) clean || true
+	rm -rf debian/.debhelper debian/$(PROJECT)*/ debian/tmp/ debian/debhelper-build-stamp debian/files debian/*.debhelper.log debian/*.*.debhelper debian/*.substvars
 
 #
 # Release
 #
 .PHONY: dch
 dch: debian/changelog
-	EDITOR=true gbp dch --debian-branch=main --multimaint-merge --commit --release --dch-opt=--upstream
+	gbp dch --ignore-branch --multimaint-merge --release --spawn-editor=never \
+	--git-log='--no-merges --perl-regexp --invert-grep --grep=^(chore:\stemplates\sgenerated)' \
+	--dch-opt=--upstream --commit --commit-msg="feat: release %(version)s"
 
 .PHONY: deb
 deb: debian
-	debuild --no-lintian --lintian-hook "lintian --fail-on error,warning --suppress-tags bad-distribution-in-changes-file -- %p_%v_*.changes" --no-sign -b -aarm64 -Pcross
+	$(CUSTOM_DEBUILD_ENV) debuild --no-lintian --lintian-hook "lintian --fail-on error,warning --suppress-tags-from-file $(PWD)/debian/common-lintian-overrides -- %p_%v_*.changes" --no-sign -b
 
 .PHONY: release
 release:
-	gh workflow run .github/workflows/new_version.yml
+	gh workflow run .github/workflows/new_version.yaml --ref $(shell git branch --show-current)

@@ -1,0 +1,63 @@
+jobs:
+  release:
+    permissions:
+      contents: "write"
+    runs-on: "ubuntu-latest"
+    steps:
+    - name: "Checkout"
+      uses: "actions/checkout@v4"
+      with:
+        fetch-depth: 0
+        submodules: "recursive"
+        token: "${{secrets.GIT_PUSH_TOKEN}}"
+    - if: "github.event.inputs.update == 'true'"
+      name: "Update submodules"
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git submodule update --remote
+        if git diff --quiet; then
+            echo "Submodules are the latest. Nothing to update."
+            exit
+        fi
+        git add .
+        git commit -m "chore: update submodules"
+      shell: "bash"
+    - name: "Set up QEMU Emulation"
+      uses: "docker/setup-qemu-action@v3"
+      with:
+        image: "tonistiigi/binfmt:latest"
+    - name: "Test"
+      uses: "devcontainers/ci@v0.3"
+      with:
+        push: "never"
+        runCmd: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y git-buildpackage
+          export DEBEMAIL="dev@radxa.com"
+          export DEBFULLNAME='"Radxa Computer Co., Ltd"'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          make dch
+          make test deb
+    - if: "github.event.inputs.release == 'true'"
+      name: "Push"
+      run: |
+        git push
+      shell: "bash"
+name: "Create release"
+"on":
+  workflow_dispatch:
+    inputs:
+      release:
+        default: true
+        description: "Release new version"
+        required: true
+        type: "boolean"
+      update:
+        default: false
+        description: "Update submodule"
+        required: true
+        type: "boolean"
+permissions: {}
+run-name: "${{ inputs.update && 'Update submodule' || '' }}${{ inputs.update && inputs.release && ' & ' || '' }}${{ inputs.release && 'Release new version' }}${{ !inputs.update && !inputs.release && 'Test for new release' || '' }}"

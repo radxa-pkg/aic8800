@@ -1,0 +1,10 @@
+# We do not track this on GitHub
+initial-upload-closes-no-bugs
+
+# We might use our own distribution name
+bad-distribution-in-changes-file
+
+# Our package is built on GitHub-hosted runner,
+# which uses Ubuntu, and will default to zstd compression.
+# This was not supported in Debian 11.
+custom-compression-in-debian-rules

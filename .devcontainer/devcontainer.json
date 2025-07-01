@@ -1,0 +1,48 @@
+{
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "mkhl.direnv",
+        "github.vscode-github-actions",
+        "grafana.vscode-jsonnet",
+        "ms-vscode.makefile-tools",
+        "vivaxy.vscode-conventional-commits"
+      ]
+    }
+  },
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/nix:1": {
+      "version": "latest",
+      "packages": "cachix,direnv,devenv",
+      "extraNixConfig": [
+        "experimental-features = nix-command flakes",
+        // Uncomment below to speed up container building in China
+        // "substituters = https://mirrors.ustc.edu.cn/nix-channels/store https://devenv.cachix.org https://cache.nixos.org",
+        "trusted-users = root vscode"
+      ]
+    }
+  },
+  "mounts": [
+    {
+      "source": "${localWorkspaceFolder}/.devcontainer/.devenv",
+      "target": "${containerWorkspaceFolder}/.devenv",
+      "type": "bind"
+    },
+    {
+      "source": "${localWorkspaceFolder}/.devcontainer/.direnv",
+      "target": "${containerWorkspaceFolder}/.direnv",
+      "type": "bind"
+    }
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder}/..,target=/workspaces,type=bind,consistency=cached",
+  "runArgs": [
+    // https://github.com/moby/moby/issues/27195#issuecomment-1410745778
+    "--ulimit", "nofile=1024:524288"
+  ],
+  "overrideCommand": true,
+  "updateContentCommand": "make devcontainer_setup"
+}

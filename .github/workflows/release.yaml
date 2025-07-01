@@ -1,0 +1,141 @@
+jobs:
+  build:
+    outputs:
+      distro: "${{ steps.distro_check.outputs.distro }}"
+    runs-on: "ubuntu-latest"
+    steps:
+    - name: "Checkout"
+      uses: "actions/checkout@v4"
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+        submodules: "recursive"
+    - name: "Set up QEMU Emulation"
+      uses: "docker/setup-qemu-action@v3"
+      with:
+        image: "tonistiigi/binfmt:latest"
+    - name: "Test"
+      uses: "devcontainers/ci@v0.3"
+      with:
+        push: "never"
+        runCmd: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y git-buildpackage
+          export DEBEMAIL="dev@radxa.com"
+          export DEBFULLNAME='"Radxa Computer Co., Ltd"'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git branch -m GITHUB_RUNNER || true
+          git branch -D main || true
+          git switch -c main || true
+          make dch
+          make test deb
+          git reset --hard HEAD~1
+          rm ../*.deb
+    - name: "Build"
+      uses: "devcontainers/ci@v0.3"
+      with:
+        push: "never"
+        runCmd: |
+          make deb
+    - id: "artifacts_path"
+      name: "Workaround actions/upload-artifact#176"
+      run: |
+        echo "artifacts_path=$(realpath ..)" >> "$GITHUB_OUTPUT"
+      shell: "bash"
+    - name: "Upload artifacts"
+      uses: "actions/upload-artifact@v4"
+      with:
+        name: "${{ github.event.repository.name }}"
+        path: |
+          ${{ steps.artifacts_path.outputs.artifacts_path }}/*.deb
+    - id: "distro_check"
+      name: "Check if the latest version is releasable"
+      run: |
+        version="$(dpkg-parsechangelog -S Version)"
+        version="${version//\~/.}"
+        if [[ -n "$(git tag -l "$version")" ]]
+        then
+            echo "distro=UNRELEASED" >> "$GITHUB_OUTPUT"
+        else
+            echo "distro=$(dpkg-parsechangelog -S Distribution)" >> "$GITHUB_OUTPUT"
+        fi
+      shell: "bash"
+  release:
+    if: "${{ github.event_name != 'pull_request' && needs.build.outputs.distro != 'UNRELEASED' }}"
+    needs: "build"
+    permissions:
+      contents: "write"
+    runs-on: "ubuntu-latest"
+    steps:
+    - name: "Checkout"
+      uses: "actions/checkout@v4"
+    - name: "Download generated debs"
+      uses: "actions/download-artifact@v4"
+      with:
+        name: "${{ github.event.repository.name }}"
+        path: ".artifacts"
+    - name: "Prepare for release"
+      run: |
+        version="$(dpkg-parsechangelog -S Version)"
+        version="${version//\~/.}"
+        echo "version=$version" >> $GITHUB_ENV
+        echo "changes<<EOF" >> $GITHUB_ENV
+        echo '```' >> $GITHUB_ENV
+        echo "$(dpkg-parsechangelog -S Changes)" >> $GITHUB_ENV
+        echo '```' >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
+        echo "$version" > VERSION
+        if [[ -f pkg.conf.template ]]
+        then
+            sed "s/VERSION/$version/g" pkg.conf.template > pkg.conf
+        fi
+      shell: "bash"
+    - name: "Release"
+      uses: "softprops/action-gh-release@v2"
+      with:
+        body_path: "README.md"
+        draft: false
+        fail_on_unmatched_files: false
+        files: |
+          .artifacts/**/*.deb
+          pkg.conf
+          VERSION
+        prerelease: false
+        tag_name: "${{ env.version }}"
+        target_commitish: "${{ github.sha }}"
+        token: "${{ secrets.GITHUB_TOKEN }}"
+    - name: "Append changelog"
+      uses: "softprops/action-gh-release@v2"
+      with:
+        append_body: true
+        body: |
+          ## Changelog for ${{ env.version }}
+          ${{ env.changes }}
+        tag_name: "${{ env.version }}"
+    - name: "Update Test repos"
+      uses: "RadxaOS-SDK/rsdk/.github/actions/infra-repo-update@main"
+      with:
+        test-repo: true
+        token: "${{ secrets.RADXA_APT_TEST_REPO_TOKEN }}"
+name: "Build & Release"
+"on":
+  merge_group: {}
+  pull_request:
+    paths-ignore:
+    - "docs/**"
+    - "theme/**"
+    - "po/**"
+    - "book.toml"
+    - ".github/workflows/docs.yaml"
+  push:
+    branches:
+    - "main"
+    paths-ignore:
+    - "docs/**"
+    - "theme/**"
+    - "po/**"
+    - "book.toml"
+    - ".github/workflows/docs.yaml"
+  workflow_dispatch: {}
+permissions: {}

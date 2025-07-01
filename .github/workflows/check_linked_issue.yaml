@@ -1,0 +1,17 @@
+jobs:
+  check_pull_requests:
+    name: "Check linked issues"
+    permissions:
+      issues: "write"
+      pull-requests: "write"
+    runs-on: "ubuntu-latest"
+    steps:
+    - name: "Check linked issues"
+      uses: "nearform-actions/github-action-check-linked-issues@v1"
+name: "Check linked issues"
+"on":
+  pull_request_target:
+    types:
+    - "opened"
+    - "reopened"
+permissions: {}
