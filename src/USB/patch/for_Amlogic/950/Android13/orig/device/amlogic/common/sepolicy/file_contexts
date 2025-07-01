@@ -1,0 +1,598 @@
+/boot/optee.ko                          u:object_r:optee_file:s0
+
+/data/log(/.*)?         		u:object_r:log_file:s0
+/data/tee(/.*)?         		u:object_r:tee_droid_data_file:s0
+/data/droidota(/.*)?			u:object_r:update_data_file:s0
+/data/vendor/btmic(/.*)?		u:object_r:btmic_data_file:s0
+/data/misc/hdcp                         u:object_r:hdcp_file:s0
+/data/vendor/dtvkit(/.*)?               u:object_r:dtvkit_data_file:s0
+/data/vendor/oad(/.*)?               u:object_r:oad_data_file:s0
+/data/vendor/irdeto                     u:object_r:irdeto_data_file:s0
+
+/dev/amaudio_.*     			u:object_r:audio_device:s0
+/dev/amaudio2_out       		u:object_r:audio_device:s0
+/dev/amdolby_vision             u:object_r:amdolbyvision_device:s0
+/dev/amremote       			u:object_r:input_device:s0
+/dev/am_adc_kpd     			u:object_r:input_device:s0
+/dev/amv.*          			u:object_r:video_device:s0
+/dev/amvecm            			u:object_r:amvecm_device:s0
+/dev/di0                                u:object_r:di0_device:s0
+/dev/aml_ldim				    u:object_r:aml_ldim_device:s0
+/dev/frc                                u:object_r:video_device:s0
+/dev/lcd0                               u:object_r:lcd0_device:s0
+/dev/mtd0                               u:object_r:mtd0_device:s0
+/dev/mtd/mtd0                           u:object_r:mtd0_device:s0
+/dev/HevcEnc				u:object_r:video_device:s0
+/dev/amvideo				u:object_r:vendor_video_device:s0
+/dev/amvideo_poll   			u:object_r:video_device:s0
+/dev/ionvideo   			u:object_r:video_device:s0
+/dev/v4lvideo   			u:object_r:video_device:s0
+/dev/video_composer.*   		u:object_r:vendor_display_device:s0
+/dev/amstream_.*    			u:object_r:codec_device:s0
+/dev/amstream_sub   			u:object_r:subtitle_device:s0
+/dev/amstream_sub_read			u:object_r:subtitle_device:s0
+/dev/media.*                    u:object_r:codec_device:s0
+/dev/avin_detect    			u:object_r:avin_device:s0
+/dev/videosync   			u:object_r:video_device:s0
+/dev/tsync   			        u:object_r:vendor_video_device:s0
+/dev/mediasync   			u:object_r:mediasync_device:s0
+/dev/video30				u:object_r:video_device:s0
+/dev/video31				u:object_r:video_device:s0
+/dev/video32				u:object_r:video_device:s0
+/dev/video33				u:object_r:video_device:s0
+/dev/video34				u:object_r:video_device:s0
+/dev/video35				u:object_r:video_device:s0
+/dev/video36				u:object_r:video_device:s0
+/dev/video37				u:object_r:video_device:s0
+/dev/video38				u:object_r:video_device:s0
+/dev/unifykeys                          u:object_r:unify_device:s0
+/dev/ptsserver   			u:object_r:ptsserver_device:s0
+
+/dev/block/env      			u:object_r:env_device:s0
+/dev/block/logo                         u:object_r:logo_device:s0
+/dev/block/data     			u:object_r:userdata_block_device:s0
+/dev/block/userdata    			u:object_r:userdata_block_device:s0
+/dev/block/cache    			u:object_r:cache_block_device:s0
+/dev/block/metadata    			u:object_r:metadata_block_device:s0
+/dev/block/metadata_a    		u:object_r:metadata_block_device:s0
+/dev/block/metadata_b    		u:object_r:metadata_block_device:s0
+/dev/block/zram0    			u:object_r:swap_block_device:s0
+/dev/block/param    			u:object_r:param_block_device:s0
+/dev/block/cri_data 			u:object_r:cri_block_device:s0
+/dev/block/sd[a-z]  			u:object_r:sda_block_device:s0
+/dev/block/sd[a-z](.*) 			u:object_r:sda_block_device:s0
+/dev/block/vold(/.*)? 			u:object_r:vold_block_device:s0
+/dev/block/drm      			u:object_r:drm_block_device:s0
+/dev/block/boot_a   			u:object_r:boot_block_device:s0
+/dev/block/boot_b   			u:object_r:boot_block_device:s0
+/dev/block/boot     			u:object_r:boot_block_device:s0
+/dev/block/vendor_boot_a   		u:object_r:vendor_block_device:s0
+/dev/block/vendor_boot_b   		u:object_r:vendor_block_device:s0
+/dev/block/vendor_boot   		u:object_r:vendor_block_device:s0
+/dev/block/system_a			u:object_r:system_block_fsck_device:s0
+/dev/block/system_b   			u:object_r:system_block_fsck_device:s0
+/dev/block/system   			u:object_r:system_block_fsck_device:s0
+/dev/block/vendor_a   			u:object_r:vendor_block_device:s0
+/dev/block/vendor_b   			u:object_r:vendor_block_device:s0
+/dev/block/vendor   			u:object_r:vendor_block_device:s0
+/dev/block/product   			u:object_r:product_block_device:s0
+/dev/block/product_a   			u:object_r:product_block_device:s0
+/dev/block/product_b   			u:object_r:product_block_device:s0
+/dev/block/dtbo   			u:object_r:dtbo_block_device:s0
+/dev/block/dtbo_a   			u:object_r:dtbo_block_device:s0
+/dev/block/dtbo_b   			u:object_r:dtbo_block_device:s0
+/dev/block/misc     			u:object_r:misc_block_device:s0
+/dev/block/tee          		u:object_r:tee_block_device:s0
+/dev/block/factory          		u:object_r:factory_block_device:s0
+/dev/block/odm          		u:object_r:odm_block_device:s0
+/dev/block/odm_a                        u:object_r:odm_block_device:s0
+/dev/block/odm_b                        u:object_r:odm_block_device:s0
+/dev/block/mmcblk[0-9]  		u:object_r:sda_block_device:s0
+/dev/block/mmcblk[0-9]p(.*)             u:object_r:sda_block_device:s0
+/dev/block/mmcblk[0-9]rpmb              u:object_r:sda_block_device:s0
+/dev/mmcblk[0-9]rpmb                    u:object_r:rpmb_device:s0
+
+/dev/block/odm_ext_a   			u:object_r:param_block_device:s0
+/dev/block/odm_ext_b   			u:object_r:param_block_device:s0
+/dev/block/odm_ext   			u:object_r:param_block_device:s0
+
+/dev/block/oem_a   			u:object_r:oem_block_device:s0
+/dev/block/oem_b   			u:object_r:oem_block_device:s0
+/dev/block/oem  			u:object_r:oem_block_device:s0
+
+/dev/block/frp                          u:object_r:frp_block_device:s0
+/dev/block/by-name/frp                  u:object_r:frp_block_device:s0
+
+/sys/module/amvdec_h264mvc/parameters/stat    u:object_r:sysfs_module:s0
+/sys/module/amvdec_h264/parameters/stat       u:object_r:sysfs_module:s0
+/sys/module/amvdec_avs/parameters/stat        u:object_r:sysfs_module:s0
+
+/dev/block/recovery   			u:object_r:recovery_block_device:s0
+/dev/block/recovery_a   		u:object_r:recovery_block_device:s0
+/dev/block/recovery_b   		u:object_r:recovery_block_device:s0
+
+/dev/block/super   			u:object_r:super_block_device:s0
+/dev/block/by-name/super	        u:object_r:super_block_device:s0
+/dev/block/by-name/dm-[0-9]	        u:object_r:super_block_device:s0
+/dev/block/dm-[0-9]   			u:object_r:super_block_device:s0
+
+/dev/block/vbmeta_a   			u:object_r:vbmeta_block_device:s0
+/dev/block/vbmeta_b   			u:object_r:vbmeta_block_device:s0
+/dev/block/vbmeta   			u:object_r:vbmeta_block_device:s0
+
+/dev/block/vbmeta_system_a                     u:object_r:vbmeta_system_block_device:s0
+/dev/block/vbmeta_system_b                     u:object_r:vbmeta_system_block_device:s0
+/dev/block/vbmeta_system                       u:object_r:vbmeta_system_block_device:s0
+
+/dev/block/by-name/env                u:object_r:env_device:s0
+/dev/block/by-name/logo               u:object_r:logo_device:s0
+/dev/block/by-name/data               u:object_r:userdata_block_device:s0
+/dev/block/by-name/userdata           u:object_r:userdata_block_device:s0
+/dev/block/by-name/cache              u:object_r:cache_block_device:s0
+
+/dev/block/by-name/param              u:object_r:param_block_device:s0
+/dev/block/by-name/cri_data           u:object_r:cri_block_device:s0
+
+/dev/block/by-name/vendor_boot(.*)    u:object_r:vendor_block_device:s0
+/dev/block/by-name/product(.*)        u:object_r:product_block_device:s0
+/dev/block/by-name/dtbo(.*)           u:object_r:dtbo_block_device:s0
+/dev/block/by-name/misc               u:object_r:misc_block_device:s0
+/dev/block/by-name/tee                u:object_r:tee_block_device:s0
+/dev/block/by-name/factory            u:object_r:factory_block_device:s0
+/dev/block/by-name/odm(.*)            u:object_r:odm_block_device:s0
+/dev/block/by-name/odm_ext(.*)        u:object_r:param_block_device:s0
+/dev/block/by-name/recovery(.*)       u:object_r:recovery_block_device:s0
+/dev/block/by-name/dt*                u:object_r:dtb_device:s0
+
+/dev/block/mmcblk[0-9]boot[0-9]         u:object_r:bootloader_device:s0
+/dev/block/by-name/mmcblk[0-9]boot[0-9]         u:object_r:bootloader_device:s0
+/dev/block/by-name/bootloader(.*)                  u:object_r:bootloader_device:s0
+/dev/block/bootloader(.*)                   u:object_r:bootloader_device:s0
+
+/dev/bootloader     			u:object_r:bootloader_device:s0
+/dev/btusb0         			u:object_r:hci_attach_dev:s0
+/dev/stpbt                              u:object_r:device_stpbt:s0
+/dev/ttyBT0				u:object_r:hci_attach_dev:s0
+/dev/ttyBT1				u:object_r:hci_attach_dev:s0
+/dev/cec            			u:object_r:cec_device:s0
+/dev/audio_utils			u:object_r:audio_utils_device:s0
+/dev/defendkey      			u:object_r:defendkey_device:s0
+/dev/display        			u:object_r:display_device:s0
+/dev/display2                           u:object_r:display_device:s0
+/dev/display3                           u:object_r:display_device:s0
+/dev/dtb            			u:object_r:dtb_device:s0
+/dev/dvb0.*         			u:object_r:dvb_device:s0
+/dev/smc0                   u:object_r:dvb_device:s0
+/dev/v4l2_frontend			u:object_r:frontend_device:s0
+/dev/esm            			u:object_r:hdcptx_device:s0
+/dev/esm_rx         			u:object_r:hdcprx_device:s0
+/dev/ge2d                               u:object_r:ge2d_device:s0
+/dev/amlgdc                               u:object_r:amlgdc_device:s0
+/dev/hdmirx0        			u:object_r:hdmirx0_device:s0
+/dev/mali           			u:object_r:gpu_device:s0
+/dev/mali0          			u:object_r:gpu_device:s0
+/dev/uvm                                u:object_r:gpu_device:s0
+/dev/videotunnel     			u:object_r:gpu_device:s0
+/dev/nand_env       			u:object_r:env_device:s0
+/dev/otz_client     			u:object_r:tee_device:s0
+/dev/picdec         			u:object_r:picture_device:s0
+/dev/aml_btusb				u:object_r:hci_attach_dev:s0
+/dev/rtk_btusb      			u:object_r:hci_attach_dev:s0
+/dev/rtkbt_dev      			u:object_r:hci_attach_dev:s0
+/dev/socket/dig	        		u:object_r:dig_socket:s0
+/dev/socket/pppoe_wrapper		u:object_r:pppoe_wrapper_socket:s0
+/dev/sw_sync           			u:object_r:sw_sync_device:s0
+/dev/tee0               		u:object_r:drm_device:s0
+/dev/teepriv0           		u:object_r:drm_device:s0
+/dev/tee_comm_hdcp			u:object_r:drm_device:s0
+/dev/amlsec-mkl0    			u:object_r:cert_device:s0
+/dev/nocs-ca-cert0    			u:object_r:cert_device:s0
+/dev/socdata    			    u:object_r:cert_device:s0
+/dev/aml_crypto        			u:object_r:cert_device:s0
+/dev/efuse        			u:object_r:cert_device:s0
+/dev/ttyS[1-2]      			u:object_r:hci_attach_dev:s0
+/dev/tvafe0             		u:object_r:video_device:s0
+/dev/vdin0              		u:object_r:video_device:s0
+/dev/vdin1              		u:object_r:video_device:s0
+/dev/wifi_power     			u:object_r:wifi_power_device:s0
+/dev/wifi_mac       			u:object_r:wifi_mac_device:s0
+/dev/hidraw[0-3]			u:object_r:hidraw_device:s0
+/dev/galcore                            u:object_r:galcore_device:s0
+/dev/amresource_mgr			u:object_r:video_device:s0
+
+/dev/hdmitx_report           u:object_r:hdmitx_device:s0
+/dev/stune/foreground/tasks   u:object_r:tasks_device:s0
+
+/dev/adla0                              u:object_r:adla_device:s0
+
+#############################
+# boot files
+#
+/misc(/.*)?                    u:object_r:misc_data_file:s0
+
+/sys/devices/platform/bt-dev/rfkill/rfkill0/state	        u:object_r:sysfs_bluetooth_writable:s0
+/sys/devices/platform/bt-dev/rfkill/rfkill0/type	        u:object_r:sysfs_bluetooth_writable:s0
+/sys/devices/platform/aml_bt/rfkill/rfkill0/state               u:object_r:sysfs_bluetooth_writable:s0
+/sys/devices/platform/aml_bt/rfkill/rfkill0/type                u:object_r:sysfs_bluetooth_writable:s0
+/sys/devices/bt-dev.*/rfkill/rfkill0/state		        u:object_r:sysfs_bluetooth_writable:s0
+/sys/devices/bt-dev.*/rfkill/rfkill0/type			u:object_r:sysfs_bluetooth_writable:s0
+/vendor/bin/uart_launcher                                       u:object_r:uart_launcher_exec:s0
+
+/sys/devices/platform/0.hdmirx/hdmirx/hdmirx0(/.*)?             u:object_r:sysfs_cec:s0
+/sys/module/rdma_mgr/parameters(/.*)?                           u:object_r:sysfs_display:s0
+/sys/kernel/debug/aml_clkmsr/clkmsr                             u:object_r:aml_debugfs:s0
+/sys/kernel/debug/aml_reg/dump                                  u:object_r:aml_debugfs:s0
+/sys/kernel/debug/aml_reg/paddr                                 u:object_r:aml_debugfs:s0
+/sys/class/dmc_monitor(/.*)?                                    u:object_r:sysfs_dmc:s0
+/sys/class/ppmgr(/.*)?                                          u:object_r:sysfs_display:s0
+/sys/class/lcd/debug                                            u:object_r:sysfs_display:s0
+/sys/class/aml_bl(/.*)?                                         u:object_r:sysfs_display:s0
+/sys/class/ionvideo(/.*)?                                       u:object_r:sysfs_video:s0
+/sys/devices/platform/vdin0/vdin/vdin0/attr                     u:object_r:sysfs_display:s0
+/sys/devices/platform/vdin1/vdin/vdin1/attr                     u:object_r:sysfs_display:s0
+/sys/devices/platform/vdin0/vdin/vdin0/vf_log                   u:object_r:sysfs_display:s0
+/sys/class/tvafe/tvafe0/reg                                     u:object_r:sysfs_cec:s0
+/sys/class/vdec/core                                            u:object_r:sysfs_video:s0
+/sys/class/video/disable_video					u:object_r:sysfs_video:s0
+/sys/class/video/disable_videopip				u:object_r:sysfs_video:s0
+/sys/class/vfm/map						u:object_r:sysfs_video:s0
+/sys/class/video/axis						u:object_r:sysfs_video:s0
+/sys/class/video/axis_pip					u:object_r:sysfs_video:s0
+/sys/class/video_composer(/.*)?					u:object_r:sysfs_video:s0
+/sys/class/tsync/enable						u:object_r:sysfs_video:s0
+/sys/class/audiodsp/digital_raw					u:object_r:sysfs_audio:s0
+/sys/class/audiodsp/codec_fatal_err                             u:object_r:sysfs_audio:s0
+/sys/class/amaudio/debug                                        u:object_r:sysfs_audio:s0
+/sys/class/amaudio/codec_report_info                            u:object_r:sysfs_audio:s0
+/sys/class/video/hdmin_delay_duration                           u:object_r:sysfs_avsync:s0
+/sys/class/video/vframe_walk_delay                              u:object_r:sysfs_avsync:s0
+/sys/class/video/hdmin_delay_max_ms                             u:object_r:sysfs_avsync:s0
+/sys/class/video/hdmin_delay_start                              u:object_r:sysfs_avsync:s0
+/sys/class/tsync/firstapts                                      u:object_r:sysfs_xbmc:s0
+/sys/class/tsync/firstvpts                                      u:object_r:sysfs_xbmc:s0
+/sys/class/tsync/pts_audio                                      u:object_r:sysfs_xbmc:s0
+/sys/class/tsync/pts_video                                      u:object_r:sysfs_xbmc:s0
+/sys/class/tsync/event                                          u:object_r:sysfs_xbmc:s0
+/sys/class/tsync/pts_pcrscr                                     u:object_r:sysfs_xbmc:s0
+
+/sys/devices/virtual/amhdmitx/amhdmitx0(/.*)?                   u:object_r:sysfs_amhdmitx:s0
+/sys/devices/platform/0.amhdmitx(/.*)?                          u:object_r:sysfs_amhdmitx:s0
+/sys/devices/platform/multi-di/deinterlace/di0(/.*)?            u:object_r:sysfs_di:s0
+
+/sys/class/audiodsp/digital_codec       		        u:object_r:sysfs_digital_codec:s0
+/sys/class/audiodsp/audio_samesource    		        u:object_r:sysfs_audio_samesource:s0
+/sys/devices/virtual/amhdmitx/amhdmitx0/aud_cap                 u:object_r:sysfs_audio_cap:s0
+/sys/devices/virtual/amhdmitx/amhdmitx0/aud_output_chs          u:object_r:sysfs_aud_output_chs:s0
+/sys/devices/platform/meson-fb/graphics/fb0/osd_afbcd           u:object_r:sysfs_fb0_afbcd:s0
+/sys/devices/platform/fb/graphics/fb0/osd_afbcd                 u:object_r:sysfs_fb0_afbcd:s0
+/sys/class/mpgpu(/.*)?                                          u:object_r:sysfs_mpgpu:s0
+/sys/class/mpgpu/mpgpucmd                                       u:object_r:sysfs_mpgpu:s0
+/sys/class/mpgpu/scale_mode                                     u:object_r:sysfs_mpgpu:s0
+#for kernel 4.9
+/sys/power/early_suspend_trigger                                u:object_r:sysfs_power:s0
+#for kernel 5.4
+/sys/class/meson_pm/early_suspend_trigger                       u:object_r:sysfs_power:s0
+
+/sys/devices/platform/[0-9a-z]*\.rtc/wakeup/wakeup[0-9](/.*)?   u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/[0-9a-z]*\.ir/wakeup/wakeup[0-9](/.*)?    u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/aml_bt/wakeup/wakeup[0-9](/.*)?           u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/.*/wakeup/wakeup[0-9](/.*)?               u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/.*/wakeup(/.*)?                           u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/soc/[0-9a-z]*\.audiobus/[0-9a-z]*\.audiobus:vad/wakeup(/.*)?              u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/soc/[0-9a-z]*\.audiobus/[0-9a-z]*\.audiobus:vad/wakeup/wakeup[0-9](/.*)?  u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/[0-9a-z]*\.rtc/rtc/rtc[0-9]/wakeup[0-9](/.*)?  u:object_r:sysfs_wakeup:s0
+/sys/devices/platform/[0-9a-z]*\.[0-9a-z]*/wakeup[0-9](/.*)?  u:object_r:sysfs_wakeup:s0
+/sys/devices/genpd.+hifi4dsp/wakeup(/.*)?                       u:object_r:sysfs_wakeup:s0
+
+/sys/module/firmware_class/parameters/path                      u:object_r:sysfs_video:s0
+/sys/module/rdma/parameters/enable                              u:object_r:sysfs_rdma:s0
+/sys/module/di/parameters(/.*)?                                 u:object_r:sysfs_di:s0
+/sys/module/dim/parameters(/.*)?                                u:object_r:sysfs_di:s0
+/sys/module/am_vecm/parameters(/.*)?                            u:object_r:sysfs_am_vecm:s0
+/sys/module/amvideo/parameters(/.*)?                            u:object_r:sysfs_video:s0
+/sys/module/tvin_afe/parameters/force_nostd                     u:object_r:sysfs_video:s0
+/sys/module/tvin_hdmirx/parameters(/.*)?                        u:object_r:sysfs_cec:s0
+/sys/module/dhd/parameters/firmware_path                        u:object_r:sysfs_wifi:s0
+/sys/module/bcmdhd/parameters/firmware_path                     u:object_r:sysfs_wifi:s0
+
+#for kernel 4.9
+/sys/devices/platform/[0-9a-z]*\.ethernet/net/eth0(/.*)?                                            u:object_r:sysfs_net:s0
+/sys/devices/platform/[0-9a-z]*\.sd2/mmc_host/sdio/sdio:0001/sdio:0001:[1-2]/net/wlan[0-1](/.*)?    u:object_r:sysfs_net:s0
+/sys/devices/platform/[0-9a-z]*\.sdio/mmc_host/sdio/sdio:0001/sdio:0001:[1-2]/net/wlan[0-1](/.*)?   u:object_r:sysfs_net:s0
+/sys/devices/platform/[0-9a-z]*\.sdio/mmc_host/sdio/sdio:0001/sdio:0001:[1-2]/net/p2p[0-1](/.*)?    u:object_r:sysfs_net:s0
+/sys/devices/platform/[0-9a-z]*\.sdio/mmc_host/sdio/sdio:0001/sdio:0001:[1-2]/net/ap[0-1](/.*)?    u:object_r:sysfs_net:s0
+
+# for android.security.cts.SELinuxHostTest#testNoBugreportDenials
+/sys/devices/platform(/.*)?\.emmc/mmc_host/emmc/emmc:0001/block/mmcblk0(/.*)? u:object_r:sysfs_devices_block:s0
+/sys/devices/platform/soc(/.*)?\.mmc/mmc_host/mmc[0-1]/mmc[0-1]:0001/block/mmcblk[0-1](/.*)? u:object_r:sysfs_devices_block:s0
+/sys/devices/platform/[0-9a-z]*\.tvafe/tvafe/tvafe[0-9]/reg(/.*)?    u:object_r:sysfs_cec:s0
+
+#for kernel 5.4
+#for jira SWPL-37171 NetdSELinuxTest#CheckProperMTULabels
+/sys/devices/platform/soc/[0-9a-z]*\.ethernet/net/eth0(/.*)?                                          u:object_r:sysfs_net:s0
+/sys/devices/platform/soc/[0-9a-z]*\.sdio/mmc_host/mmc[0-9]/mmc[0-9]:000[0-9]/mmc[0-9]:000[0-9]:[0-9]/net/wlan[0-1](/.*)? u:object_r:sysfs_net:s0
+/sys/devices/platform/soc/[0-9a-z]*\.sdio/mmc_host/mmc[0-9]/mmc[0-9]:000[0-9]/mmc[0-9]:000[0-9]:[0-9]/net/p2p[0-1](/.*)?  u:object_r:sysfs_net:s0
+/sys/devices/platform/soc/[0-9a-z]*\.sdio/mmc_host/mmc[0-9]/mmc[0-9]:000[0-9]/mmc[0-9]:000[0-9]:[0-9]/net/ap[0-1](/.*)?  u:object_r:sysfs_net:s0
+
+#for VTS case NetdSELinuxTest#CheckProperMTULabels
+/sys/devices/platform/[0-9a-z]*\.crg[0-9]*/xhci-hcd.[0-9].auto/usb[0-9]/1-[0-9]/1-[0-9]:1.[0-9]/net/p2p[0-1](/.*)?     u:object_r:sysfs_net:s0
+/sys/devices/platform/[0-9a-z]*\.crg[0-9]*/xhci-hcd.[0-9].auto/usb[0-9]/1-[0-9]/1-[0-9]:1.[0-9]/net/wlan[0-1](/.*)?    u:object_r:sysfs_net:s0
+/sys/devices/platform/[0-9a-z]*\.crg[0-9]*/xhci-hcd.[0-9].auto/usb[0-9]/1-[0-9]/1-[0-9]:1.[0-9]/net/ap[0-1](/.*)?      u:object_r:sysfs_net:s0
+/sys/devices/platform/soc/[0-9a-z]*\.crg[0-9]*/xhci-hcd.[0-9].auto/usb[0-9]/1-[0-9]/1-[0-9]:1.[0-9]/net/wlan[0-1](/.*)?    u:object_r:sysfs_net:s0
+/sys/devices/platform/soc/[0-9a-z]*\.crg[0-9]*/xhci-hcd.[0-9].auto/usb[0-9]/1-[0-9]/1-[0-9]:1.[0-9]/net/ap[0-1](/.*)?      u:object_r:sysfs_net:s0
+
+/sys/devices/virtual/net(/.*)?                                  u:object_r:sysfs_net:s0
+/sys/class/hdmirx/hdmirx0/edid                                  u:object_r:sysfs_cec:s0
+/sys/devices/platform/ffd26000.hdmirx/hdmirx/hdmirx0/edid       u:object_r:sysfs_cec:s0
+/sys/devices/virtual/amhdmitx/amhdmitx0/edid_info               u:object_r:sysfs_cec:s0
+/sys/class/cec/port_seq                                         u:object_r:sysfs_cec:s0
+/sys/devices/virtual/amhdmitx/amhdmitx0(/.*)                    u:object_r:sysfs_cec:s0
+/sys/class/display(/.*)                                         u:object_r:sysfs_display:s0
+/sys/devices/meson-fb/graphics/fb[0-3](/.*)                     u:object_r:sysfs_display:s0
+/sys/devices/platform/meson-fb/graphics/fb[0-3](/.*)            u:object_r:sysfs_display:s0
+/sys/devices/platform/fb/graphics/fb[0-3](/.*)                  u:object_r:sysfs_display:s0
+/sys/class/lcd/enable                                           u:object_r:sysfs_lcd:s0
+/sys/class/video/video_scaler_path_sel                          u:object_r:sysfs_video:s0
+/sys/module/amdolby_vision/parameters(/.*)?                     u:object_r:sysfs_video:s0
+
+/sys/devices/platform/gpioleds/leds(/.*)?                       u:object_r:sysfs_display:s0
+
+/sys/class/unifykeys(/.*)?                                      u:object_r:sysfs_unifykey:s0
+/sys/devices/platform/ffd26000\.hdmirx/hdmirx/hdmirx0/key       u:object_r:sysfs_unifykey:s0
+
+/sys/devices/virtual/irblaster/irblaster0(/.*)?                 u:object_r:sysfs_ir:s0
+
+/sys/class/aml_store/store_device                               u:object_r:sysfs_store:s0
+/sys/class/defendkey/decrypt_dtb                                u:object_r:sysfs_defendkey:s0
+/sys/class/aml_store/bl_off_bytes                               u:object_r:sysfs_store:s0
+/sys/class/android_usb(/.*)?                                    u:object_r:sysfs_usb:s0
+/sys/class/dual_role_usb(/.*)?                                  u:object_r:sysfs_usb:s0
+/sys/power/boot_type                                            u:object_r:sysfs_boottype:s0
+#/sys/class/thermal/thermal_zone0/temp                          u:object_r:sysfs_thermal:s0
+
+/sys/devices/virtual/thermal/thermal_zone[0-1](/.*)             u:object_r:sysfs_thermal:s0
+/sys/devices/virtual/thermal/cooling_device[0-3](/.*)           u:object_r:sysfs_thermal:s0
+
+/sys/class/amhdmitx/amhdmitx0/sink_type                         u:object_r:sysfs_amhdmitx:s0
+/sys/class/amhdmitx/amhdmitx0/edid_parsing                      u:object_r:sysfs_amhdmitx:s0
+/sys/class/amhdmitx/amhdmitx0/hdcp_mode                         u:object_r:sysfs_amhdmitx:s0
+/sys/class/amhdmitx/amhdmitx0/avmute                            u:object_r:sysfs_amhdmitx:s0
+/sys/class/amhdmitx/amhdmitx0/disp_cap                          u:object_r:sysfs_amhdmitx:s0
+/sys/class/amhdmitx/amhdmitx0/hdr_cap                           u:object_r:sysfs_amhdmitx:s0
+/sys/module/amvdec_h265/parameters/double_write_mode            u:object_r:sysfs_amvdec:s0
+
+/sys/devices/virtual/remote/amremote(/.*)?                      u:object_r:sysfs_remote:s0
+/sys/class/stb(/.*)?                                            u:object_r:sysfs_stb:s0
+/sys/class/aml_ci_bus_test(/.*)?                                u:object_r:sysfs_stb:s0
+
+
+/sys/devices/virtual/amhdmitx/amhdmitx0/hdmi_audio/state        u:object_r:sysfs_hdmi:s0
+/sys/devices/virtual/thermal/thermal_zone0/mode                 u:object_r:sysfs_display:s0
+/sys/class/meson_pm/suspend_reason                              u:object_r:sysfs_pm:s0
+/sys/devices/platform/aml_pm/suspend_reason                     u:object_r:sysfs_pm:s0
+
+/acct/uid/cgroup.procs                                          u:object_r:reco_file:s0
+/acct/cgroup.procs                                              u:object_r:reco_file:s0
+/acct/uid_0/pid_.*/cgroup.procs                                 u:object_r:reco_file:s0
+/acct/uid_0/pid_2161/cgroup.procs                               u:object_r:reco_file:s0
+/acct/uid_0/cgroup.procs                                        u:object_r:reco_file:s0
+
+/vendor/etc/mesondisplay.cfg                                    u:object_r:vendor_app_file:s0
+/sys/class/display2/mode                                        u:object_r:sysfs_display:s0
+/sys/class/display/mode                                         u:object_r:sysfs_display:s0
+
+/sys/class/video/video_layer1_state                             u:object_r:sysfs_display:s0
+/sys/class/graphics(/.*)?                                       u:object_r:sysfs_display:s0
+
+/sys/devices/platform/vout/extcon/setmode/cable.0/state         u:object_r:sysfs_display:s0
+/sys/devices/platform/vout/extcon/setmode/state                 u:object_r:sysfs_display:s0
+/sys/devices/platform/meson-fb/graphics(/.*)?                   u:object_r:sysfs_display:s0
+/sys/devices/platform/fb/graphics(/.*)?                         u:object_r:sysfs_display:s0
+/dev/graphics/fb0                                               u:object_r:sysfs_display:s0
+/dev/graphics/fb1                                               u:object_r:sysfs_display:s0
+/dev/dri/card0                                                  u:object_r:graphics_device:s0
+
+
+/sys/devices/system/clocksource/clocksource0/current_clocksource    u:object_r:sysfs_clock:s0
+
+/sys/devices/platform/rtc/rtc/rtc0/hctosys                      u:object_r:sysfs_rtc:s0
+
+/sys/devices/platform/dummy-battery/power_supply/Battery(/.*)   u:object_r:sysfs_power:s0
+/sys/devices/platform/dummy-charger/power_supply/usb(/.*)       u:object_r:sysfs_power:s0
+
+/sys/class/amvecm(/.*)?                                         u:object_r:sysfs_video:s0
+/sys/class/video(/.*)?                                          u:object_r:sysfs_video:s0
+/dev/vbi                                                        u:object_r:vbi_device:s0
+/dev/vbi[0-3]                                                   u:object_r:vbi_device:s0
+
+/sys/bus/iio/devices                                                   u:object_r:sysfs_iio:s0
+/sys/devices/platform/soc/ff800000.bus/ff809000.adc/iio:device0(/.*)?  u:object_r:sysfs_iio:s0
+
+/sys/devices/platform/soc/ff800000.bus/ff8000a8.rtc/rtc(/.*)?   u:object_r:sysfs_rtc:s0
+
+/param(/.*)?                  u:object_r:param_tv_file:s0
+/mnt/vendor/tee(/.*)?         u:object_r:tee_vendor_file:s0
+/mnt/vendor/param(/.*)?       u:object_r:param_tv_file:s0
+
+/odm_ext(/.*)?                u:object_r:param_tv_file:s0
+/mnt/vendor/odm_ext(/.*)?     u:object_r:param_tv_file:s0
+
+/dev/usb-ffs/fastboot(/.*)?   u:object_r:fastboot_aml_file:s0
+
+#/vendor/bin/bootplayer       u:object_r:bootvideo_exec:s0
+#/vendor/bin/dv_config        u:object_r:dv_config_exec:s0
+
+# Kernel modules related
+/vendor/bin/init\.insmod\.sh    u:object_r:init-insmod-sh_exec:s0
+
+#/system/bin/mke2fs       --   u:object_r:fsck_exec:s0
+#/system/bin/e2fsdroid    --	  u:object_r:fsck_exec:s0
+#/vendor/bin/pppoe_wrapper    u:object_r:pppoe_wrapper_exec:s0
+/system_ext/bin/ntfsfix    --      u:object_r:fsck_exec:s0
+/vendor/bin/screencontrol     u:object_r:screen_control_exec:s0
+/vendor/bin/vadservice        u:object_r:vadservice_exec:s0
+
+/vendor/bin/hdcp_rx22         u:object_r:hdcp_rx22_exec:s0
+/vendor/bin/hdcp_tx22         u:object_r:hdcp_tx22_exec:s0
+/odm/bin/hdcp_tx22            u:object_r:hdcp_tx22_exec:s0
+/vendor/bin/hdcp_rp22         u:object_r:hdcp_rp22_exec:s0
+/vendor/bin/remotecfg         u:object_r:remotecfg_exec:s0
+/vendor/bin/systemcontrol     u:object_r:system_control_exec:s0
+/vendor/bin/hw/subtitleserver u:object_r:subtitleserver_exec:s0
+/vendor/bin/droidvold         u:object_r:droidvold_exec:s0
+/vendor/bin/tee-supplicant    u:object_r:tee_exec:s0
+/vendor/bin/tee_hdcp          u:object_r:tee_exec:s0
+/vendor/bin/tee_preload_fw    u:object_r:firmload_exec:s0
+/vendor/bin/tee_key_inject    u:object_r:tee_exec:s0
+/vendor/bin/tee_provision     u:object_r:tee_exec:s0
+
+/vendor/bin/tvserver          u:object_r:tvserver_exec:s0
+#/vendor/bin/wlan_fwloader    u:object_r:wlan_fwloader_exec:s0
+/vendor/xbin/bcmdl   	      u:object_r:bcmdl_exec:s0
+/vendor/bin/nxp_fwloader      u:object_r:nxp_fwloader_exec:s0
+/vendor/bin/hw/dtvkitserver      u:object_r:dtvkitserver_exec:s0
+#/vendor/bin/vmx_indiv         u:object_r:vmx_indiv_exec:s0
+/vendor/bin/resmanload       u:object_r:resmanload_exec:s0
+/vendor/bin/hw/vmx_webclient  u:object_r:vmx_webclient_exec:s0
+
+## keylayout is vendor config file! must update!
+/(vendor|system/vendor)/usr/keylayout(/.*)?               u:object_r:vendor_configs_file:s0
+/(vendor|system/vendor)/usr/idc(/.*)?                     u:object_r:vendor_configs_file:s0
+/vendor/usr/icu/icudt60l.dat                              u:object_r:vendor_configs_file:s0
+
+/vendor/bin/hw/android\.hardware\.health-service.droidlogic               u:object_r:hal_health_default_exec:s0
+/vendor/bin/hw/android\.hardware\.health@2\.1-service.droidlogic         u:object_r:hal_health_default_exec:s0
+/vendor/bin/hw/android\.hardware\.ir-service.droidlogic                   u:object_r:hal_ir_default_exec:s0
+/vendor/bin/hw/android\.hardware\.dumpstate-service\.droidlogic          u:object_r:hal_dumpstate_default_exec:s0
+/vendor/bin/hw/android\.hardware\.drm-service\.widevine                  u:object_r:hal_drm_default_exec:s0
+/vendor/bin/hw/android\.hardware\.drm-service\.verimatrix                u:object_r:hal_drm_verimatrix_exec:s0
+/vendor/bin/hw/android\.hardware\.drm@[0-9]+\.[0-9]+-service\.playready  u:object_r:hal_drm_default_exec:s0
+/vendor/bin/hw/android\.hardware\.drm@[0-9]+\.[0-9]+-service\.clearkey   u:object_r:hal_drm_clearkey_exec:s0
+/vendor/bin/hw/android\.hardware\.drm@[0-9]+\.[0-9]+-service\.netflix    u:object_r:hal_drm_default_exec:s0
+/vendor/bin/hw/android\.hardware\.power\.aidl-service.droidlogic         u:object_r:hal_power_default_exec:s0
+/vendor/bin/hw/lights                                                    u:object_r:hal_light_default_exec:s0
+
+/(vendor|system/vendor)/bin/hw/android\.hardware\.boot@1\.[0-9]+-service.droidlogic      u:object_r:hal_bootctl_default_exec:s0
+
+/vendor/bin/hw/android\.hardware\.graphics\.composer.*\.droidlogic       u:object_r:hal_graphics_composer_default_exec:s0
+/vendor/bin/hw/android\.hardware\.memtrack-service\.droidlogic           u:object_r:hal_memtrack_default_exec:s0
+/vendor/bin/hw/android\.hardware\.thermal@2\.0-service.droidlogic        u:object_r:hal_thermal_default_exec:s0
+/vendor/bin/hw/android\.hardware\.oemlock-service\.droidlogic            u:object_r:hal_oemlock_default_exec:s0
+/vendor/bin/hw/android\.hardware\.oemlock@1\.0-service\.droidlogic       u:object_r:hal_oemlock_default_exec:s0
+/vendor/bin/hw/android\.hardware\.audio\.service-droidlogic              u:object_r:hal_audio_default_exec:s0
+/vendor/bin/hw/android\.hardware\.usb\.gadget@1\.1-service\.droidlogic   u:object_r:hal_usb_gadget_default_exec:s0
+/vendor/bin/hw/android\.hardware\.usb\.gadget@1\.2-service\.droidlogic   u:object_r:hal_usb_gadget_default_exec:s0
+/vendor/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.software      u:object_r:hal_gatekeeper_default_exec:s0
+/vendor/bin/hw/android\.hardware\.wifi@1\.0-service\.droidlogic          u:object_r:hal_wifi_default_exec:s0
+/vendor/bin/hw/android\.hardware\.tv\.tuner@1\.0-service\.droidlogic     u:object_r:hal_tv_tuner_default_exec:s0
+/vendor/bin/hw/android\.hardware\.bluetooth@1\.0-service-droidlogic      u:object_r:hal_bluetooth_default_exec:s0
+/vendor/bin/hw/android\.hardware\.neuralnetworks@1\.[0-9]-service-aml-driver    u:object_r:hal_neuralnetworks_adla_exec:s0
+/vendor/bin/hw/android\.hardware\.tv\.tuner-service\.droidlogic          u:object_r:hal_tv_tuner_default_exec:s0
+/vendor/bin/hw/android\.hardware\.tv\.tuner@1\.1-service\.droidlogic     u:object_r:hal_tv_tuner_default_exec:s0
+/(vendor|system/vendor)/bin/hw/android\.hardware\.neuralnetworks@1\.[0-9]-service-ovx-driver    u:object_r:hal_neuralnetworks_default_exec:s0
+/vendor/bin/hw/android\.hardware\.camera\.provider@2\.5-service-droidlogic                      u:object_r:hal_camera_default_exec:s0
+
+/data/vendor/mediadrm(/.*)?                                              u:object_r:mediadrm_vendor_data_file:s0
+/data/vendor/mediacas(/.*)?                                              u:object_r:mediadrm_vendor_data_file:s0
+
+/data/vendor/csrs                                                        u:object_r:vendor_data_file:s0
+
+/vendor/lib(64)?/hw/android\.hardware\.graphics\.mapper@[0-9]\.[0-9]-impl-arm\.so   u:object_r:same_process_hal_file:s0
+/data/vendor/nn(/.*)?                      u:object_r:nn_data_file:s0
+
+/vendor/lib(64)?/libdrm\.so   u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/arm\.graphics-ndk_platform\.so      u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/arm\.graphics-V[0-9]-ndk\.so            u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/arm\.graphics-V[0-9]-ndk_platform\.so   u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/extractors                u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?		           u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/extractors/libamextractor\.so   u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libamffmpegadapter\.so          u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libamffmpeg\.so                 u:object_r:same_process_hal_file:s0
+
+/vendor/lib(64)?/libjni_remoteime\.so      u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libtunertvinput_jni\.so   u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libjnifont\.so            u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/jnidtvepgscanner\.so      u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libam_adp\.so             u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libam_mw\.so              u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libicuuc_vendor\.so       u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libzvbi\.so               u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libjnidtvsubtitle\.so     u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libvendorfont\.so         u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libtvbinder\.so           u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libtv_jni\.so             u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libamadec_omx_api\.so     u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/liboptimization\.so       u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libscreencontrol_jni\.so  u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libsystemcontrolservice\.so  u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libremotecontrol_jni\.so     u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libsubtitlemanager_jni\.so u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libremotecontrolserver\.so    u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libpppoe\.so          u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/vendor\.amlogic\.hardware\.droidvold@1\.0\.so  u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/vendor\.amlogic\.hardware\.subtitleserver@1\.0\.so  u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/vendor\.amlogic\.hardware\.dtvkitserver@1\.0\.so   u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/vendor\.amlogic\.hardware\.screencontrol@1\.0\.so  u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libjnidtvepgscanner\.so   u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libjniuevent\.so            u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libsubjni\.so        u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libtvsubtitle_tv\.so        u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libjnifont_tv\.so        u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libscreencontrolclient\.so        u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libdtvkithidlclient\.so           u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libdtvkit_jni\.so                 u:object_r:vendor_app_file:s0
+#For HbbTV
+/vendor/lib(64)?/libffmpeg\.so                          u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libnetview\.so                         u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libuva\.so                             u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libvewdcore\.so                        u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libhbbtv_backend_jni\.so               u:object_r:vendor_app_file:s0
+/vendor/lib(64)?/libfmq.vendor\.so                      u:object_r:vendor_app_file:s0
+
+/dev/hidraw[0-9]*	u:object_r:hidraw_audio_device:s0
+#The final space is necessary. Please don't delete it.
+
+/system_ext/bin/ntfs-3g             u:object_r:fsck_exec:s0
+/system_ext/bin/fsck.exfat          u:object_r:fsck_exec:s0
+/vendor/bin/hw/android\.hardware\.keymaster@4\.1-service.amlogic      u:object_r:hal_keymaster_default_exec:s0
+/vendor/bin/hw/android\.hardware\.keymaster@4\.0-service.amlogic      u:object_r:hal_keymaster_default_exec:s0
+/vendor/bin/hw/android\.hardware\.security\.keymint-service.amlogic   u:object_r:hal_keymint_default_exec:s0
+/vendor/bin/hw/android\.hardware\.gatekeeper@1\.0-service\.amlogic    u:object_r:hal_gatekeeper_default_exec:s0
+/vendor/bin/hw/android\.hardware\.media\.c2@1\.2-service              u:object_r:mediacodec_exec:s0
+
+# Irdeto hidlimw
+/vendor/lib(64)?/libNativeIMW\.so                                     u:object_r:vendor_app_file:s0
+/(vendor|system/vendor)/bin/hw/vendor\.irdeto\.hal\.hidlimw@1\.0-service u:object_r:hal_hidlimw_exec:s0
+/vendor/lib/libhidlimw_hal_client\.so                                 u:object_r:same_process_hal_file:s0
+/vendor/lib/libspimw_hal\.so                                          u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.common@1\.0\.so             u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.v34_0\.base@2\.0\.so        u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.v34_0\.base.av@2\.0\.so        u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.v34_0\.base.dmx@2\.0\.so        u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.v34_0\.base.svcpipe@2\.0\.so       u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.v34_0\.base.tspipe@2\.0\.so        u:object_r:same_process_hal_file:s0
+/vendor/lib/vendor\.irdeto\.hal\.hidlimw\.v34_0\.pvr@2\.0\.so         u:object_r:same_process_hal_file:s0
+/data/vendor/cas(/.*)?                                                u:object_r:hal_hidlimw_file:s0
+/dev/media                                                            u:object_r:media_device:s0
+/dev/bl40                                                             u:object_r:irdeto_device:s0
+/dev/nee2scpu                                                         u:object_r:irdeto_device:s0
+/dev/secmem                                                           u:object_r:video_device:s0
+/dev/key                                                           u:object_r:key_device:s0
+/vendor/bin/miracast_hdcp2					      u:object_r:miracast_hdcp2_exec:s0
+/sys/class/tee_info(/.*)?					      u:object_r:sysfs_tee:s0
+
+/system/bin/kexec           u:object_r:init_exec:s0
+
+/dev/aml_dsm                                      u:object_r:aml_dsm_device:s0
+/dev/ac_isp                  u:object_r:isp_device:s0
+/dev/ac_isp4uf               u:object_r:isp_device:s0
+/dev/ac_sbuf0                u:object_r:isp_device:s0
+/dev/ac_sbuf1                u:object_r:isp_device:s0
+/dev/v4l-subdev[0-9]         u:object_r:isp_device:s0
+/system_ext/lib/libtee-hal.so             u:object_r:nfx_tee_hal_lib:s0
+
+/sys/class/resource_mgr/res_report           u:object_r:sysfs_video:s0
+
+/sys/class/smc_sc2-class/ctrl_5v3v  u:object_r:sysfs_stb:s0
+/sys/class/smc_sc2-class/pins_mode  u:object_r:sysfs_stb:s0

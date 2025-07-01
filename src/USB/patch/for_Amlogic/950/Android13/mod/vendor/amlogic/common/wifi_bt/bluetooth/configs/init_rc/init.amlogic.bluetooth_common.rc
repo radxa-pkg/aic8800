@@ -1,0 +1,49 @@
+service unloadamlbtsdio /system/bin/rmmod sdio_bt
+    #user bluetooth
+    #class main
+    #group bluetooth net_bt_stack
+    disabled
+    oneshot
+on property:vendor.sys.amlbtsdiodriver=true
+    insmod /vendor/lib/modules/aml_sdio.ko
+    insmod /vendor/lib/modules/sdio_bt.ko
+
+on property:vendor.sys.amlbtsdiodriver=false
+    start unloadamlbtsdio
+
+on property:persist.vendor.bt_module=aic_btusb
+    insmod /vendor/lib/modules/aic_btusb.ko
+
+on property:persist.vendor.bt_module=rtk_btusb
+    insmod /vendor/lib/modules/rtk_btusb.ko
+
+on property:persist.vendor.bt_module=btusb
+    insmod /vendor/lib/modules/btusb.ko
+
+on property:persist.vendor.bt_module=bt_usb_qcom
+    insmod /vendor/lib/modules/bt_usb_qcom.ko
+
+on property:persist.vendor.bt_module=btmtk_usb
+    insmod /vendor/lib/modules/btmtk_usb.ko
+
+on property:persist.vendor.bt_module=btmtk_usb
+    insmod /vendor/lib/modules/btmtk_usb.ko
+
+on property:persist.vendor.bt_module=btmtk_usb_unify
+    insmod /vendor/lib/modules/btmtk_usb_unify.ko
+
+on property:persist.vendor.bt_module=sprdbt_tty
+    insmod /vendor/lib/modules/uwe5621_bsp_sdio.ko
+    insmod /vendor/lib/modules/sprdbt_tty.ko
+
+on property:persist.vendor.bt_name=nxp8987
+    insmod /vendor/lib/modules/mlan_sd8987.ko
+    insmod /vendor/lib/modules/moal_sd8987.ko mod_para=nxp/wifi_mod_para_8987.conf
+
+on property:persist.vendor.bt_name=nxp8997
+    insmod /vendor/lib/modules/mlan_sd8997.ko
+    insmod /vendor/lib/modules/moal_sd8997.ko mod_para=nxp/wifi_mod_para_8997.conf
+
+on property:persist.vendor.bt_name=nxpiw620
+    insmod /vendor/lib/modules/mlan_iw620.ko
+    insmod /vendor/lib/modules/moal_iw620.ko mod_para=nxp/wifi_mod_para_iw620.conf

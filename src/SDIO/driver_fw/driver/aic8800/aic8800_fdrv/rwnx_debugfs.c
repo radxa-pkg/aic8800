@@ -1248,6 +1248,12 @@ static ssize_t rwnx_dbgfs_regdbg_write(struct file *file,
     	if(oper== 0) {
 		ret = rwnx_send_dbg_mem_read_req(priv, addr, &mem_read_cfm);
         	printk("[0x%x] = [0x%x]\n", mem_read_cfm.memaddr, mem_read_cfm.memdata);
+	} else if (oper == 1) {
+		ret = rwnx_send_dbg_mem_read_req(priv, addr, &mem_read_cfm);
+		printk("before write : [0x%x] = [0x%x]\n", mem_read_cfm.memaddr, mem_read_cfm.memdata);
+		ret = rwnx_send_dbg_mem_block_write_req(priv, addr, 4, &val);
+		ret = rwnx_send_dbg_mem_read_req(priv, addr, &mem_read_cfm);
+		printk("after write : [0x%x] = [0x%x]\n", mem_read_cfm.memaddr, mem_read_cfm.memdata);
     	}
 
 	return count;
@@ -1261,7 +1267,7 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 {
 	struct rwnx_hw *priv = file->private_data;
 	char buf[64];
-	int32_t addr[13];
+	int32_t addr[14];
     int32_t addr_out[12];
 	u32_l hwconfig_id;
 	size_t len = min_t(size_t,count,sizeof(buf)-1);
@@ -1295,8 +1301,8 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 			    break;}
 			addr[12] = ~addr[12] + 1;
 			ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, NULL);
-			printk("CHANNEL_ACCESS_REQ edca:%x,%x,%x,%x, vif:%x, retry_cnt:%x, rts:%x, long_nav:%x, cfe:%x, rc_retry_cnt:%x:%x:%x ccademod_th %x\n",
-                                addr[0],  addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11], addr[12]);
+			printk("CHANNEL_ACCESS_REQ edca:%x,%x,%x,%x, vif:%x, retry_cnt:%x, rts:%x, long_nav:%x, cfe:%x, rc_retry_cnt:%x:%x:%x ccademod_th %x, remove_1m2m %x\n",
+                                addr[0],  addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11], addr[12], addr[13]);
 			break;
 		    case 2:
 			if(ret != 7) {
@@ -1334,6 +1340,14 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
                     printk("CHIP_TEMP_GET_REQ degree=%d\n", addr_out[0]);
                 }
             break;
+			case 6://AP_PS_LEVEL_SET_REQ
+				if (ret != 2) {
+					printk("param error != 2\n");
+				} else {
+					ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, NULL);
+					printk("AP_PS_LEVEL_SET_REQ lvl=%d\n", addr[0]);
+				}
+			break;
             default:
 			printk("param error\n");
 			break;
@@ -2082,7 +2096,7 @@ static ssize_t rwnx_dbgfs_last_rx_read(struct file *file,
 		nss = last_rx->ht.mcs / 8;;
 		gi = last_rx->ht.short_gi;
 	} else {
-		BUG_ON((mcs = legrates_lut[last_rx->leg_rate]) == -1);
+		BUG_ON((mcs = legrates_lut[last_rx->leg_rate].idx) == -1);
 		nss = 0;
 		gi = 0;
 	}

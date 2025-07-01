@@ -74,6 +74,10 @@
 #define IEEE80211_HE_PHY_CAP3_RX_HE_MU_PPDU_FROM_NON_AP_STA IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU
 #endif
 
+#ifdef CONFIG_KLYIN
+#define IEEE80211_MAX_AMPDU_BUF IEEE80211_MAX_AMPDU_BUF_HE
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0) || defined(CONFIG_VHT_FOR_OLD_KERNEL)
 enum nl80211_ac {
         NL80211_AC_VO,
@@ -667,8 +671,9 @@ struct rwnx_hw {
     atomic_t txdata_cnt;
 
 	atomic_t txdata_cnt_push;
-    u8 fc;
-
+	u8 txdata_reserved;
+	u8 fc;
+	seqlock_t txdata_reserved_seqlock;
 	atomic_t rxbuf_cnt;
 	u32 tcp_pacing_shift;
 
@@ -683,6 +688,8 @@ struct rwnx_hw {
 #ifdef AICWF_PCIE_SUPPORT
 	//struct ipc_host_env_tag *pcie_env;
 #endif
+
+    struct mm_all_restore_param all_restore_param;
 
     // Shared buffers
     struct rwnx_ipc_buf_pool msgbuf_pool;
@@ -738,7 +745,10 @@ struct rwnx_hw {
     u8 sta_mac_addr[6];
 
 	u8 pci_suspending;
-
+#ifdef CONFIG_TEMP_CONTROL
+	unsigned long started_jiffies;
+	s8_l temp;
+#endif
 };
 
 u8 *rwnx_build_bcn(struct rwnx_bcn *bcn, struct cfg80211_beacon_data *new);

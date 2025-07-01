@@ -55,7 +55,7 @@
 #ifdef CONFIG_SDIO_BT
 #include "aic_btsdio.h"
 #endif
-
+#include "aic_priv_cmd.h"
 
 #define RW_DRV_DESCRIPTION  "RivieraWaves 11nac driver for Linux cfg80211"
 #define RW_DRV_COPYRIGHT    "Copyright(c) 2015-2017 RivieraWaves"
@@ -770,8 +770,12 @@ static void rwnx_csa_finish(struct work_struct *ws)
 		cfg80211_disconnected(vif->ndev, 0, NULL, 0, 0, GFP_KERNEL);
 		#endif
 	} else {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+		wiphy_lock(rwnx_hw->wiphy);
+#else
 		mutex_lock(&vif->wdev.mtx);
 		__acquire(&vif->wdev.mtx);
+#endif
 		spin_lock_bh(&rwnx_hw->cb_lock);
 		rwnx_chanctx_unlink(vif);
 		rwnx_chanctx_link(vif, csa->ch_idx, &csa->chandef);
@@ -788,8 +792,12 @@ static void rwnx_csa_finish(struct work_struct *ws)
 #else
 		cfg80211_ch_switch_notify(vif->ndev, &csa->chandef);
 #endif
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+		wiphy_unlock(rwnx_hw->wiphy);
+#else
 		mutex_unlock(&vif->wdev.mtx);
 		__release(&vif->wdev.mtx);
+#endif
 	}
 	rwnx_del_csa(vif);
 }
@@ -913,6 +921,17 @@ void netdev_br_init(struct net_device *netdev)
 }
 #endif /* CONFIG_BR_SUPPORT */
 
+void rwnx_set_conn_state(atomic_t *drv_conn_state, int state){
+
+    if((int)atomic_read(drv_conn_state) != state){
+        AICWFDBG(LOGDEBUG, "%s drv_conn_state:%p %s --> %s \r\n", __func__, 
+            drv_conn_state,
+            s_conn_state[(int)atomic_read(drv_conn_state)], 
+            s_conn_state[state]);
+        
+        atomic_set(drv_conn_state, state);
+    }
+}
 
 /*********************************************************************
  * netdev callbacks
@@ -947,6 +966,12 @@ static int rwnx_open(struct net_device *dev)
 		}
 	}
 
+#ifdef AICWF_LATENCY_MODE
+	if ((testmode == 0) && (RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_STATION || RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_CLIENT)) {
+		rwnx_send_me_set_lp_level(rwnx_hw, 1, 1);
+	}
+#endif
+
 #ifdef CONFIG_GPIO_WAKEUP
 //close lp mode
 //	rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, 0);
@@ -970,7 +995,8 @@ static int rwnx_open(struct net_device *dev)
 	   if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801 ||
 		((rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC||
 		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW ||
-		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80) && testmode == 0)){
+		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) && testmode == 0)){
 		 if (RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_STATION || RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_CLIENT) {
 			rwnx_send_coex_req(rwnx_hw, 0, 1);
 		}
@@ -986,7 +1012,7 @@ static int rwnx_open(struct net_device *dev)
 	#endif
 
 	set_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
-	atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
+	rwnx_set_conn_state(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
 	AICWFDBG(LOGDEBUG, "%s rwnx_vif->drv_flags:%d\r\n", __func__, (int)rwnx_vif->drv_flags);
 
 	if (RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_CLIENT || RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_GO) {
@@ -1071,7 +1097,19 @@ static int rwnx_open(struct net_device *dev)
 			//Configure the monitor channel
 			error = rwnx_send_config_monitor_req(rwnx_hw, &rwnx_hw->chanctx_table[rwnx_vif->ch_index].chan_def, NULL);
 		}
+#if defined(CONFIG_RWNX_MON_XMIT)
+        rwnx_txq_unk_vif_init(rwnx_vif);
+#endif
+#if defined(CONFIG_RWNX_MON_RXFILTER)
+        rwnx_send_set_filter(rwnx_hw, (FIF_BCN_PRBRESP_PROMISC | FIF_OTHER_BSS | FIF_PSPOLL | FIF_PROBE_REQ));
+#endif
 	}
+
+#if defined(CONFIG_RWNX_MON_XMIT)
+    netif_carrier_on(dev);
+	AICWFDBG(LOGINFO, "monitor xmit: netif_carrier_on\n");
+#endif
+
 
 	#ifdef CONFIG_BR_SUPPORT
 		 netdev_br_init(dev);
@@ -1207,7 +1245,7 @@ static int rwnx_close(struct net_device *dev)
 				RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_P2P_CLIENT){
 				test_counter = waiting_counter;
 				if(atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_CONNECTED){
-					atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTING);
+					rwnx_set_conn_state(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTING);
 					rwnx_send_sm_disconnect_req(rwnx_hw, rwnx_vif, 3);
 					while (atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_DISCONNECTING) {
 						AICWFDBG(LOGDEBUG, "%s wifi is disconnecting, waiting 100ms for state to stable\r\n", __func__);
@@ -1276,1481 +1314,16 @@ static int rwnx_close(struct net_device *dev)
 	clear_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags);
 	AICWFDBG(LOGDEBUG, "%s rwnx_vif->drv_flags:%d\r\n", __func__, (int)rwnx_vif->drv_flags);
 
-#ifdef CONFIG_GPIO_WAKEUP
-	//open lp mode
-	//rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, 1);
-#if defined(CONFIG_SDIO_PWRCTRL)
-		aicwf_sdio_pwr_stctl(g_rwnx_plat->sdiodev, SDIO_SLEEP_ST);
-#endif
-		ret = aicwf_sdio_writeb(g_rwnx_plat->sdiodev, g_rwnx_plat->sdiodev->sdio_reg.wakeup_reg, 2);
-		if (ret < 0) {
-			sdio_err("reg:%d write failed!\n", g_rwnx_plat->sdiodev->sdio_reg.wakeup_reg);
-		}
-#endif//CONFIG_GPIO_WAKEUP
-
 	return 0;
 }
-
-#ifdef CONFIG_RFTEST
-enum {
-	SET_TX,
-	SET_TXSTOP,
-	SET_TXTONE,
-	SET_RX,
-	GET_RX_RESULT,
-	SET_RXSTOP,
-	SET_RXMETER,
-	SET_POWER,
-	SET_XTAL_CAP,
-	SET_XTAL_CAP_FINE,
-	GET_EFUSE,
-	SET_FREQ_CAL,
-	SET_FREQ_CAL_FINE,
-	GET_FREQ_CAL,
-	SET_MAC_ADDR,
-	GET_MAC_ADDR,
-	SET_BT_MAC_ADDR,
-	GET_BT_MAC_ADDR,
-	SET_VENDOR_INFO,
-	GET_VENDOR_INFO,
-	RDWR_PWRMM,
-	RDWR_PWRIDX,
-	RDWR_PWRLVL = RDWR_PWRIDX,
-	RDWR_PWROFST,
-	RDWR_DRVIBIT,
-	RDWR_EFUSE_PWROFST,
-	RDWR_EFUSE_DRVIBIT,
-	SET_PAPR,
-	SET_CAL_XTAL,
-	GET_CAL_XTAL_RES,
-	SET_COB_CAL,
-	GET_COB_CAL_RES,
-	RDWR_EFUSE_USRDATA,
-	SET_NOTCH,
-    RDWR_PWROFSTFINE,
-    RDWR_EFUSE_PWROFSTFINE,
-    RDWR_EFUSE_SDIOCFG,
-    RDWR_EFUSE_USBVIDPID,
-    SET_SRRC,
-    SET_FSS,
-    RDWR_EFUSE_HE_OFF,
-};
-
-typedef struct {
-	u8_l chan;
-	u8_l bw;
-	u8_l mode;
-	u8_l rate;
-	u16_l length;
-	u16_l tx_intv_us;
-} cmd_rf_settx_t;
-
-typedef struct {
-	u8_l val;
-} cmd_rf_setfreq_t;
-
-typedef struct {
-	u8_l chan;
-	u8_l bw;
-} cmd_rf_rx_t;
-
-typedef struct {
-	u8_l block;
-} cmd_rf_getefuse_t;
-typedef struct
-{
-    u8_l dutid;
-    u8_l chip_num;
-    u8_l dis_xtal;
-}cmd_rf_setcobcal_t;
-typedef struct
- {
-     u16_l dut_rcv_golden_num;
-     u8_l golden_rcv_dut_num;
-     s8_l rssi_static;
-     s8_l snr_static;
-     s8_l dut_rssi_static;
-     u16_l reserved;
- }cob_result_ptr_t;
-#endif
-
-#define CMD_MAXARGS 10
-
-#if 0
-#define isblank(c)      ((c) == ' ' || (c) == '\t')
-#define isascii(c)      (((unsigned char)(c)) <= 0x7F)
-
-static int isdigit(unsigned char c)
-{
-	return ((c >= '0') && (c <= '9'));
-}
-
-static int isxdigit(unsigned char c)
-{
-	if ((c >= '0') && (c <= '9'))
-		return 1;
-	if ((c >= 'a') && (c <= 'f'))
-		return 1;
-	if ((c >= 'A') && (c <= 'F'))
-		return 1;
-	return 0;
-}
-
-static int islower(unsigned char c)
-{
-	return ((c >= 'a') && (c <= 'z'));
-}
-
-static unsigned char toupper(unsigned char c)
-{
-	if (islower(c))
-		c -= 'a' - 'A';
-	return c;
+    
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
+#ifdef CONFIG_SHUTDOWN_CALLBACK
+int rwnx_close_(struct net_device *dev){
+	return rwnx_close(dev);
 }
 #endif
-
-
-static int parse_line (char *line, char *argv[])
-{
-	int nargs = 0;
-
-	while (nargs < CMD_MAXARGS) {
-		/* skip any white space */
-		while ((*line == ' ') || (*line == '\t')) {
-			++line;
-		}
-
-		if (*line == '\0') {    /* end of line, no more args    */
-			argv[nargs] = 0;
-			return nargs;
-		}
-
-		/* Argument include space should be bracketed by quotation mark */
-		if (*line == '\"') {
-			/* Skip quotation mark */
-			line++;
-
-			/* Begin of argument string */
-			argv[nargs++] = line;
-
-			/* Until end of argument */
-			while (*line && (*line != '\"')) {
-				++line;
-			}
-		} else {
-			argv[nargs++] = line;    /* begin of argument string    */
-
-			/* find end of string */
-			while (*line && (*line != ' ') && (*line != '\t')) {
-				++line;
-			}
-		}
-
-		if (*line == '\0') {    /* end of line, no more args    */
-			argv[nargs] = 0;
-			return nargs;
-		}
-
-		*line++ = '\0';         /* terminate current arg     */
-	}
-
-	printk("** Too many args (max. %d) **\n", CMD_MAXARGS);
-
-	return nargs;
-}
-
-unsigned int command_strtoul(const char *cp, char **endp, unsigned int base)
-{
-	unsigned int result = 0, value, is_neg = 0;
-
-	if (*cp == '0') {
-		cp++;
-		if ((*cp == 'x') && isxdigit(cp[1])) {
-			base = 16;
-			cp++;
-		}
-		if (!base) {
-			base = 8;
-		}
-	}
-	if (!base) {
-		base = 10;
-	}
-	if (*cp == '-') {
-		is_neg = 1;
-		cp++;
-	}
-	while (isxdigit(*cp) && (value = isdigit(*cp) ? *cp - '0' : (islower(*cp) ? toupper(*cp) : *cp) - 'A' + 10) < base) {
-		result = result * base + value;
-		cp++;
-	}
-	if (is_neg)
-		result = (unsigned int)((int)result * (-1));
-
-	if (endp)
-		*endp = (char *)cp;
-	return result;
-}
-
-
-int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
-{
-	int bytes_written = 0;
-	char *para = NULL;
-	char *cmd = NULL;
-	char *argv[CMD_MAXARGS + 1];
-	int argc;
-#ifdef CONFIG_RFTEST
-	struct dbg_rftest_cmd_cfm cfm;
-	u8_l mac_addr[6];
-	cmd_rf_settx_t settx_param;
-	cmd_rf_rx_t setrx_param;
-	int freq;
-	cmd_rf_getefuse_t getefuse_param;
-	cmd_rf_setfreq_t cmd_setfreq;
-	cmd_rf_setcobcal_t setcob_cal;
-	u8_l ana_pwr;
-	u8_l dig_pwr;
-	u8_l pwr;
-	u8_l xtal_cap;
-	u8_l xtal_cap_fine;
-	u8_l vendor_info;
-	cob_result_ptr_t *cob_result_ptr;
-
 #endif
-
-	u8_l state;
-
-#ifdef CONFIG_GPIO_WAKEUP
-	u8_l setsusp_mode;
-	int ret = 0;
-#endif
-
-	RWNX_DBG(RWNX_FN_ENTRY_STR);
-
-	argc = parse_line(command, argv);
-	if (argc == 0) {
-		return -1;
-	}
-
-	do {
-#ifdef CONFIG_RFTEST
-		if (strcasecmp(argv[0], "GET_RX_RESULT") == 0) {
-			AICWFDBG(LOGINFO, "get_rx_result\n");
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_RX_RESULT, 0, NULL, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, GET_RX_RESULT, 0, NULL, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 8);
-			bytes_written = 8;
-		} else if (strcasecmp(argv[0], "SET_TX") == 0) {
-			AICWFDBG(LOGINFO, "set_tx\n");
-			if (argc < 6) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			settx_param.chan = command_strtoul(argv[1], NULL, 10);
-			settx_param.bw = command_strtoul(argv[2], NULL, 10);
-			settx_param.mode = command_strtoul(argv[3], NULL, 10);
-			settx_param.rate = command_strtoul(argv[4], NULL, 10);
-			settx_param.length = command_strtoul(argv[5], NULL, 10);
-			if (argc > 6) {
-				settx_param.tx_intv_us = command_strtoul(argv[6], NULL, 10);
-			} else {
-				settx_param.tx_intv_us = 10000; // set default val 10ms
-			}
-			AICWFDBG(LOGINFO, "txparam:%d,%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
-				settx_param.mode, settx_param.rate, settx_param.length, settx_param.tx_intv_us);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_TX, sizeof(cmd_rf_settx_t), (u8_l *)&settx_param, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_TX, sizeof(cmd_rf_settx_t), (u8_l *)&settx_param, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "SET_TXSTOP") == 0) {
-			AICWFDBG(LOGINFO, "settx_stop\n");
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_TXSTOP, 0, NULL, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_TXSTOP, 0, NULL, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "SET_TXTONE") == 0) {
-			AICWFDBG(LOGINFO, "set_tx_tone,argc:%d\n", argc);
-			if ((argc == 2) || (argc == 3)) {
-				u8_l func, buf[2];
-				s8_l freq;
-				AICWFDBG(LOGINFO, "argv 1:%s\n", argv[1]);
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-				if (argc == 3) {
-					AICWFDBG(LOGINFO, "argv 2:%s\n", argv[2]);
-					freq = (u8_l)command_strtoul(argv[2], NULL, 10);
-				} else {
-					freq = 0;
-				}
-				buf[0] = func;
-				buf[1] = (u8_l)freq;
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_TXTONE, argc - 1, buf, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_TXTONE, argc - 1, buf, NULL);
-	#endif
-			} else {
-				AICWFDBG(LOGERROR, "wrong args\n");
-				bytes_written = -EINVAL;
-			}
-		} else if (strcasecmp(argv[0], "SET_RX") == 0) {
-			AICWFDBG(LOGINFO, "set_rx\n");
-			if (argc < 3) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			setrx_param.chan = command_strtoul(argv[1], NULL, 10);
-			setrx_param.bw = command_strtoul(argv[2], NULL, 10);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_RX, sizeof(cmd_rf_rx_t), (u8_l *)&setrx_param, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_RX, sizeof(cmd_rf_rx_t), (u8_l *)&setrx_param, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "SET_RXSTOP") == 0) {
-			AICWFDBG(LOGINFO, "set_rxstop\n");
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_RXSTOP, 0, NULL, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_RXSTOP, 0, NULL, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "SET_RX_METER") == 0) {
-			AICWFDBG(LOGINFO, "set_rx_meter\n");
-			freq = (int)command_strtoul(argv[1], NULL, 10);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_RXMETER, sizeof(freq), (u8_l *)&freq, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_RXMETER, sizeof(freq), (u8_l *)&freq, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "SET_FREQ_CAL") == 0) {
-			AICWFDBG(LOGINFO, "set_freq_cal\n");
-			if (argc < 2) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			cmd_setfreq.val = command_strtoul(argv[1], NULL, 16);
-			AICWFDBG(LOGINFO, "param:%x\r\n", cmd_setfreq.val);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_FREQ_CAL, sizeof(cmd_rf_setfreq_t), (u8_l *)&cmd_setfreq, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_FREQ_CAL, sizeof(cmd_rf_setfreq_t), (u8_l *)&cmd_setfreq, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-		} else if (strcasecmp(argv[0], "SET_FREQ_CAL_FINE") == 0) {
-			AICWFDBG(LOGINFO, "set_freq_cal_fine\n");
-			if (argc < 2) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			cmd_setfreq.val = command_strtoul(argv[1], NULL, 16);
-			AICWFDBG(LOGINFO, "param:%x\r\n", cmd_setfreq.val);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_FREQ_CAL_FINE, sizeof(cmd_rf_setfreq_t), (u8_l *)&cmd_setfreq, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_FREQ_CAL_FINE, sizeof(cmd_rf_setfreq_t), (u8_l *)&cmd_setfreq, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-		} else if (strcasecmp(argv[0], "GET_EFUSE") == 0) {
-			AICWFDBG(LOGINFO, "get_efuse\n");
-			if (argc < 2) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			getefuse_param.block = command_strtoul(argv[1], NULL, 10);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_EFUSE, sizeof(cmd_rf_getefuse_t), (u8_l *)&getefuse_param, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, GET_EFUSE, sizeof(cmd_rf_getefuse_t), (u8_l *)&getefuse_param, &cfm);
-	#endif
-			AICWFDBG(LOGINFO, "get val=%x\r\n", cfm.rftest_result[0]);
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-		} else if (strcasecmp(argv[0], "SET_POWER") == 0) {
-			AICWFDBG(LOGINFO, "set_power\n");
-			if(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8801) {
-				ana_pwr = command_strtoul(argv[1], NULL, 16);
-				dig_pwr = command_strtoul(argv[2], NULL, 16);
-				pwr = (ana_pwr << 4 | dig_pwr);
-				if (ana_pwr > 0xf || dig_pwr > 0xf) {
-					AICWFDBG(LOGERROR, "invalid param\r\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				ana_pwr = command_strtoul(argv[1], NULL, 10);
-				pwr = ana_pwr;
-				if (ana_pwr > 0x1e) {
-					AICWFDBG(LOGERROR, "invalid param\r\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			}
-			AICWFDBG(LOGINFO, "pwr =%x\r\n", pwr);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_POWER, sizeof(pwr), (u8_l *)&pwr, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_POWER, sizeof(pwr), (u8_l *)&pwr, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "SET_XTAL_CAP") == 0) {
-			AICWFDBG(LOGINFO, "set_xtal_cap\n");
-			if (argc < 2) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			xtal_cap = command_strtoul(argv[1], NULL, 10);
-			AICWFDBG(LOGINFO, "xtal_cap =%x\r\n", xtal_cap);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_XTAL_CAP, sizeof(xtal_cap), (u8_l *)&xtal_cap, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_XTAL_CAP, sizeof(xtal_cap), (u8_l *)&xtal_cap, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-		} else if (strcasecmp(argv[0], "SET_XTAL_CAP_FINE") == 0) {
-			AICWFDBG(LOGINFO, "set_xtal_cap_fine\n");
-			if (argc < 2) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			xtal_cap_fine = command_strtoul(argv[1], NULL, 10);
-			AICWFDBG(LOGINFO, "xtal_cap_fine =%x\r\n", xtal_cap_fine);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_XTAL_CAP_FINE, sizeof(xtal_cap_fine), (u8_l *)&xtal_cap_fine, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_XTAL_CAP_FINE, sizeof(xtal_cap_fine), (u8_l *)&xtal_cap_fine, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-		} else if (strcasecmp(argv[0], "SET_MAC_ADDR") == 0) {
-			printk("set_mac_addr\n");
-			if (argc < 7) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			mac_addr[5] = command_strtoul(argv[1], NULL, 16);
-			mac_addr[4] = command_strtoul(argv[2], NULL, 16);
-			mac_addr[3] = command_strtoul(argv[3], NULL, 16);
-			mac_addr[2] = command_strtoul(argv[4], NULL, 16);
-			mac_addr[1] = command_strtoul(argv[5], NULL, 16);
-			mac_addr[0] = command_strtoul(argv[6], NULL, 16);
-			AICWFDBG(LOGINFO, "set macaddr:%x,%x,%x,%x,%x,%x\n", mac_addr[5], mac_addr[4], mac_addr[3], mac_addr[2], mac_addr[1], mac_addr[0]);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_MAC_ADDR, sizeof(mac_addr), (u8_l *)&mac_addr, NULL);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_MAC_ADDR, sizeof(mac_addr), (u8_l *)&mac_addr, NULL);
-	#endif
-		} else if (strcasecmp(argv[0], "GET_MAC_ADDR") == 0) {
-			u32_l addr0, addr1;
-			AICWFDBG(LOGINFO, "get mac addr\n");
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_MAC_ADDR, 0, NULL, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, GET_MAC_ADDR, 0, NULL, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 8);
-			bytes_written = 8;
-			addr0 = cfm.rftest_result[0];
-			if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-				(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) {
-				int rem_cnt = (cfm.rftest_result[1] >> 16) & 0x00FF;
-				addr1 = cfm.rftest_result[1] & 0x0000FFFF;
-				AICWFDBG(LOGINFO, "0x%x,0x%x (remain:%x)\n", addr0, addr1, rem_cnt);
-			} else {
-				addr1 = cfm.rftest_result[1];
-				AICWFDBG(LOGINFO, "0x%x,0x%x\n", addr0, addr1);
-			}
-		} else if (strcasecmp(argv[0], "SET_BT_MAC_ADDR") == 0) {
-			AICWFDBG(LOGINFO, "set_bt_mac_addr\n");
-			if (argc < 7) {
-				AICWFDBG(LOGERROR, "wrong param\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			mac_addr[5] = command_strtoul(argv[1], NULL, 16);
-			mac_addr[4] = command_strtoul(argv[2], NULL, 16);
-			mac_addr[3] = command_strtoul(argv[3], NULL, 16);
-			mac_addr[2] = command_strtoul(argv[4], NULL, 16);
-			mac_addr[1] = command_strtoul(argv[5], NULL, 16);
-			mac_addr[0] = command_strtoul(argv[6], NULL, 16);
-			AICWFDBG(LOGINFO, "set bt macaddr:%x,%x,%x,%x,%x,%x\n", mac_addr[5], mac_addr[4], mac_addr[3], mac_addr[2], mac_addr[1], mac_addr[0]);
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_BT_MAC_ADDR, sizeof(mac_addr), (u8_l *)&mac_addr, NULL);
-		} else if (strcasecmp(argv[0], "GET_BT_MAC_ADDR")==0) {
-			u32_l addr0, addr1;
-			AICWFDBG(LOGINFO, "get bt mac addr\n");
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_BT_MAC_ADDR, 0, NULL, &cfm);
-			memcpy(command, &cfm.rftest_result[0], 8);
-			bytes_written = 8;
-			addr0 = cfm.rftest_result[0];
-			if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-				(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) {
-				int rem_cnt = (cfm.rftest_result[1] >> 16) & 0x00FF;
-				addr1 = cfm.rftest_result[1] & 0x0000FFFF;
-				 AICWFDBG(LOGINFO, "0x%x,0x%x (remain:%x)\n", addr0, addr1, rem_cnt);
-			} else {
-				addr1 = cfm.rftest_result[1];
-				AICWFDBG(LOGINFO, "0x%x,0x%x\n", addr0, addr1);
-			}
-		} else if (strcasecmp(argv[0], "SET_VENDOR_INFO") == 0) {
-			vendor_info = command_strtoul(argv[1], NULL, 16);
-			AICWFDBG(LOGINFO, "set vendor info:%x\n", vendor_info);
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_VENDOR_INFO, 1, &vendor_info, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, SET_VENDOR_INFO, 1, &vendor_info, &cfm);
-	#endif
-			if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-				(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) {
-				memcpy(command, &cfm.rftest_result[0], 2);
-				bytes_written = 2;
-			} else {
-				memcpy(command, &cfm.rftest_result[0], 1);
-				bytes_written = 1;
-			}
-			AICWFDBG(LOGINFO, "0x%x\n", cfm.rftest_result[0]);
-		} else if (strcasecmp(argv[0], "GET_VENDOR_INFO") == 0) {
-			AICWFDBG(LOGINFO, "get vendor info\n");
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_VENDOR_INFO, 0, NULL, &cfm);
-	#endif
-	#ifdef AICWF_USB_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->usbdev->rwnx_hw, GET_VENDOR_INFO, 0, NULL, &cfm);
-	#endif
-			if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-				(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) {
-				memcpy(command, &cfm.rftest_result[0], 2);
-				bytes_written = 2;
-			} else {
-				memcpy(command, &cfm.rftest_result[0], 1);
-				bytes_written = 1;
-			}
-			AICWFDBG(LOGINFO, "0x%x\n", cfm.rftest_result[0]);
-		} else if (strcasecmp(argv[0], "GET_FREQ_CAL") == 0) {
-			unsigned int val;
-			AICWFDBG(LOGINFO, "get freq cal\n");
-	#ifdef AICWF_SDIO_SUPPORT
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_FREQ_CAL, 0, NULL, &cfm);
-	#endif
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-			val = cfm.rftest_result[0];
-			if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-				(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) {
-				AICWFDBG(LOGINFO, "cap=0x%x (remain:%x), cap_fine=%x (remain:%x)\n",
-						val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24) & 0xff);
-			} else {
-				AICWFDBG(LOGINFO, "cap=0x%x, cap_fine=0x%x\n", val & 0xff, (val >> 8) & 0xff);
-			}
-		}  else if (strcasecmp(argv[0], "RDWR_PWRMM") == 0) {
-			AICWFDBG(LOGINFO, "read/write txpwr manul mode\n");
-			if (argc <= 1) { // read cur
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWRMM, 0, NULL, &cfm);
-	#endif
-			} else { // write
-				u8_l pwrmm = (u8_l)command_strtoul(argv[1], NULL, 16);
-				pwrmm = (pwrmm) ? 1 : 0;
-				AICWFDBG(LOGINFO, "set pwrmm = %x\r\n", pwrmm);
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWRMM, sizeof(pwrmm), (u8_l *)&pwrmm, &cfm);
-	#endif
-			}
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-		} else if (strcasecmp(argv[0], "RDWR_PWRIDX") == 0) {
-			u8_l func = 0;
-			#ifdef AICWF_SDIO_SUPPORT
-			if (g_rwnx_plat->sdiodev->chipid != PRODUCT_ID_AIC8801) {
-				AICWFDBG(LOGERROR, "unsupported cmd\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			#endif
-			AICWFDBG(LOGINFO, "read/write txpwr index\n");
-			if (argc > 1) {
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-			}
-			if (func == 0) { // read cur
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWRIDX, 0, NULL, &cfm);
-	#endif
-			} else if (func <= 2) { // write 2.4g/5g pwr idx
-				if (argc > 3) {
-					u8_l type = (u8_l)command_strtoul(argv[2], NULL, 16);
-					u8_l pwridx = (u8_l)command_strtoul(argv[3], NULL, 10);
-					u8_l buf[3] = {func, type, pwridx};
-					AICWFDBG(LOGINFO, "set pwridx:[%x][%x]=%x\r\n", func, type, pwridx);
-					rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWRIDX, sizeof(buf), buf, &cfm);
-				} else {
-					AICWFDBG(LOGERROR, "wrong args\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-				bytes_written = -EINVAL;
-				break;
-			}
-			memcpy(command, &cfm.rftest_result[0], 9);
-			bytes_written = 9;
-		} else if (strcasecmp(argv[0], "RDWR_PWRLVL") == 0) {
-			u8_l func = 0;
-			#ifdef AICWF_SDIO_SUPPORT
-			if ((g_rwnx_plat->sdiodev->chipid != PRODUCT_ID_AIC8800DC)
-			&& (g_rwnx_plat->sdiodev->chipid != PRODUCT_ID_AIC8800DW)
-			&& (g_rwnx_plat->sdiodev->chipid != PRODUCT_ID_AIC8800D80)) {
-				AICWFDBG(LOGINFO, "unsupported cmd\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-			#endif
-			AICWFDBG(LOGINFO, "read/write txpwr level\n");
-			if (argc > 1) {
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-			}
-			if (func == 0) { // read cur
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWRLVL, 0, NULL, &cfm);
-			} else if (func <= 2) { // write 2.4g/5g pwr lvl
-				if (argc > 4) {
-					u8_l grp = (u8_l)command_strtoul(argv[2], NULL, 16);
-					u8_l idx, size;
-					u8_l buf[14] = {func, grp,};
-					if (argc > 12) { // set all grp
-						AICWFDBG(LOGINFO, "set pwrlvl %s:\n"
-						"  [%x] =", (func == 1) ? "2.4g" : "5g", grp);
-						if (grp == 1) { // TXPWR_LVL_GRP_11N_11AC
-							size = 10;
-						} else {
-							size = 12;
-						}
-						for (idx = 0; idx < size; idx++) {
-							s8_l pwrlvl = (s8_l)command_strtoul(argv[3 + idx], NULL, 10);
-							buf[2 + idx] = (u8_l)pwrlvl;
-							if (idx && !(idx & 0x3)) {
-								AICWFDBG(LOGINFO, " ");
-							}
-							AICWFDBG(LOGINFO, " %2d", pwrlvl);
-						}
-						AICWFDBG(LOGINFO, "\n");
-						size += 2;
-					} else { // set grp[idx]
-						u8_l idx = (u8_l)command_strtoul(argv[3], NULL, 10);
-						s8_l pwrlvl = (s8_l)command_strtoul(argv[4], NULL, 10);
-						buf[2] = idx;
-						buf[3] = (u8_l)pwrlvl;
-						size = 4;
-						AICWFDBG(LOGINFO, "set pwrlvl %s:\n"
-						"  [%x][%d] = %d\n", (func == 1) ? "2.4g" : "5g", grp, idx, pwrlvl);
-					}
-					rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWRLVL, size, buf, &cfm);
-				} else {
-					AICWFDBG(LOGERROR, "wrong args\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-				bytes_written = -EINVAL;
-				break;
-			}
-			if(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80){
-				memcpy(command, &cfm.rftest_result[0], 6 * 12);
-				bytes_written = 6 * 12;
-			} else {
-				memcpy(command, &cfm.rftest_result[0], 3 * 12);
-				bytes_written = 3 * 12;
-			}
-		} else if (strcasecmp(argv[0], "RDWR_PWROFST") == 0) {
-			u8_l func = 0;
-            int res_len = 0;
-			AICWFDBG(LOGINFO, "read/write txpwr offset\n");
-			if (argc > 1) {
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-			}
-			if (func == 0) { // read cur
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWROFST, 0, NULL, &cfm);
-	#endif
-			} else if (func <= 2) { // write 2.4g/5g pwr ofst
-				if ((argc > 4) && (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80)) {
-                    u8_l type = (u8_l)command_strtoul(argv[2], NULL, 16);
-                    u8_l chgrp = (u8_l)command_strtoul(argv[3], NULL, 16);
-                    s8_l pwrofst = (u8_l)command_strtoul(argv[4], NULL, 10);
-                    u8_l buf[4] = {func, type, chgrp, (u8_l)pwrofst};
-                    printk("set pwrofst_%s:[%x][%x]=%d\r\n", (func == 1) ? "2.4g" : "5g", type, chgrp, pwrofst);
-                    #ifdef AICWF_SDIO_SUPPORT
-                    rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWROFST, sizeof(buf), buf, &cfm);
-                    #endif
-                } else if ((argc > 3) && (g_rwnx_plat->sdiodev->chipid != PRODUCT_ID_AIC8800D80)) {
-					u8_l chgrp = (u8_l)command_strtoul(argv[2], NULL, 16);
-					s8_l pwrofst = (u8_l)command_strtoul(argv[3], NULL, 10);
-					u8_l buf[3] = {func, chgrp, (u8_l)pwrofst};
-					printk("set pwrofst_%s:[%x]=%d\r\n", (func == 1) ? "2.4g" : "5g", chgrp, pwrofst);
-	#ifdef AICWF_SDIO_SUPPORT
-					rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWROFST, sizeof(buf), buf, &cfm);
-	#endif
-				} else {
-					AICWFDBG(LOGERROR, "wrong args\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-				bytes_written = -EINVAL;
-				break;
-			}
-            if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-                (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) { // 3 = 3 (2.4g)
-                res_len = 3;
-            } else if (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80) { // 3 * 2 (2.4g) + 3 * 6 (5g)
-                res_len = 3 * 3 + 3 * 6;
-            } else {
-                res_len = 3 + 4;
-            }
-			memcpy(command, &cfm.rftest_result[0], res_len);
-			bytes_written = res_len;
-        } else if (strcasecmp(argv[0], "RDWR_PWROFSTFINE") == 0) {
-            u8_l func = 0;
-            AICWFDBG(LOGINFO, "read/write txpwr offset fine\n");
-            if (argc > 1) {
-                func = (u8_l)command_strtoul(argv[1], NULL, 16);
-            }
-            if (func == 0) { // read cur
-                rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWROFSTFINE, 0, NULL, &cfm);
-            } else if (func <= 2) { // write 2.4g/5g pwr ofst
-                if (argc > 3) {
-                    u8_l chgrp = (u8_l)command_strtoul(argv[2], NULL, 16);
-                    s8_l pwrofst = (u8_l)command_strtoul(argv[3], NULL, 10);
-                    u8_l buf[3] = {func, chgrp, (u8_l)pwrofst};
-                    AICWFDBG(LOGINFO, "set pwrofstfine:[%x][%x]=%d\r\n", func, chgrp, pwrofst);
-                    rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_PWROFSTFINE, sizeof(buf), buf, &cfm);
-                } else {
-                    AICWFDBG(LOGERROR, "wrong args\n");
-                    bytes_written = -EINVAL;
-                    break;
-                }
-            } else {
-                AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-                bytes_written = -EINVAL;
-                break;
-            }
-            memcpy(command, &cfm.rftest_result[0], 7);
-            bytes_written = 7;
-		} else if (strcasecmp(argv[0], "RDWR_DRVIBIT") == 0) {
-			u8_l func = 0;
-			AICWFDBG(LOGINFO, "read/write pa drv_ibit\n");
-			if (argc > 1) {
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-			}
-			if (func == 0) { // read cur
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_DRVIBIT, 0, NULL, &cfm);
-	#endif
-			} else if (func == 1) { // write 2.4g pa drv_ibit
-				if (argc > 2) {
-					u8_l ibit = (u8_l)command_strtoul(argv[2], NULL, 16);
-					u8_l buf[2] = {func, ibit};
-					printk("set drvibit:[%x]=%x\r\n", func, ibit);
-	#ifdef AICWF_SDIO_SUPPORT
-					rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_DRVIBIT, sizeof(buf), buf, &cfm);
-	#endif
-				} else {
-					AICWFDBG(LOGERROR, "wrong args\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-				bytes_written = -EINVAL;
-				break;
-			}
-			memcpy(command, &cfm.rftest_result[0], 16);
-			bytes_written = 16;
-		} else if (strcasecmp(argv[0], "RDWR_EFUSE_PWROFST") == 0) {
-			u8_l func = 0;
-            int res_len = 0;
-			AICWFDBG(LOGINFO, "read/write txpwr offset into efuse\n");
-			if (argc > 1) {
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-			}
-			if (func == 0) { // read cur
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_PWROFST, 0, NULL, &cfm);
-	#endif
-			} else if (func <= 2) { // write 2.4g/5g pwr ofst
-				if ((argc > 4) && (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80)) {
-                    u8_l type = (u8_l)command_strtoul(argv[2], NULL, 16);
-                    u8_l chgrp = (u8_l)command_strtoul(argv[3], NULL, 16);
-                    s8_l pwrofst = (u8_l)command_strtoul(argv[4], NULL, 10);
-                    u8_l buf[4] = {func, type, chgrp, (u8_l)pwrofst};
-                    printk("set efuse pwrofst_%s:[%x][%x]=%d\r\n", (func == 1) ? "2.4g" : "5g", type, chgrp, pwrofst);
-                    #ifdef AICWF_SDIO_SUPPORT
-                    rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_PWROFST, sizeof(buf), buf, &cfm);
-                    #endif
-                } else if ((argc > 3) && (g_rwnx_plat->sdiodev->chipid != PRODUCT_ID_AIC8800D80)) {
-					u8_l chgrp = (u8_l)command_strtoul(argv[2], NULL, 16);
-					s8_l pwrofst = (u8_l)command_strtoul(argv[3], NULL, 10);
-					u8_l buf[3] = {func, chgrp, (u8_l)pwrofst};
-					printk("set efuse pwrofst_%s:[%x]=%d\r\n", (func == 1) ? "2.4g" : "5g", chgrp, pwrofst);
-	#ifdef AICWF_SDIO_SUPPORT
-					rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_PWROFST, sizeof(buf), buf, &cfm);
-	#endif
-				} else {
-					AICWFDBG(LOGERROR, "wrong args\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-				bytes_written = -EINVAL;
-				break;
-			}
-            if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-                (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) { // 6 = 3 (2.4g) * 2
-                res_len = 3 * 2;
-            } else if (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80) { // 3 * 2 (2.4g) + 3 * 6 (5g)
-                res_len = 3 * 3 + 3 * 6;
-            } else { // 7 = 3(2.4g) + 4(5g)
-                res_len = 3 + 4;
-            }
-            memcpy(command, &cfm.rftest_result[0], res_len);
-            bytes_written = res_len;
-		} else if (strcasecmp(argv[0], "RDWR_EFUSE_DRVIBIT") == 0) {
-			u8_l func = 0;
-			AICWFDBG(LOGINFO, "read/write pa drv_ibit into efuse\n");
-			if (argc > 1) {
-				func = (u8_l)command_strtoul(argv[1], NULL, 16);
-			}
-			if (func == 0) { // read cur
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_DRVIBIT, 0, NULL, &cfm);
-	#endif
-			} else if (func == 1) { // write 2.4g pa drv_ibit
-				if (argc > 2) {
-				u8_l ibit = (u8_l)command_strtoul(argv[2], NULL, 16);
-				u8_l buf[2] = {func, ibit};
-				AICWFDBG(LOGINFO, "set efuse drvibit:[%x]=%x\r\n", func, ibit);
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_DRVIBIT, sizeof(buf), buf, &cfm);
-	#endif
-				} else {
-					AICWFDBG(LOGERROR, "wrong args\n");
-					bytes_written = -EINVAL;
-					break;
-				}
-			} else {
-				AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-				bytes_written = -EINVAL;
-				break;
-			}
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-        } else if (strcasecmp(argv[0], "RDWR_EFUSE_PWROFSTFINE") == 0) {
-            u8_l func = 0;
-            AICWFDBG(LOGINFO, "read/write txpwr offset fine into efuse\n");
-            if (argc > 1) {
-                func = (u8_l)command_strtoul(argv[1], NULL, 16);
-            }
-            if (func == 0) { // read cur
-                rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_PWROFSTFINE, 0, NULL, &cfm);
-            } else if (func <= 2) { // write 2.4g/5g pwr ofst
-                if (argc > 3) {
-                    u8_l chgrp = (u8_l)command_strtoul(argv[2], NULL, 16);
-                    s8_l pwrofst = (u8_l)command_strtoul(argv[3], NULL, 10);
-                    u8_l buf[3] = {func, chgrp, (u8_l)pwrofst};
-                    AICWFDBG(LOGINFO, "set efuse pwrofstfine:[%x][%x]=%d\r\n", func, chgrp, pwrofst);
-                    rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_PWROFSTFINE, sizeof(buf), buf, &cfm);
-                } else {
-                    AICWFDBG(LOGERROR, "wrong args\n");
-                    bytes_written = -EINVAL;
-                    break;
-                }
-            } else {
-                AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-                bytes_written = -EINVAL;
-                break;
-            }
-            if ((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DC) ||
-                (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800DW)) { // 6 = 3 (2.4g) * 2
-                memcpy(command, &cfm.rftest_result[0], 6);
-                bytes_written = 6;
-            } else { // 7 = 3(2.4g) + 4(5g)
-                memcpy(command, &cfm.rftest_result[0], 7);
-                bytes_written = 7;
-            }
-		} else if (strcasecmp(argv[0], "SET_PAPR") == 0) {
-			AICWFDBG(LOGINFO, "set papr\n");
-			if (argc > 1) {
-				u8_l func = (u8_l) command_strtoul(argv[1], NULL, 10);
-				AICWFDBG(LOGINFO, "papr %d\r\n", func);
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_PAPR, sizeof(func), &func, NULL);
-	#endif
-			} else {
-				AICWFDBG(LOGERROR, "wrong args\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-		} else if (strcasecmp(argv[0], "SET_NOTCH") == 0) {
-			if (argc > 1) {
-				u8_l func = (u8_l) command_strtoul(argv[1], NULL, 10);
-				AICWFDBG(LOGINFO, "set notch %d\r\n", func);
-	#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_NOTCH, sizeof(func), &func, NULL);
-	#endif
-			} else {
-				AICWFDBG(LOGERROR, "wrong args\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-		} else if (strcasecmp(argv[0], "SET_SRRC") == 0) {
-			if (argc > 1) {
-				u8_l func = (u8_l) command_strtoul(argv[1], NULL, 10);
-				AICWFDBG(LOGINFO, "set srrc %d\r\n", func);
-				#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_SRRC, sizeof(func), &func, NULL);
-				#endif
-			} else {
-				AICWFDBG(LOGERROR, "wrong args\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-		} else if (strcasecmp(argv[0], "SET_FSS") == 0) {
-			if (argc > 1) {
-				u8_l func = (u8_l) command_strtoul(argv[1], NULL, 10);
-				AICWFDBG(LOGINFO, "set fss: %d\r\n", func);
-				#ifdef AICWF_SDIO_SUPPORT
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_FSS, sizeof(func), &func, NULL);
-				#endif
-			} else {
-				AICWFDBG(LOGERROR, "wrong args\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-		} else if (strcasecmp(argv[0], "RDWR_EFUSE_HE_OFF") == 0) {
-			if (argc > 1) {
-				u8_l func = command_strtoul(argv[1], NULL, 10);
-				AICWFDBG(LOGINFO, "set he off: %d\n", func);
-				rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_HE_OFF, sizeof(func), (u8_l *)&func, &cfm);
-				AICWFDBG(LOGINFO, "he_off cfm: %d\n", cfm.rftest_result[0]);
-				memcpy(command, &cfm.rftest_result[0], 4);
-				bytes_written = 4;
-			} else {
-				AICWFDBG(LOGERROR, "wrong args\n");
-				bytes_written = -EINVAL;
-				break;
-			}
-		} else if (strcasecmp(argv[0], "SET_COB_CAL") == 0) {
-				   AICWFDBG(LOGINFO, "set_cob_cal\n");
-				   if (argc < 3) {
-					   AICWFDBG(LOGERROR, "wrong param\n");
-					   bytes_written = -EINVAL;
-					   break;
-				   }
-				   setcob_cal.dutid = command_strtoul(argv[1], NULL, 10);
-				   setcob_cal.chip_num = command_strtoul(argv[2], NULL, 10);
-				   setcob_cal.dis_xtal = command_strtoul(argv[3], NULL, 10);
-				   rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_COB_CAL, sizeof(cmd_rf_setcobcal_t), (u8_l *)&setcob_cal, NULL);
-		} else if (strcasecmp(argv[0], "GET_COB_CAL_RES")==0) {
-			AICWFDBG(LOGINFO, "get cob cal res\n");
-			rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_COB_CAL_RES, 0, NULL, &cfm);
-			memcpy(command, &cfm.rftest_result[0], 4);
-			bytes_written = 4;
-			AICWFDBG(LOGINFO, "cap=0x%x, cap_fine=0x%x\n", cfm.rftest_result[0] & 0x0000ffff, (cfm.rftest_result[0] >> 16) & 0x0000ffff);
-		} else if (strcasecmp(argv[0], "DO_COB_TEST") == 0) {
-             AICWFDBG(LOGINFO, "do_cob_test\n");
-             setcob_cal.dutid = 1;
-             setcob_cal.chip_num = 1;
-             setcob_cal.dis_xtal = 0;
-             if (argc > 1 ) {
-                 setcob_cal.dis_xtal = command_strtoul(argv[1], NULL, 10);
-             }
-             rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, SET_COB_CAL, sizeof(cmd_rf_setcobcal_t), (u8_l *)&setcob_cal, NULL);
-             msleep(2000);
-             rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, GET_COB_CAL_RES, 0, NULL, &cfm);
-             state = (cfm.rftest_result[0] >> 16) & 0x000000ff;
-             if (!state){
-                 AICWFDBG(LOGINFO, "cap= 0x%x, cap_fine= 0x%x, freq_ofst= %d Hz\n",
-                 cfm.rftest_result[0] & 0x000000ff, (cfm.rftest_result[0] >> 8) & 0x000000ff, cfm.rftest_result[1]);
-                 cob_result_ptr = (cob_result_ptr_t *) & (cfm.rftest_result[2]);
-                 AICWFDBG(LOGINFO, "golden_rcv_dut= %d , tx_rssi= %d dBm, snr = %d dB\ndut_rcv_godlden= %d , rx_rssi= %d dBm",
-                 cob_result_ptr->golden_rcv_dut_num, cob_result_ptr->rssi_static, cob_result_ptr->snr_static,
-                 cob_result_ptr->dut_rcv_golden_num, cob_result_ptr->dut_rssi_static);
-                 memcpy(command, &cfm.rftest_result, 16);
-                 bytes_written = 16;
-             } else {
-                 AICWFDBG(LOGERROR, "cob not idle\n");
-                 bytes_written = -EINVAL;
-                 break;
-             }
-        } else if (strcasecmp(argv[0], "RDWR_EFUSE_SDIOCFG") == 0) {
-            u8_l func = 0;
-            AICWFDBG(LOGINFO, "read/write sdiocfg_bit into efuse\n");
-            if (argc > 1) {
-                func = (u8_l)command_strtoul(argv[1], NULL, 16);
-            }
-            if (func == 0) { // read cur
-                rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_SDIOCFG, 0, NULL, &cfm);
-            } else if (func == 1) { // write sdiocfg
-                if (argc > 2) {
-                u8_l ibit = (u8_l)command_strtoul(argv[2], NULL, 16);
-                u8_l buf[2] = {func, ibit};
-                AICWFDBG(LOGINFO, "set efuse sdiocfg:[%x]=%x\r\n", func, ibit);
-                rwnx_send_rftest_req(g_rwnx_plat->sdiodev->rwnx_hw, RDWR_EFUSE_SDIOCFG, sizeof(buf), buf, &cfm);
-                } else {
-                    AICWFDBG(LOGERROR, "wrong args\n");
-                    bytes_written = -EINVAL;
-                    break;
-                }
-            } else {
-                AICWFDBG(LOGERROR, "wrong func: %x\n", func);
-                bytes_written = -EINVAL;
-                break;
-            }
-            memcpy(command, &cfm.rftest_result[0], 4);
-            bytes_written = 4;
-		} else if (strcasecmp(argv[0], "SETSUSPENDMODE") == 0 && testmode == 0) {
-	#ifdef AICWF_SDIO_SUPPORT
-			#ifdef CONFIG_GPIO_WAKEUP
-			setsusp_mode = command_strtoul(argv[1], NULL, 10);
-			rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, setsusp_mode);
-			if (setsusp_mode == 1) {
-				#if defined(CONFIG_SDIO_PWRCTRL)
-				aicwf_sdio_pwr_stctl(g_rwnx_plat->sdiodev, SDIO_SLEEP_ST);
-				#endif
-
-				ret = aicwf_sdio_writeb(g_rwnx_plat->sdiodev, SDIOWIFI_WAKEUP_REG, 2);
-				if (ret < 0) {
-					sdio_err("reg:%d write failed!\n", SDIOWIFI_WAKEUP_REG);
-				}
-			}
-			AICWFDBG(LOGINFO, "set suspend mode %d\n", setsusp_mode);
-			#endif//CONFIG_GPIO_WAKEUP
-	#endif
-		} else {
-			AICWFDBG(LOGERROR, "wrong cmd:%s in %s\n", cmd, __func__);
-			bytes_written = -EINVAL;
-		}
-#endif
-	} while (0);
-	kfree(cmd);
-	kfree(para);
-	return bytes_written;
-}
-
-//Android private command
-
-#define RWNX_COUNTRY_CODE_LEN 2
-#define CMD_SET_COUNTRY "COUNTRY"
-#define CMD_SET_VENDOR_EX_IE "SET_VENDOR_EX_IE"
-#define CMD_SET_AP_WPS_P2P_IE "SET_AP_WPS_P2P_IE"
-
-struct ieee80211_regdomain *getRegdomainFromRwnxDB(struct wiphy *wiphy, char *alpha2);
-struct ieee80211_regdomain *getRegdomainFromRwnxDBIndex(struct wiphy *wiphy, int index);
-extern int reg_regdb_size;
-
-#ifdef CONFIG_SET_VENDOR_EXTENSION_IE
-extern u8_l vendor_extension_data[256];
-extern int vendor_extension_len;
-
-void set_vendor_extension_ie(char *command){
-
-	char databyte[3]={0x00, 0x00, 0x00};
-	int skip = strlen(CMD_SET_VENDOR_EX_IE) + 1;
-	int command_index = skip;
-	int data_index = 0;
-
-	memset(vendor_extension_data, 0, 256);
-	vendor_extension_len = 0;
-	memcpy(databyte, command + command_index, 2);
-	vendor_extension_len = command_strtoul(databyte, NULL, 16);
-	printk("%s len:%d \r\n", __func__, vendor_extension_len);
-
-	//parser command and save data in vendor_extension_data
-	for(data_index = 0;data_index < vendor_extension_len; data_index++){
-		command_index = command_index + 3;
-		memcpy(databyte, command + command_index, 2);
-		vendor_extension_data[data_index] = command_strtoul(databyte, NULL, 16);
-	}
-
-}
-#endif//CONFIG_SET_VENDOR_EXTENSION_IE
-
-
-int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
-{
-#define PRIVATE_COMMAND_MAX_LEN 8192
-#define PRIVATE_COMMAND_DEF_LEN 4096
-
-	struct rwnx_vif *vif = netdev_priv(net);
-	int ret = 0;
-	char *command = NULL;
-	int bytes_written = 0;
-	android_wifi_priv_cmd priv_cmd;
-	int buf_size = 0;
-	int skip = 0;
-	char *country = NULL;
-	struct ieee80211_regdomain *regdomain;
-
-	RWNX_DBG(RWNX_FN_ENTRY_STR);
-
-	///todo: add our lock
-	//net_os_wake_lock(net);
-
-
-/*	if (!capable(CAP_NET_ADMIN)) {
-		ret = -EPERM;
-		goto exit;
-	}*/
-	if (!ifr->ifr_data) {
-		ret = -EINVAL;
-		goto exit;
-	}
-
-#ifdef CONFIG_COMPAT
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
-	if (in_compat_syscall())
-#else
-	if (is_compat_task())
-#endif
-	{
-		compat_android_wifi_priv_cmd compat_priv_cmd;
-		if (copy_from_user(&compat_priv_cmd, ifr->ifr_data, sizeof(compat_android_wifi_priv_cmd))) {
-		ret = -EFAULT;
-			goto exit;
-		}
-		priv_cmd.buf = compat_ptr(compat_priv_cmd.buf);
-		priv_cmd.used_len = compat_priv_cmd.used_len;
-		priv_cmd.total_len = compat_priv_cmd.total_len;
-	} else
-#endif /* CONFIG_COMPAT */
-	{
-		if (copy_from_user(&priv_cmd, ifr->ifr_data, sizeof(android_wifi_priv_cmd))) {
-		ret = -EFAULT;
-			goto exit;
-		}
-	}
-	if ((priv_cmd.total_len > PRIVATE_COMMAND_MAX_LEN) || (priv_cmd.total_len < 0)) {
-		printk("%s: buf length invalid:%d\n", __FUNCTION__, priv_cmd.total_len);
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	buf_size = max(priv_cmd.total_len, PRIVATE_COMMAND_DEF_LEN);
-	command = kmalloc((buf_size + 1), GFP_KERNEL);
-
-	if (!command) {
-		printk("%s: failed to allocate memory\n", __FUNCTION__);
-		ret = -ENOMEM;
-		goto exit;
-	}
-	if (copy_from_user(command, priv_cmd.buf, priv_cmd.total_len)) {
-		ret = -EFAULT;
-		goto exit;
-	}
-	command[priv_cmd.total_len] = '\0';
-
-	/* outputs */
-	AICWFDBG(LOGINFO, "%s: Android private cmd \"%s\" on %s\n", __FUNCTION__, command, ifr->ifr_name);
-	AICWFDBG(LOGINFO, "cmd = %d\n", cmd);
-	AICWFDBG(LOGINFO, "buf_size=%d\n", buf_size);
-
-#if 1//Handle Android command
-		if(!strncasecmp(command, CMD_SET_COUNTRY, strlen(CMD_SET_COUNTRY))) {
-			skip = strlen(CMD_SET_COUNTRY) + 1;
-			country = command + skip;
-			if (!country || strlen(country) < RWNX_COUNTRY_CODE_LEN) {
-				printk("%s: invalid country code\n", __func__);
-				ret = -EINVAL;
-				goto exit;
-			}
-#if 0
-			for(index = 0; index < reg_regdb_size; index++){
-				regdomain = getRegdomainFromRwnxDBIndex(vif->rwnx_hw->wiphy, index);
-				if((ret = regulatory_set_wiphy_regd(vif->rwnx_hw->wiphy, regdomain))){
-					printk("regulatory_set_wiphy_regd fail \r\n");
-				}else{
-					printk("regulatory_set_wiphy_regd ok \r\n");
-				}
-			}
-#endif
-			AICWFDBG(LOGINFO, "%s country code:%c%c\n", __func__, toupper(country[0]), toupper(country[1]));
-			regdomain = getRegdomainFromRwnxDB(vif->rwnx_hw->wiphy, country);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
-			if((ret = regulatory_set_wiphy_regd(vif->rwnx_hw->wiphy, regdomain))){
-				printk("regulatory_set_wiphy_regd fail \r\n");
-			}
-#else
-			wiphy_apply_custom_regulatory(vif->rwnx_hw->wiphy, regdomain);
-#endif
-		}
-#ifdef CONFIG_SET_VENDOR_EXTENSION_IE
-		else if(!strncasecmp(command, CMD_SET_VENDOR_EX_IE, strlen(CMD_SET_VENDOR_EX_IE))){
-			set_vendor_extension_ie(command);
-		}
-#endif//CONFIG_SET_VENDOR_EXTENSION_IE
-		else if(!strncasecmp(command, CMD_SET_AP_WPS_P2P_IE, strlen(CMD_SET_AP_WPS_P2P_IE))){
-			ret = 0;
-			goto exit;
-		}
-#endif//Handle Android command
-
-	bytes_written = handle_private_cmd(net, command, priv_cmd.total_len);
-	if (bytes_written >= 0) {
-		if ((bytes_written == 0) && (priv_cmd.total_len > 0)) {
-			command[0] = '\0';
-		}
-		if (bytes_written >= priv_cmd.total_len) {
-			printk("%s: err. bytes_written:%d >= buf_size:%d \n",
-				__FUNCTION__, bytes_written, buf_size);
-			goto exit;
-		}
-		bytes_written++;
-		priv_cmd.used_len = bytes_written;
-		if (copy_to_user(priv_cmd.buf, command, bytes_written)) {
-			printk("%s: failed to copy data to user buffer\n", __FUNCTION__);
-			ret = -EFAULT;
-		}
-	} else {
-		/* Propagate the error */
-		ret = bytes_written;
-	}
-
-exit:
-	///todo: add our unlock
-	//net_os_wake_unlock(net);
-	kfree(command);
-	return ret;
-}
-
-#ifdef CONFIG_MCU_MESSAGE
-#define CMD_GET_VERSION_STR "GET_VERSION"
-#define CMD_GET_SSID_STR    "GET_SSID"
-#define CMD_SET_SSID_STR    "SET_SSID"
-#define CMD_GET_PASS_STR    "GET_PASS"
-#define CMD_SET_PASS_STR    "SET_PASS"
-#define CMD_GET_VAR_STR     "GET_VAR"
-#define CMD_SET_VAR_STR     "SET_VAR"
-
-enum custmsg_cmd_tag
-{
-    CUST_CMD_GET_VERSION = 0,
-    CUST_CMD_GET_SSID,
-    CUST_CMD_SET_SSID,
-    CUST_CMD_GET_PASS,
-    CUST_CMD_SET_PASS,
-    CUST_CMD_GET_VAR,
-    CUST_CMD_SET_VAR,
-    CUST_CMD_MAX
-};
-
-int handle_custom_msg(char *command, u32 cmd_len)
-{
-    int bytes_read = 0, max_bytes_to_read = 0;
-    struct rwnx_hw *p_rwnx_hw = NULL;
-    u32 cmd, len = 0, flags = 0;
-    char *buf = NULL;
-    struct dbg_custom_msg_cfm *cust_msg_cfm;
-    printk("cmd,%s,%ld\n",command,strlen(command));
-    if (strncasecmp(command, CMD_GET_VERSION_STR, strlen(CMD_GET_VERSION_STR)) == 0) {
-        cmd = CUST_CMD_GET_VERSION;
-        max_bytes_to_read = 32; // max str len for version
-    } else if (strncasecmp(command, CMD_GET_SSID_STR, strlen(CMD_GET_SSID_STR)) == 0) {
-        cmd = CUST_CMD_GET_SSID;
-        max_bytes_to_read = 48; // max str len for ssid
-    } else if (strncasecmp(command, CMD_SET_SSID_STR, strlen(CMD_SET_SSID_STR)) == 0) {
-        cmd = CUST_CMD_SET_SSID;
-        len = cmd_len - (strlen(CMD_SET_SSID_STR) + 1);
-        buf = command + (strlen(CMD_SET_SSID_STR) + 1);
-        max_bytes_to_read = 0;
-    } else if (strncasecmp(command, CMD_GET_PASS_STR, strlen(CMD_GET_PASS_STR)) == 0) {
-        cmd = CUST_CMD_GET_PASS;
-        max_bytes_to_read = 64; // max str len for PASS
-    } else if (strncasecmp(command, CMD_SET_PASS_STR, strlen(CMD_SET_PASS_STR)) == 0) {
-        cmd = CUST_CMD_SET_PASS;
-        len = cmd_len - (strlen(CMD_SET_PASS_STR) + 1);
-        buf = command + (strlen(CMD_SET_PASS_STR) + 1);
-        max_bytes_to_read = 0;
-    } else if (strncasecmp(command, CMD_GET_VAR_STR, strlen(CMD_GET_VAR_STR)) == 0) {
-        cmd = CUST_CMD_GET_VAR;
-        max_bytes_to_read = 64; // max str len for VAR
-    } else if (strncasecmp(command, CMD_SET_VAR_STR, strlen(CMD_SET_VAR_STR)) == 0) {
-        cmd = CUST_CMD_SET_VAR;
-        len = cmd_len - (strlen(CMD_SET_VAR_STR) + 1);
-        buf = command + (strlen(CMD_SET_VAR_STR) + 1);
-        max_bytes_to_read = 0;
-    } else {
-        printk("invalid cmd: %s\r\n", command);
-        return -1;
-    }
-    if (len < 0) {
-        printk("invalid len: %d\r\n", len);
-        return -3;
-    }
-    #ifdef AICWF_SDIO_SUPPORT
-    p_rwnx_hw = g_rwnx_plat->sdiodev->rwnx_hw;
-    #endif
-    #ifdef AICWF_USB_SUPPORT
-    p_rwnx_hw = g_rwnx_plat->usbdev->rwnx_hw;
-    #endif
-    cust_msg_cfm = (struct dbg_custom_msg_cfm *)kmalloc((offsetof(struct dbg_custom_msg_cfm, buf) + max_bytes_to_read), GFP_KERNEL);
-    if (cust_msg_cfm == NULL) {
-        printk("msg cfm alloc fail\r\n");
-        return -2;
-    }
-    rwnx_send_dbg_custom_msg_req(p_rwnx_hw, cmd, buf, len, flags, cust_msg_cfm);
-    bytes_read = cust_msg_cfm->len;
-    printk("Custom msg cfm: cmd=%d, len=%d, status=%x\n", cust_msg_cfm->cmd, bytes_read, cust_msg_cfm->status);
-    if (bytes_read) {
-        memcpy(command, cust_msg_cfm->buf, bytes_read);
-        command[bytes_read] = '\0';
-    } else {
-        command[0] = '\0';
-    }
-    if (cust_msg_cfm->status) {
-        printk("cfm status: %x", cust_msg_cfm->status);
-    }
-    return bytes_read;
-}
-
-int devipc_cust_msg(struct net_device *net, struct ifreq *ifr, int cmd)
-{
-#ifdef PRIVATE_COMMAND_MAX_LEN
-#undef PRIVATE_COMMAND_MAX_LEN
-#undef PRIVATE_COMMAND_DEF_LEN
-#define PRIVATE_COMMAND_MAX_LEN 8192
-#define PRIVATE_COMMAND_DEF_LEN 4096
-#endif
-    int ret = 0;
-    char *command = NULL;
-    int bytes_written = 0;
-    android_wifi_priv_cmd priv_cmd;
-    int buf_size = 0;
-
-    RWNX_DBG(RWNX_FN_ENTRY_STR);
-
-    ///todo: add our lock
-    //net_os_wake_lock(net);
-
-
-/*    if (!capable(CAP_NET_ADMIN)) {
-        ret = -EPERM;
-        goto exit;
-    }*/
-    if (!ifr->ifr_data) {
-        ret = -EINVAL;
-        goto exit;
-    }
-
-#ifdef CONFIG_COMPAT
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 6, 0))
-    if (in_compat_syscall())
-#else
-    if (is_compat_task())
-#endif
-    {
-        compat_android_wifi_priv_cmd compat_priv_cmd;
-        if (copy_from_user(&compat_priv_cmd, ifr->ifr_data, sizeof(compat_android_wifi_priv_cmd))) {
-	    ret = -EFAULT;
-            goto exit;
-        }
-        priv_cmd.buf = compat_ptr(compat_priv_cmd.buf);
-        priv_cmd.used_len = compat_priv_cmd.used_len;
-        priv_cmd.total_len = compat_priv_cmd.total_len;
-    } else
-#endif /* CONFIG_COMPAT */
-    {
-        if (copy_from_user(&priv_cmd, ifr->ifr_data, sizeof(android_wifi_priv_cmd))) {
-	    ret = -EFAULT;
-            goto exit;
-        }
-    }
-    if ((priv_cmd.total_len > PRIVATE_COMMAND_MAX_LEN) || (priv_cmd.total_len < 0)) {
-        printk("%s: buf length invalid:%d\n", __FUNCTION__, priv_cmd.total_len);
-        ret = -EINVAL;
-        goto exit;
-    }
-
-    buf_size = max(priv_cmd.total_len, PRIVATE_COMMAND_DEF_LEN);
-    command = kmalloc((buf_size + 1), GFP_KERNEL);
-
-    if (!command)
-    {
-        printk("%s: failed to allocate memory\n", __FUNCTION__);
-        ret = -ENOMEM;
-        goto exit;
-    }
-    if (copy_from_user(command, priv_cmd.buf, priv_cmd.used_len)) {
-        ret = -EFAULT;
-        goto exit;
-    }
-    command[priv_cmd.used_len] = '\0';
-
-    /* outputs */
-    printk("%s: Devipc custom msg \"%s\" on %s\n", __FUNCTION__, command, ifr->ifr_name);
-    printk("cmd = %x\n", cmd);
-    printk("buf_size=%d\n", buf_size);
-
-
-    bytes_written = handle_custom_msg(command, priv_cmd.used_len);
-    if (bytes_written >= 0) {
-        if ((bytes_written == 0) && (priv_cmd.total_len > 0)) {
-            command[0] = '\0';
-        }
-        if (bytes_written >= priv_cmd.total_len) {
-            printk("%s: err. bytes_written:%d >= buf_size:%d \n",
-                __FUNCTION__, bytes_written, buf_size);
-            goto exit;
-        }
-        bytes_written++;
-        priv_cmd.used_len = bytes_written;
-        if (copy_to_user(priv_cmd.buf, command, bytes_written)) {
-            printk("%s: failed to copy data to user buffer\n", __FUNCTION__);
-            ret = -EFAULT;
-        }
-    }
-    else {
-        /* Propagate the error */
-        ret = bytes_written;
-    }
-
-exit:
-    ///todo: add our unlock
-    //net_os_wake_unlock(net);
-    kfree(command);
-    return ret;
-}
-#endif
-
 
 #define IOCTL_HOSTAPD   (SIOCIWFIRSTPRIV+28)
 #define IOCTL_WPAS      (SIOCIWFIRSTPRIV+30)
@@ -2867,6 +1440,15 @@ static const struct net_device_ops rwnx_netdev_ops = {
 static const struct net_device_ops rwnx_netdev_monitor_ops = {
 	.ndo_open               = rwnx_open,
 	.ndo_stop               = rwnx_close,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+    .ndo_siocdevprivate     = rwnx_do_ioctl,
+#else
+    .ndo_do_ioctl           = rwnx_do_ioctl,
+#endif
+#ifdef CONFIG_RWNX_MON_XMIT
+    .ndo_start_xmit         = rwnx_start_monitor_if_xmit,
+    .ndo_select_queue       = rwnx_select_queue,
+#endif
 	.ndo_get_stats          = rwnx_get_stats,
 	.ndo_set_mac_address    = rwnx_set_mac_address,
 };
@@ -3063,7 +1645,7 @@ static struct rwnx_vif *rwnx_interface_add(struct rwnx_hw *rwnx_hw,
 	} else
 		vif->use_4addr = false;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
         if (cfg80211_register_netdevice(ndev))
 #else
         if (register_netdevice(ndev))
@@ -3336,7 +1918,7 @@ static int rwnx_cfg80211_del_iface(struct wiphy *wiphy, struct wireless_dev *wde
 
 	if (dev->reg_state == NETREG_REGISTERED) {
         /* Will call rwnx_close if interface is UP */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
         cfg80211_unregister_netdevice(dev);
 #else
         unregister_netdevice(dev);
@@ -3487,6 +2069,18 @@ static int rwnx_cfg80211_change_iface(struct wiphy *wiphy,
 	    vif->rwnx_hw->vif_table[add_if_cfm.inst_nbr] = vif;
 	    spin_unlock_bh(&vif->rwnx_hw->cb_lock);
 	}
+    
+    if (type == NL80211_IFTYPE_MONITOR) {
+        vif->rwnx_hw->monitor_vif = vif->vif_index;
+    #if defined(CONFIG_RWNX_MON_XMIT)
+        rwnx_txq_unk_vif_init(vif);
+    #endif
+    #if defined(CONFIG_RWNX_MON_RXFILTER)
+        rwnx_send_set_filter(vif->rwnx_hw, (FIF_BCN_PRBRESP_PROMISC | FIF_OTHER_BSS | FIF_PSPOLL | FIF_PROBE_REQ));
+    #endif
+    } else {
+        vif->rwnx_hw->monitor_vif = RWNX_INVALID_VIF;
+    }
 
 	return 0;
 }
@@ -3792,6 +2386,7 @@ static int rwnx_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
 static int rwnx_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 								 struct cfg80211_connect_params *sme)
 {
+
 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 	struct rwnx_vif *rwnx_vif = netdev_priv(dev);
 	struct sm_connect_cfm sm_connect_cfm;
@@ -3802,13 +2397,8 @@ static int rwnx_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 			(sme->crypto.ciphers_pairwise[0] == WLAN_CIPHER_SUITE_WEP104));
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
+    
 #if 1
-#if 0
-		if((int)atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_CONNECTED){
-			AICWFDBG(LOGERROR, "%s driver was connected return it \r\n", __func__);
-			return -EALREADY;
-		}
-#endif
 	if((int)atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_CONNECTED) {
 		AICWFDBG(LOGDEBUG, "%s this connection is roam \r\n", __func__);
 		rwnx_vif->sta.is_roam = true;
@@ -3819,38 +2409,42 @@ static int rwnx_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 	if((int)atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_DISCONNECTING||
 		(int)atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_CONNECTING) {
 		AICWFDBG(LOGERROR, "%s driver is disconnecting or connecting ,return it \r\n", __func__);
-		return -EALREADY;
+		return 0;
 	}
 #endif
 
-		atomic_set(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_CONNECTING);
-
-        if (is_wep) {
-                if(sme->auth_type == NL80211_AUTHTYPE_AUTOMATIC) {
-                        if(rwnx_vif->wep_enabled && rwnx_vif->wep_auth_err) {
-                                if(rwnx_vif->last_auth_type == NL80211_AUTHTYPE_SHARED_KEY)
-                                        sme->auth_type = NL80211_AUTHTYPE_OPEN_SYSTEM;
-                                else
-                                        sme->auth_type = NL80211_AUTHTYPE_SHARED_KEY;
-                        } else {
-                                if((rwnx_vif->wep_enabled && !rwnx_vif->wep_auth_err))
-                                        sme->auth_type = rwnx_vif->last_auth_type;
-                                else
-                                sme->auth_type = NL80211_AUTHTYPE_SHARED_KEY;
-                }
-                printk("auto: use sme->auth_type = %d\r\n", sme->auth_type);
-                } else {
-                        if (rwnx_vif->wep_enabled && rwnx_vif->wep_auth_err && (sme->auth_type == rwnx_vif->last_auth_type)) {
-                                if(sme->auth_type == NL80211_AUTHTYPE_SHARED_KEY) {
-                                        sme->auth_type = NL80211_AUTHTYPE_OPEN_SYSTEM;
-                                        printk("start connect, auth_type changed, shared --> open\n");
-                                } else if(sme->auth_type == NL80211_AUTHTYPE_OPEN_SYSTEM) {
-                                        sme->auth_type = NL80211_AUTHTYPE_SHARED_KEY;
-                                        printk("start connect, auth_type changed, open --> shared\n");
-                                }
-                        }
-                }
-        }
+    if(rwnx_vif->sta.is_roam){
+        rwnx_set_conn_state(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_ROAMING);
+    }else{
+		rwnx_set_conn_state(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_CONNECTING);
+    }
+    
+    if (is_wep) {
+            if(sme->auth_type == NL80211_AUTHTYPE_AUTOMATIC) {
+                    if(rwnx_vif->wep_enabled && rwnx_vif->wep_auth_err) {
+                            if(rwnx_vif->last_auth_type == NL80211_AUTHTYPE_SHARED_KEY)
+                                    sme->auth_type = NL80211_AUTHTYPE_OPEN_SYSTEM;
+                            else
+                                    sme->auth_type = NL80211_AUTHTYPE_SHARED_KEY;
+                    } else {
+                            if((rwnx_vif->wep_enabled && !rwnx_vif->wep_auth_err))
+                                    sme->auth_type = rwnx_vif->last_auth_type;
+                            else
+                            sme->auth_type = NL80211_AUTHTYPE_SHARED_KEY;
+            }
+            printk("auto: use sme->auth_type = %d\r\n", sme->auth_type);
+            } else {
+                    if (rwnx_vif->wep_enabled && rwnx_vif->wep_auth_err && (sme->auth_type == rwnx_vif->last_auth_type)) {
+                            if(sme->auth_type == NL80211_AUTHTYPE_SHARED_KEY) {
+                                    sme->auth_type = NL80211_AUTHTYPE_OPEN_SYSTEM;
+                                    printk("start connect, auth_type changed, shared --> open\n");
+                            } else if(sme->auth_type == NL80211_AUTHTYPE_OPEN_SYSTEM) {
+                                    sme->auth_type = NL80211_AUTHTYPE_SHARED_KEY;
+                                    printk("start connect, auth_type changed, open --> shared\n");
+                            }
+                    }
+            }
+    }
 
 	/* For SHARED-KEY authentication, must install key first */
 	if (sme->auth_type == NL80211_AUTHTYPE_SHARED_KEY && sme->key) {
@@ -3905,6 +2499,7 @@ static int rwnx_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
 	}
 
 	return error;
+
 }
 
 /**
@@ -3916,25 +2511,17 @@ static int rwnx_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 {
 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 	struct rwnx_vif *rwnx_vif = netdev_priv(dev);
+	int ret = 0;
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
 	AICWFDBG(LOGINFO, "%s drv_vif_index:%d disconnect reason:%d \r\n",
 		__func__, rwnx_vif->drv_vif_index, reason_code);
-
-#if 0
-	while(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_CONNECTING){
-		AICWFDBG(LOGERROR, "%s driver connecting waiting 100ms \r\n", __func__);
-		msleep(100);
-
-	if(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_CONNECTED){
-		atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTING);
-	}
-#endif
-	if(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_CONNECTING){
-		AICWFDBG(LOGINFO, "%s call cfg80211_connect_result reason:%d \r\n",
-			__func__, reason_code);
-		msleep(500);
+    
+	if(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_DISCONNECTED) {
+		AICWFDBG(LOGERROR, "%s this\r\n",__func__);
+        WARN_ON(1);
+		return -EBUSY;
 	}
 
 	if(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_DISCONNECTING) {
@@ -3943,18 +2530,30 @@ static int rwnx_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 		return -EBUSY;
 	}
 
-	if(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_CONNECTED){
-		atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTING);
+	if(atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_CONNECTED||
+        atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_CONNECTING||
+        atomic_read(&rwnx_vif->drv_conn_state) == RWNX_DRV_STATUS_ROAMING) {
+		rwnx_set_conn_state(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTING);
 		key_flag = true;
-		return(rwnx_send_sm_disconnect_req(rwnx_hw, rwnx_vif, reason_code));
-	}else{
+		ret = rwnx_send_sm_disconnect_req(rwnx_hw, rwnx_vif, reason_code);
+#ifdef AICWF_SDIO_SUPPORT
+		if (rwnx_hw->sdiodev->bus_if->state == BUS_DOWN_ST) {
+			AICWFDBG(LOGINFO, "%s bus is down %d\n", __func__, ret);
+			rwnx_set_conn_state(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
+		}
+#endif
+		return ret;
+	} 
+#if 0
+    else {
 		cfg80211_connect_result(dev,  NULL, NULL, 0, NULL, 0,
 			reason_code?reason_code:WLAN_STATUS_UNSPECIFIED_FAILURE, GFP_ATOMIC);
-		atomic_set(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
+		rwnx_set_conn_state(&rwnx_vif->drv_conn_state, RWNX_DRV_STATUS_DISCONNECTED);
 		rwnx_external_auth_disable(rwnx_vif);
 		return 0;
 	}
-
+#endif
+    return 0;
 }
 
 #ifdef CONFIG_SCHED_SCAN
@@ -4236,13 +2835,11 @@ static int rwnx_cfg80211_del_station_compat(struct wiphy *wiphy,
     struct aicwf_rx_priv *rx_priv;
 #endif
 
-    //RWNX_DBG(RWNX_FN_ENTRY_STR);
-    printk("%s: %pM\n", __func__, mac);
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)
     if (params)
         mac = params->mac;
 #endif
+    printk("%s: %pM\n", __func__, mac);
 
 	do {
 		spin_lock_bh(&rwnx_hw->cb_lock);
@@ -4296,7 +2893,6 @@ static int rwnx_cfg80211_del_station_compat(struct wiphy *wiphy,
 				macaddr = cur->mac_addr;
 				printk("deinit:macaddr:%x,%x,%x,%x,%x,%x\r\n", macaddr[0],macaddr[1],macaddr[2], \
 									   macaddr[3],macaddr[4],macaddr[5]);
-				spin_lock_bh(&rx_priv->stas_reord_lock);
 				list_for_each_entry_safe(reord_info, reord_tmp,
 					&rx_priv->stas_reord_list, list) {
 					printk("reord_mac:%x,%x,%x,%x,%x,%x\r\n", reord_info->mac_addr[0],reord_info->mac_addr[1],reord_info->mac_addr[2], \
@@ -4306,7 +2902,6 @@ static int rwnx_cfg80211_del_station_compat(struct wiphy *wiphy,
 						break;
 					}
 				}
-				spin_unlock_bh(&rx_priv->stas_reord_lock);
 			}
 #endif
 
@@ -4412,7 +3007,6 @@ void apm_staloss_work_process(struct work_struct *work)
 			macaddr = cur->mac_addr;
 			printk("deinit:macaddr:%x,%x,%x,%x,%x,%x\r\n", macaddr[0], macaddr[1], macaddr[2], \
 								   macaddr[3], macaddr[4], macaddr[5]);
-			spin_lock_bh(&rx_priv->stas_reord_lock);
 			list_for_each_entry_safe(reord_info, reord_tmp,
 				&rx_priv->stas_reord_list, list) {
 				printk("reord_mac:%x,%x,%x,%x,%x,%x\r\n", reord_info->mac_addr[0], reord_info->mac_addr[1], reord_info->mac_addr[2], \
@@ -4422,7 +3016,6 @@ void apm_staloss_work_process(struct work_struct *work)
 					break;
 				}
 			}
-			spin_unlock_bh(&rx_priv->stas_reord_lock);
 		}
 #endif
 
@@ -4689,6 +3282,7 @@ static int rwnx_cfg80211_start_ap(struct wiphy *wiphy, struct net_device *dev,
 #if (defined CONFIG_HE_FOR_OLD_KERNEL) || (defined CONFIG_VHT_FOR_OLD_KERNEL)
 		rwnx_vif->ap.aic_index = 0;
 #endif
+		rwnx_vif->ap.csa = NULL;
 		sta = &rwnx_hw->sta_table[apm_start_cfm.bcmc_idx];
 		sta->valid = true;
 		sta->aid = 0;
@@ -4796,6 +3390,11 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
 	netif_tx_stop_all_queues(dev);
 	netif_carrier_off(dev);
 
+	/* delete any remaining STA*/
+	while (!list_empty(&rwnx_vif->ap.sta_list)) {
+		rwnx_cfg80211_del_station_compat(wiphy, dev, NULL);
+	}
+
 	if (rwnx_vif->wdev.iftype == NL80211_IFTYPE_P2P_GO)
 		rwnx_hw->is_p2p_connected = 0;
 	rwnx_radar_cancel_cac(&rwnx_hw->radar);
@@ -4803,11 +3402,6 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
 	spin_lock_bh(&rwnx_hw->cb_lock);
 	rwnx_chanctx_unlink(rwnx_vif);
 	spin_unlock_bh(&rwnx_hw->cb_lock);
-
-	/* delete any remaining STA*/
-	while (!list_empty(&rwnx_vif->ap.sta_list)) {
-		rwnx_cfg80211_del_station_compat(wiphy, dev, NULL);
-	}
 
 	/* delete BC/MC STA */
 	sta = &rwnx_hw->sta_table[rwnx_vif->ap.bcmc_index];
@@ -4884,6 +3478,12 @@ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
 
 	return 0;
 }
+
+int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
+                                             struct cfg80211_chan_def *chandef){
+    return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
+}
+
 
 /**
  * @probe_client: probe an associated client, must return a cookie that it
@@ -4977,6 +3577,25 @@ static int rwnx_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *
 	}
 
 	return res;
+}
+
+static int rwnx_cfg80211_get_tx_power(struct wiphy *wiphy,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+ struct wireless_dev *wdev,
+#endif
+	int *mbm)
+{
+    #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+    struct wireless_dev *wdev = NULL;
+    #endif
+    //struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+    //struct rwnx_vif *vif;
+    s8 pwr = 0;
+    int res = 0;
+
+	*mbm = get_txpwr_max(pwr);
+
+    return res;
 }
 
 /**
@@ -5423,6 +4042,8 @@ int rwnx_cfg80211_start_radar_detection(struct wiphy *wiphy,
 	struct rwnx_vif *rwnx_vif = netdev_priv(dev);
 	struct apm_start_cac_cfm cfm;
 
+	RWNX_DBG(RWNX_FN_ENTRY_STR);
+
 	#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
 	rwnx_radar_start_cac(&rwnx_hw->radar, cac_time_ms, rwnx_vif);
 	#endif
@@ -5539,11 +4160,6 @@ int rwnx_cfg80211_channel_switch (struct wiphy *wiphy,
 	if (!buf) {
 		error = -ENOMEM;
 		rwnx_del_csa(vif);
-		goto end;
-	}
-
-	error = rwnx_send_bcn(rwnx_hw, buf, vif->vif_index, bcn_after->len);
-	if (error) {
 		goto end;
 	}
 
@@ -5838,12 +4454,17 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 	sinfo->tx_failed = cfm.txfailed;
 	rate_info = (union rwnx_rate_ctrl_info *)&cfm.rate_info;
 
-	AICWFDBG(LOGDEBUG, "%s ModTx:%d TxIndex:%d ModRx:%d RxHTIndex:%d RxVHTIndex:%d RxHEIndex:%d RSSI:%d \r\n", __func__,
-		rate_info->formatModTx, rate_info->mcsIndexTx, rx_vect1->format_mod,
+	AICWFDBG(LOGDEBUG, "%s ModTx(%d):%d TxIndex:%d ModRx(%d):%d RxHTIndex:%d RxVHTIndex:%d RxHEIndex:%d RSSI:%d \r\n", __func__,
+		rate_info->bwTx,
+		rate_info->formatModTx,
+		rate_info->mcsIndexTx,
+		rx_vect1->ch_bw,
+		rx_vect1->format_mod,
 		rx_vect1->ht.mcs,
 		rx_vect1->vht.mcs,
 		rx_vect1->he.mcs,
 		(s8)cfm.rssi);
+
 
 
 	switch (rate_info->formatModTx) {
@@ -5851,15 +4472,20 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 	case FORMATMOD_NON_HT_DUP_OFDM:
 		sinfo->txrate.flags = 0;
 		sinfo->txrate.legacy = tx_legrates_lut_rate[rate_info->mcsIndexTx];
+		sinfo->txrate.nss = 1;
 		break;
 	case FORMATMOD_HT_MF:
 	case FORMATMOD_HT_GF:
 		sinfo->txrate.flags = RATE_INFO_FLAGS_MCS;
 		sinfo->txrate.mcs = rate_info->mcsIndexTx;
+		sinfo->txrate.nss = ((rate_info->mcsIndexTx >> 3) & 0x7) + 1;
+        if (rate_info->giAndPreTypeTx)
+            sinfo->txrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
 		break;
 	case FORMATMOD_VHT:
 		sinfo->txrate.flags = RATE_INFO_FLAGS_VHT_MCS;
 		sinfo->txrate.mcs = rate_info->mcsIndexTx;
+		sinfo->txrate.nss = ((rate_info->mcsIndexTx >> 4) & 0x7) + 1;
 		break;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 	case FORMATMOD_HE_MU:
@@ -5867,6 +4493,7 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 	case FORMATMOD_HE_ER:
 		sinfo->txrate.flags = RATE_INFO_FLAGS_HE_MCS;
 		sinfo->txrate.mcs = rate_info->mcsIndexTx;
+		sinfo->txrate.nss = ((rate_info->mcsIndexTx >> 4) & 0x7) + 1;
 		break;
 #else
 	case FORMATMOD_HE_MU:
@@ -5878,6 +4505,7 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
         }else{
 		    sinfo->txrate.mcs = rate_info->mcsIndexTx;
         }
+		sinfo->txrate.nss = ((rate_info->mcsIndexTx >> 4) & 0x7) + 1;
 		break;
 #endif
 	default:
@@ -5908,7 +4536,6 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 	}
 #endif
 
-	sinfo->txrate.nss = 1;
 	sinfo->filled |= (BIT(NL80211_STA_INFO_TX_BITRATE) | BIT(NL80211_STA_INFO_TX_FAILED));
 
 	sinfo->inactive_time = jiffies_to_msecs(jiffies - vif->rwnx_hw->stats.last_tx);
@@ -5917,7 +4544,6 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 	sinfo->tx_packets = vif->net_stats.tx_packets;
 	sinfo->rx_packets = vif->net_stats.rx_packets;
 	sinfo->signal = (s8)cfm.rssi;
-	sinfo->rxrate.nss = 1;
 
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
 	switch (rx_vect1->ch_bw) {
@@ -5947,7 +4573,8 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 	case FORMATMOD_NON_HT:
 	case FORMATMOD_NON_HT_DUP_OFDM:
 		sinfo->rxrate.flags = 0;
-		sinfo->rxrate.legacy = legrates_lut_rate[legrates_lut[rx_vect1->leg_rate]];
+		sinfo->rxrate.legacy = legrates_lut[rx_vect1->leg_rate].rate;
+		sinfo->rxrate.nss = 1;
 		break;
 	case FORMATMOD_HT_MF:
 	case FORMATMOD_HT_GF:
@@ -5955,12 +4582,14 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 		if (rx_vect1->ht.short_gi)
 			sinfo->rxrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
 		sinfo->rxrate.mcs = rx_vect1->ht.mcs;
+		sinfo->rxrate.nss = rx_vect1->ht.num_extn_ss + 1;
 		break;
 	case FORMATMOD_VHT:
 		sinfo->rxrate.flags = RATE_INFO_FLAGS_VHT_MCS;
 		if (rx_vect1->vht.short_gi)
 			sinfo->rxrate.flags |= RATE_INFO_FLAGS_SHORT_GI;
 		sinfo->rxrate.mcs = rx_vect1->vht.mcs;
+		sinfo->rxrate.nss = rx_vect1->vht.nss + 1;
 		break;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 	case FORMATMOD_HE_MU:
@@ -5971,6 +4600,7 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
 		sinfo->rxrate.mcs = rx_vect1->he.mcs;
 		sinfo->rxrate.he_gi = rx_vect1->he.gi_type;
 		sinfo->rxrate.he_dcm = rx_vect1->he.dcm;
+		sinfo->rxrate.nss = rx_vect1->he.nss + 1;
 		break;
 #else
 	//kernel not support he
@@ -5983,6 +4613,8 @@ static int rwnx_fill_station_info(struct rwnx_sta *sta, struct rwnx_vif *vif,
         }else{
             sinfo->rxrate.mcs = rx_vect1->he.mcs;
         }
+		sinfo->rxrate.mcs = (rx_vect1->he.mcs > 9 ? 9 : rx_vect1->he.mcs);
+		sinfo->rxrate.nss = rx_vect1->he.nss + 1;
 		break;
 #endif
 	default:
@@ -6548,7 +5180,7 @@ static struct cfg80211_ops rwnx_cfg80211_ops = {
 	.set_wiphy_params = rwnx_cfg80211_set_wiphy_params,
 	.set_txq_params = rwnx_cfg80211_set_txq_params,
 	.set_tx_power = rwnx_cfg80211_set_tx_power,
-//    .get_tx_power = rwnx_cfg80211_get_tx_power,
+    .get_tx_power = rwnx_cfg80211_get_tx_power,
 	.set_power_mgmt = rwnx_cfg80211_set_power_mgmt,
 	.get_station = rwnx_cfg80211_get_station,
 	.remain_on_channel = rwnx_cfg80211_remain_on_channel,
@@ -6610,11 +5242,17 @@ static void rwnx_reg_notifier(struct wiphy *wiphy,
 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 
 	// For now trust all initiator
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	if(request->dfs_region != 0)
+		rwnx_radar_set_domain(&rwnx_hw->radar, request->dfs_region);
+#else
 	rwnx_radar_set_domain(&rwnx_hw->radar, request->dfs_region);
+#endif
 	if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801 ||
 		((rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC||
 		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW ||
-		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80) && testmode == 0)){
+		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) && testmode == 0)){
     		rwnx_send_me_chan_config_req(rwnx_hw);
 		}
 }
@@ -6694,7 +5332,7 @@ int rwnx_ic_system_init(struct rwnx_hw *rwnx_hw){
 	AICWFDBG(LOGINFO, "FDRV chip_id=%x, chip_sub_id=%x!!\n", chip_id, chip_sub_id);
 
 #ifdef CONFIG_OOB
-    if(rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80) {
+    if(rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
         u32 memdata_temp = 0x00000006;
         int ret;
         ret = rwnx_send_dbg_mem_block_write_req(rwnx_hw, 0x40504084, 4, &memdata_temp);
@@ -6747,7 +5385,7 @@ int rwnx_ic_rf_init(struct rwnx_hw *rwnx_hw){
 			return -1;
 
 
-	}else if(rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80){
+	}else if(rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
 		if ((ret = aicwf_set_rf_config_8800d80(rwnx_hw, &cfm)))
 			return -1;
 	}
@@ -6807,7 +5445,27 @@ int rwnx_get_custom_mac_addr(u8_l *mac_addr_efuse){
 }
 #endif
 
+#ifdef CONFIG_FOR_IPCAM
+void aic_ipc_setting(struct rwnx_vif *rwnx_vif){
+    struct rwnx_hw *rwnx_hw = rwnx_vif->rwnx_hw;
+	uint32_t hw_edca = 1;
+	uint32_t hw_cca = 3;
+	int32_t param[14];
+	int32_t cca[5]= {0x10, 0, 0, 0, 0};
+
+	param[0] = 0xFA522; param[1] = 0xFA522; param[2] = 0xFA522; param[3] = 0xFA522;
+	param[4] = rwnx_vif->vif_index;
+	param[5] = 0x1e; param[6] = 0; param[7] = 0; param[8] =0;param[9] = 0x2;param[10] = 0x2;param[11] = 0x7;param[12] = 0;param[13] = 1;
+	rwnx_send_vendor_hwconfig_req(rwnx_hw, hw_edca, param, NULL);
+	rwnx_send_vendor_hwconfig_req(rwnx_hw, hw_cca, cca, NULL);
+}
+#endif
+
 extern void *aicwf_prealloc_txq_alloc(size_t size);
+#ifdef CONFIG_POWER_LIMIT
+extern char default_ccode[];
+extern char country_code[];
+#endif
 int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 {
 	struct rwnx_hw *rwnx_hw;
@@ -6835,6 +5493,9 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	aicbsp_get_feature(&feature, fw_path);
 
 	get_random_bytes(&dflt_mac[4], 2);
+#ifdef CONFIG_POWER_LIMIT
+	memcpy(country_code, default_ccode, 4);
+#endif
 
 	/* create a new wiphy for use with cfg80211 */
     AICWFDBG(LOGINFO, "%s sizeof(struct rwnx_hw):%d \r\n", __func__, (int)sizeof(struct rwnx_hw));
@@ -7109,11 +5770,16 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	rwnx_enable_mesh(rwnx_hw);
 	rwnx_radar_detection_init(&rwnx_hw->radar);
 
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	rwnx_radar_set_domain(&rwnx_hw->radar, NL80211_DFS_FCC);
+#endif
+
 	/* Set parameters to firmware */
 	if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801 ||
 		((rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC||
 		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW ||
-		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80) && testmode == 0)){
+		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		 rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) && testmode == 0)){
 		rwnx_send_me_config_req(rwnx_hw);
 	}
 
@@ -7138,7 +5804,8 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801 ||
 		((rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC ||
 		rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW ||
-		rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80) && testmode == 0)) {
+		rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) && testmode == 0)) {
     	rwnx_send_me_chan_config_req(rwnx_hw);
 	}
 
@@ -7156,6 +5823,12 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	/* Add an initial station interface */
 	vif = rwnx_interface_add(rwnx_hw, "wlan%d", NET_NAME_UNKNOWN,
 								NL80211_IFTYPE_STATION, NULL);
+
+#ifdef CONFIG_RWNX_MON_DATA
+    /* Add an initial station interface */
+    vif = rwnx_interface_add(rwnx_hw, "wlan%d", 1,
+                                    NL80211_IFTYPE_MONITOR, NULL);
+#endif
 
 	rtnl_unlock();
 
@@ -7203,6 +5876,9 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
 	atomic_set(&rwnx_hw->p2p_alive_timer_count, 0);
 #endif
 
+#ifdef CONFIG_FOR_IPCAM
+	aic_ipc_setting(vif);
+#endif
 
 	return 0;
 

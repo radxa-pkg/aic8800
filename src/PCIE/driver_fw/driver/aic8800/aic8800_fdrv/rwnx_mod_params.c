@@ -44,7 +44,7 @@ struct rwnx_mod_params rwnx_mod_params = {
 	COMMON_PARAM(sgi, true, true)
 	COMMON_PARAM(sgi80, true, true)
 	COMMON_PARAM(use_2040, 1, 1)
-	COMMON_PARAM(nss, 1, 1)
+	COMMON_PARAM(nss, 2, 2)
 	COMMON_PARAM(amsdu_rx_max, 0, 0)
 	COMMON_PARAM(bfmee, true, true)
 	COMMON_PARAM(bfmer, false, false)
@@ -724,6 +724,9 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
         return;
     }
 
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+        nss = 1;
+
 	rwnx_hw->vht_cap_2G.vht_supported = true;
 		if (rwnx_hw->mod_params->sgi80)
 			rwnx_hw->vht_cap_2G.cap |= IEEE80211_VHT_CAP_SHORT_GI_80;
@@ -788,7 +791,7 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		for (i = 0; i < nss; i++) {
 			rwnx_hw->vht_cap_2G.vht_mcs.rx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 			rwnx_hw->vht_cap_2G.vht_mcs.rx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-			mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
+			//mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
 			printk("lemon map=%x\n", rwnx_hw->vht_cap_2G.vht_mcs.rx_mcs_map);
 		}
 		for (; i < 8; i++) {
@@ -801,8 +804,8 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		for (i = 0; i < nss; i++) {
 			rwnx_hw->vht_cap_2G.vht_mcs.tx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 			rwnx_hw->vht_cap_2G.vht_mcs.tx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-			mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
-							IEEE80211_VHT_MCS_SUPPORT_0_8);
+			//mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
+			//				IEEE80211_VHT_MCS_SUPPORT_0_8);
 		}
 		for (; i < 8; i++) {
 			rwnx_hw->vht_cap_2G.vht_mcs.tx_mcs_map |= cpu_to_le16(
@@ -884,7 +887,7 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	    for (i = 0; i < nss; i++) {
 	        rwnx_hw->vht_cap_5G.vht_mcs.rx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 	        rwnx_hw->vht_cap_5G.vht_mcs.rx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-	        mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
+	        //mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
 	    }
 	    for (; i < 8; i++) {
 	        rwnx_hw->vht_cap_5G.vht_mcs.rx_mcs_map |= cpu_to_le16(
@@ -896,8 +899,8 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	    for (i = 0; i < nss; i++) {
 	        rwnx_hw->vht_cap_5G.vht_mcs.tx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 	        rwnx_hw->vht_cap_5G.vht_mcs.tx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-	        mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
-	                        IEEE80211_VHT_MCS_SUPPORT_0_8);
+	        //mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
+	        //                IEEE80211_VHT_MCS_SUPPORT_0_8);
 	    }
 	    for (; i < 8; i++) {
 	        rwnx_hw->vht_cap_5G.vht_mcs.tx_mcs_map |= cpu_to_le16(
@@ -910,6 +913,8 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 #endif//CONFIG_VENDOR_RWNX_VHT_NO80
 	        rwnx_hw->vht_cap_5G.cap &= ~IEEE80211_VHT_CAP_SHORT_GI_80;
 	    }
+
+		rwnx_hw->vht_cap_5G.cap |= IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK;
 
 	} 
 #endif//USE_5G
@@ -928,7 +933,9 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	if (!rwnx_hw->mod_params->vht_on) {
 		return;
 	}
-    
+
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+		nss = 1;
 
 	band_2GHz->vht_cap.vht_supported = true;
 	if (rwnx_hw->mod_params->sgi80)
@@ -994,7 +1001,7 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	for (i = 0; i < nss; i++) {
 		band_2GHz->vht_cap.vht_mcs.rx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 		band_2GHz->vht_cap.vht_mcs.rx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-		mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
+		//mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
 	}
 	for (; i < 8; i++) {
 		band_2GHz->vht_cap.vht_mcs.rx_mcs_map |= cpu_to_le16(
@@ -1006,8 +1013,8 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	for (i = 0; i < nss; i++) {
 		band_2GHz->vht_cap.vht_mcs.tx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 		band_2GHz->vht_cap.vht_mcs.tx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-		mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
-						IEEE80211_VHT_MCS_SUPPORT_0_8);
+		//mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
+		//				IEEE80211_VHT_MCS_SUPPORT_0_8);
 	}
 	for (; i < 8; i++) {
 		band_2GHz->vht_cap.vht_mcs.tx_mcs_map |= cpu_to_le16(
@@ -1086,7 +1093,7 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		for (i = 0; i < nss; i++) {
 			band_5GHz->vht_cap.vht_mcs.rx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 			band_5GHz->vht_cap.vht_mcs.rx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-			mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
+			//mcs_map = IEEE80211_VHT_MCS_SUPPORT_0_7;
 		}
 		for (; i < 8; i++) {
 			band_5GHz->vht_cap.vht_mcs.rx_mcs_map |= cpu_to_le16(
@@ -1098,8 +1105,8 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		for (i = 0; i < nss; i++) {
 			band_5GHz->vht_cap.vht_mcs.tx_mcs_map |= cpu_to_le16(mcs_map << (i*2));
 			band_5GHz->vht_cap.vht_mcs.tx_highest = MAX_VHT_RATE(mcs_map, nss, bw_max);
-			mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
-							IEEE80211_VHT_MCS_SUPPORT_0_8);
+			//mcs_map = min_t(int, rwnx_hw->mod_params->mcs_map,
+			//				IEEE80211_VHT_MCS_SUPPORT_0_8);
 		}
 		for (; i < 8; i++) {
 			band_5GHz->vht_cap.vht_mcs.tx_mcs_map |= cpu_to_le16(
@@ -1128,6 +1135,9 @@ static void rwnx_set_ht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 			band_5GHz->ht_cap.ht_supported = false;
 		return;
 	}
+
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+		nss = 1;
 
 	if (rwnx_hw->mod_params->stbc_on)
 		band_2GHz->ht_cap.cap |= 1 << IEEE80211_HT_CAP_RX_STBC_SHIFT;
@@ -1166,6 +1176,12 @@ static void rwnx_set_ht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		band_5GHz->ht_cap = band_2GHz->ht_cap;
 }
 
+#ifdef CONFIG_KLYIN
+#define IEEE80211_HE_PHY_CAP3_RX_HE_MU_PPDU_FROM_NON_AP_STA 0x40
+#define IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMER_FB 0x04
+#define IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMER_FB 0x08
+#endif
+
 #ifdef CONFIG_HE_FOR_OLD_KERNEL
 extern struct ieee80211_sband_iftype_data rwnx_he_capa;
 #endif
@@ -1176,6 +1192,9 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	int i;
 	int nss = rwnx_hw->mod_params->nss;
 	int mcs_map;
+
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+        nss  = 1;
 
 	he_cap = (struct ieee80211_sta_he_cap *) &rwnx_he_capa.he_cap;
 	he_cap->has_he = true;
@@ -1250,7 +1269,7 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		he_cap->he_mcs_nss_supp.rx_mcs_80 |= cpu_to_le16(mcs_map << (i*2));
 		he_cap->he_mcs_nss_supp.rx_mcs_160 |= unsup_for_ss;
 		he_cap->he_mcs_nss_supp.rx_mcs_80p80 |= unsup_for_ss;
-		mcs_map = IEEE80211_HE_MCS_SUPPORT_0_7;
+		//mcs_map = IEEE80211_HE_MCS_SUPPORT_0_7;
 		}
 	for (; i < 8; i++) {
 		__le16 unsup_for_ss = cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << (i*2));
@@ -1264,8 +1283,8 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		he_cap->he_mcs_nss_supp.tx_mcs_80 |= cpu_to_le16(mcs_map << (i*2));
 		he_cap->he_mcs_nss_supp.tx_mcs_160 |= unsup_for_ss;
 		he_cap->he_mcs_nss_supp.tx_mcs_80p80 |= unsup_for_ss;
-		mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map,
-						IEEE80211_HE_MCS_SUPPORT_0_7);
+		//mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map,
+		//				IEEE80211_HE_MCS_SUPPORT_0_7);
 	}
 	for (; i < 8; i++) {
 		__le16 unsup_for_ss = cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << (i*2));
@@ -1284,6 +1303,10 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	int nss = rwnx_hw->mod_params->nss;
 	struct ieee80211_sta_he_cap *he_cap;
 	int mcs_map;
+
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+		nss  = 1;
+
 	if (!rwnx_hw->mod_params->he_on) {
 		band_2GHz->iftype_data = NULL;
 		band_2GHz->n_iftype_data = 0;
@@ -1388,7 +1411,7 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		he_cap->he_mcs_nss_supp.rx_mcs_80 |= cpu_to_le16(mcs_map << (i*2));
 		he_cap->he_mcs_nss_supp.rx_mcs_160 |= unsup_for_ss;
 		he_cap->he_mcs_nss_supp.rx_mcs_80p80 |= unsup_for_ss;
-		mcs_map = IEEE80211_HE_MCS_SUPPORT_0_7;
+		//mcs_map = IEEE80211_HE_MCS_SUPPORT_0_7;
 		}
 	for (; i < 8; i++) {
 		__le16 unsup_for_ss = cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << (i*2));
@@ -1402,8 +1425,8 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		he_cap->he_mcs_nss_supp.tx_mcs_80 |= cpu_to_le16(mcs_map << (i*2));
 		he_cap->he_mcs_nss_supp.tx_mcs_160 |= unsup_for_ss;
 		he_cap->he_mcs_nss_supp.tx_mcs_80p80 |= unsup_for_ss;
-		mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map,
-						IEEE80211_HE_MCS_SUPPORT_0_7);
+		//mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map,
+		//				IEEE80211_HE_MCS_SUPPORT_0_7);
 	}
 	for (; i < 8; i++) {
 		__le16 unsup_for_ss = cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << (i*2));
@@ -1503,7 +1526,7 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 			he_cap->he_mcs_nss_supp.rx_mcs_80 |= cpu_to_le16(mcs_map << (i*2));
 			he_cap->he_mcs_nss_supp.rx_mcs_160 |= unsup_for_ss;
 			he_cap->he_mcs_nss_supp.rx_mcs_80p80 |= unsup_for_ss;
-			mcs_map = IEEE80211_HE_MCS_SUPPORT_0_7;
+			//mcs_map = IEEE80211_HE_MCS_SUPPORT_0_7;
 		}
 		for (; i < 8; i++) {
 			__le16 unsup_for_ss = cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << (i*2));
@@ -1517,8 +1540,8 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 			he_cap->he_mcs_nss_supp.tx_mcs_80 |= cpu_to_le16(mcs_map << (i*2));
 			he_cap->he_mcs_nss_supp.tx_mcs_160 |= unsup_for_ss;
 			he_cap->he_mcs_nss_supp.tx_mcs_80p80 |= unsup_for_ss;
-			mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map,
-							IEEE80211_HE_MCS_SUPPORT_0_7);
+			//mcs_map = min_t(int, rwnx_hw->mod_params->he_mcs_map,
+			//				IEEE80211_HE_MCS_SUPPORT_0_7);
 		}
 		for (; i < 8; i++) {
 			__le16 unsup_for_ss = cpu_to_le16(IEEE80211_HE_MCS_NOT_SUPPORTED << (i*2));

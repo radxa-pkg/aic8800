@@ -55,28 +55,28 @@ void aicwf_pcie_host_init(struct ipc_host_env_tag *env, void *cb,  struct ipc_sh
 
 int aicwf_pcie_platform_init(struct aic_pci_dev *pcidev)
 {
-    struct rwnx_plat *rwnx_plat = NULL;
-    void *drvdata;
-    int ret = -ENODEV;
+	struct rwnx_plat *rwnx_plat = NULL;
+	void *drvdata;
+	int ret = -ENODEV;
 
-    rwnx_plat = kzalloc(sizeof(struct rwnx_plat), GFP_KERNEL);
+	rwnx_plat = kzalloc(sizeof(struct rwnx_plat), GFP_KERNEL);
 
-    if (!rwnx_plat)
-        return -ENOMEM;
+	if (!rwnx_plat)
+		return -ENOMEM;
 
 	rwnx_plat->pcidev = pcidev;
 
-    ret = rwnx_platform_init(rwnx_plat, &drvdata);
+	ret = rwnx_platform_init(rwnx_plat, &drvdata);
 	if(ret) {
 		printk("%s fail\n", __func__);
 	}
-#if 0
-    pci_set_drvdata(pci_dev, drvdata);
+	#if 0
+	pci_set_drvdata(pci_dev, drvdata);
 
-    if (ret)
-        rwnx_plat->deinit(rwnx_plat);
-#endif
-    return ret;
+	if (ret)
+		rwnx_plat->deinit(rwnx_plat);
+	#endif
+	return ret;
 }
 
 
@@ -114,7 +114,7 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
     struct rwnx_ipc_buf *ipc_hostdesc_buf = &sw_txhdr->ipc_hostdesc;
 	uint32_t dma_idx = rwnx_hw->ipc_env->txdmadesc_idx;
 	//int i;
-    unsigned long flags;
+    //unsigned long flags;
 
 	//printk("txdesc_host=%p, dma_idx=%d, pkt_addr=%x\n", txdesc_host, dma_idx, txdesc_host->api.host.packet_addr[0]);
     volatile uint32_t *src;
@@ -191,10 +191,11 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 
     //atomic_inc(&rwnx_hw->txdata_cnt);
 	dma_idx++;
-    if (dma_idx == IPC_TXDMA_DESC_CNT)
+    if (dma_idx == IPC_TXDMA_DESC_CNT) {
         rwnx_hw->ipc_env->txdmadesc_idx = 0;
-    else
+    } else {
         rwnx_hw->ipc_env->txdmadesc_idx = dma_idx;
+    }
 
 	atomic_dec(&rwnx_hw->txdata_cnt_push);
 	//printk("p%d,%d\n",atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push));

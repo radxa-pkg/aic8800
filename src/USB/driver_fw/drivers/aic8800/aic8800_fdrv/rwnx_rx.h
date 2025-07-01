@@ -326,8 +326,12 @@ struct hw_rxhdr {
     u32    pattern;
 };
 
-extern const u8 legrates_lut[];
-extern u16 legrates_lut_rate[];
+struct rwnx_legrate {
+	int idx;
+	int rate;
+};
+
+extern struct rwnx_legrate legrates_lut[];
 extern u16 tx_legrates_lut_rate[];
 
 struct DHCPInfo {
@@ -376,6 +380,8 @@ void reord_timeout_handler (struct timer_list *t);
 #endif
 
 #endif
+void rwnx_rxdata_process_amsdu(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, u8 vif_idx,
+                                        struct sk_buff_head *list);
 
 #ifdef CONFIG_HE_FOR_OLD_KERNEL
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 197)

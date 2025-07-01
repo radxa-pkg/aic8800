@@ -2866,6 +2866,7 @@ const struct ieee80211_regdomain *reg_regdb[] = {
 	&regdom_YT,
 	&regdom_ZA,
 	&regdom_ZW,
+	NULL,
 };
 
 int reg_regdb_size = ARRAY_SIZE(reg_regdb);

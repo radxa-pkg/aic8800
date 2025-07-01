@@ -1,0 +1,43 @@
+#!/bin/bash
+Main_version=`uname -r |awk -F'.' '{print $1}'`
+Minor_version=`uname -r |awk -F'.' '{print $2}'`
+
+cd /AIC8800/fw/aic8800D80
+rm -rf /lib/firmware/aic8800D80
+cp -rf /AIC8800/fw/aic8800D80 /lib/firmware/aic8800D80
+
+cd /AIC8800/drivers/aic8800/aic8800_fdrv
+make
+make install
+#insmod /AIC8800/drivers/aic8800/aic8800_fdrv/aic8800D80_fdrv.ko
+insmod aic8800D80_fdrv.ko
+
+cd /AIC8800/aicrf_test/
+make
+make install
+
+#cd /etc
+#mkdir pm
+#cd /etc/pm
+#mkdir sleep.d
+#cp -f /AIC8800/aicbt_dis.sh /etc/pm/sleep.d
+#chmod 777 /etc/pm/sleep.d/aicbt_dis.sh
+
+
+#cd /AIC8800
+#cp dis_bt.service /etc/systemd/system/
+#systemctl enable dis_bt.service
+#systemctl start dis_bt.service
+
+
+
+#rmmod btusb
+#cd /usr/lib/modules/$(uname -r)/kernel/drivers/bluetooth
+#mv btusb.ko btusb.ko.bak
+#cd /AIC8800/drivers/aic8800/aic_btusb
+#make
+#make install
+#insmod aic_btusb.ko
+
+echo "Install aic8800D80 wifi driver successful!!!!!"
+exit 0

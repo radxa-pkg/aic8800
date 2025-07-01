@@ -165,6 +165,159 @@ typedef struct AIC_sco_card {
 #define DRV_MP_MODE 1
 int mp_drv_mode = 0; /* 1 Mptool Fw; 0 Normal Fw */
 
+#if CONFIG_BLUEDROID
+/* -----  HCI Commands ---- */
+#define HCI_OP_INQUIRY            0x0401
+#define HCI_OP_INQUIRY_CANCEL        0x0402
+#define HCI_OP_EXIT_PERIODIC_INQ    0x0404
+#define HCI_OP_CREATE_CONN        0x0405
+#define HCI_OP_DISCONNECT                0x0406
+#define HCI_OP_ADD_SCO            0x0407
+#define HCI_OP_CREATE_CONN_CANCEL    0x0408
+#define HCI_OP_ACCEPT_CONN_REQ        0x0409
+#define HCI_OP_REJECT_CONN_REQ        0x040a
+#define HCI_OP_LINK_KEY_REPLY        0x040b
+#define HCI_OP_LINK_KEY_NEG_REPLY    0x040c
+#define HCI_OP_PIN_CODE_REPLY        0x040d
+#define HCI_OP_PIN_CODE_NEG_REPLY    0x040e
+#define HCI_OP_CHANGE_CONN_PTYPE    0x040f
+#define HCI_OP_AUTH_REQUESTED        0x0411
+#define HCI_OP_SET_CONN_ENCRYPT        0x0413
+#define HCI_OP_CHANGE_CONN_LINK_KEY    0x0415
+#define HCI_OP_REMOTE_NAME_REQ        0x0419
+#define HCI_OP_REMOTE_NAME_REQ_CANCEL    0x041a
+#define HCI_OP_READ_REMOTE_FEATURES    0x041b
+#define HCI_OP_READ_REMOTE_EXT_FEATURES    0x041c
+#define HCI_OP_READ_REMOTE_VERSION    0x041d
+#define HCI_OP_SETUP_SYNC_CONN        0x0428
+#define HCI_OP_ACCEPT_SYNC_CONN_REQ    0x0429
+#define HCI_OP_REJECT_SYNC_CONN_REQ    0x042a
+#define HCI_OP_SNIFF_MODE        0x0803
+#define HCI_OP_EXIT_SNIFF_MODE        0x0804
+#define HCI_OP_ROLE_DISCOVERY        0x0809
+#define HCI_OP_SWITCH_ROLE        0x080b
+#define HCI_OP_READ_LINK_POLICY        0x080c
+#define HCI_OP_WRITE_LINK_POLICY    0x080d
+#define HCI_OP_READ_DEF_LINK_POLICY    0x080e
+#define HCI_OP_WRITE_DEF_LINK_POLICY    0x080f
+#define HCI_OP_SNIFF_SUBRATE        0x0811
+#define HCI_OP_Write_Link_Policy_Settings 0x080d
+#define HCI_OP_SET_EVENT_MASK        0x0c01
+#define HCI_OP_RESET            0x0c03
+#define HCI_OP_SET_EVENT_FLT        0x0c05
+#endif
+
+#define HCI_OP_Write_Extended_Inquiry_Response        0x0c52
+#define HCI_OP_Write_Simple_Pairing_Mode 0x0c56
+#define HCI_OP_Read_Buffer_Size 0x1005
+#define HCI_OP_Host_Buffer_Size 0x0c33
+#define HCI_OP_Read_Local_Version_Information 0x1001
+#define HCI_OP_Read_BD_ADDR 0x1009
+#define HCI_OP_Read_Local_Supported_Commands 0x1002
+#define HCI_OP_Write_Scan_Enable 0x0c1a
+#define HCI_OP_Write_Current_IAC_LAP 0x0c3a
+#define HCI_OP_Write_Inquiry_Scan_Activity 0x0c1e
+#define HCI_OP_Write_Class_of_Device 0x0c24
+#define HCI_OP_LE_Rand 0x2018
+#define HCI_OP_LE_Set_Random_Address 0x2005
+#define HCI_OP_LE_Set_Extended_Scan_Enable 0x2042
+#define HCI_OP_LE_Set_Extended_Scan_Parameters 0x2041
+#define HCI_OP_Set_Event_Filter 0x0c05
+#define HCI_OP_Write_Voice_Setting 0x0c26
+#define HCI_OP_Change_Local_Name 0x0c13
+#define HCI_OP_Read_Local_Name 0x0c14
+#define HCI_OP_Wirte_Page_Timeout 0x0c18
+#define HCI_OP_LE_Clear_Resolving_List 0x0c29
+#define HCI_OP_LE_Set_Addres_Resolution_Enable_Command 0x0c2e
+#define HCI_OP_Write_Inquiry_mode 0x0c45
+#define HCI_OP_Write_Page_Scan_Type 0x0c47
+#define HCI_OP_Write_Inquiry_Scan_Type 0x0c43
+
+
+
+#define HCI_OP_Delete_Stored_Link_Key 0x0c12
+#define HCI_OP_LE_Read_Local_Resolvable_Address 0x202d
+#define HCI_OP_LE_Extended_Create_Connection 0x2043
+#define HCI_OP_Read_Remote_Version_Information 0x041d
+#define HCI_OP_LE_Start_Encryption 0x2019
+#define HCI_OP_LE_Add_Device_to_Resolving_List 0x2027
+#define HCI_OP_LE_Set_Privacy_Mode 0x204e
+#define HCI_OP_LE_Connection_Update 0x2013
+
+#define HCI_OP_LE_Read_Local_Support_Featrues 0x2003 
+#define HCI_OP_LE_Get_Vendor_Capabilities_Command   0xfd53
+#define HCI_OP_LE_Set_Le_Scan_Enable 0x200C
+#define HCI_OP_LE_Create_Connection 0x200d
+
+
+#if CONFIG_BLUEDROID
+/* -----  HCI events---- */
+#define HCI_OP_DISCONNECT        0x0406
+#define HCI_EV_INQUIRY_COMPLETE        0x01
+#define HCI_EV_INQUIRY_RESULT        0x02
+#define HCI_EV_CONN_COMPLETE        0x03
+#define HCI_EV_CONN_REQUEST            0x04
+#define HCI_EV_DISCONN_COMPLETE        0x05
+#define HCI_EV_AUTH_COMPLETE        0x06
+#define HCI_EV_REMOTE_NAME            0x07
+#define HCI_EV_ENCRYPT_CHANGE        0x08
+#define HCI_EV_CHANGE_LINK_KEY_COMPLETE    0x09
+
+#define HCI_EV_REMOTE_FEATURES        0x0b
+#define HCI_EV_REMOTE_VERSION        0x0c
+#define HCI_EV_QOS_SETUP_COMPLETE    0x0d
+#define HCI_EV_CMD_COMPLETE            0x0e
+#define HCI_EV_CMD_STATUS            0x0f
+
+#define HCI_EV_ROLE_CHANGE            0x12
+#define HCI_EV_NUM_COMP_PKTS        0x13
+#define HCI_EV_MODE_CHANGE            0x14
+#define HCI_EV_PIN_CODE_REQ            0x16
+#define HCI_EV_LINK_KEY_REQ            0x17
+#define HCI_EV_LINK_KEY_NOTIFY        0x18
+#define HCI_EV_CLOCK_OFFSET            0x1c
+#define HCI_EV_PKT_TYPE_CHANGE        0x1d
+#define HCI_EV_PSCAN_REP_MODE        0x20
+
+#define HCI_EV_INQUIRY_RESULT_WITH_RSSI    0x22
+#define HCI_EV_REMOTE_EXT_FEATURES    0x23
+#define HCI_EV_SYNC_CONN_COMPLETE    0x2c
+#define HCI_EV_SYNC_CONN_CHANGED    0x2d
+#define HCI_EV_SNIFF_SUBRATE            0x2e
+#define HCI_EV_EXTENDED_INQUIRY_RESULT    0x2f
+#define HCI_EV_IO_CAPA_REQUEST        0x31
+#define HCI_EV_SIMPLE_PAIR_COMPLETE    0x36
+#define HCI_EV_REMOTE_HOST_FEATURES    0x3d
+#define HCI_EV_LE_Meta 0x3e
+
+/* ULP Event sub code */
+#define HCI_BLE_CONN_COMPLETE_EVT 0x01
+#define HCI_BLE_ADV_PKT_RPT_EVT 0x02
+#define HCI_BLE_LL_CONN_PARAM_UPD_EVT 0x03
+#define HCI_BLE_READ_REMOTE_FEAT_CMPL_EVT 0x04
+#define HCI_BLE_LTK_REQ_EVT 0x05
+#define HCI_BLE_RC_PARAM_REQ_EVT 0x06
+#define HCI_BLE_DATA_LENGTH_CHANGE_EVT 0x07
+#define HCI_BLE_ENHANCED_CONN_COMPLETE_EVT 0x0a
+#define HCI_BLE_DIRECT_ADV_EVT 0x0b
+#define HCI_BLE_PHY_UPDATE_COMPLETE_EVT 0x0c
+#define HCI_LE_EXTENDED_ADVERTISING_REPORT_EVT 0x0D
+#define HCI_BLE_PERIODIC_ADV_SYNC_EST_EVT      0x0E
+#define HCI_BLE_PERIODIC_ADV_REPORT_EVT        0x0F
+#define HCI_BLE_PERIODIC_ADV_SYNC_LOST_EVT     0x10
+#define HCI_BLE_SCAN_TIMEOUT_EVT               0x11
+#define HCI_LE_ADVERTISING_SET_TERMINATED_EVT 0x12
+#define HCI_BLE_SCAN_REQ_RX_EVT                0x13
+#define HCI_BLE_CIS_EST_EVT 0x19
+#define HCI_BLE_CIS_REQ_EVT 0x1a
+#define HCI_BLE_CREATE_BIG_CPL_EVT 0x1b
+#define HCI_BLE_TERM_BIG_CPL_EVT 0x1c
+#define HCI_BLE_BIG_SYNC_EST_EVT 0x1d
+#define HCI_BLE_BIG_SYNC_LOST_EVT 0x1e
+#define HCI_BLE_REQ_PEER_SCA_CPL_EVT 0x1f
+
+#define HCI_VENDOR_SPECIFIC_EVT 0xFF /* Vendor specific events */
+#endif
 
 #if CONFIG_BLUEDROID
 #define QUEUE_SIZE 500
@@ -432,146 +585,6 @@ static inline void hci_set_drvdata(struct hci_dev *hdev, void *data)
 #define SET_HCIDEV_DEV(hdev, pdev) ((hdev)->parent = (pdev))
 /* AicSemi - Integrate from hci_core.h end */
 
-/* -----  HCI Commands ---- */
-#define HCI_OP_INQUIRY            0x0401
-#define HCI_OP_INQUIRY_CANCEL        0x0402
-#define HCI_OP_EXIT_PERIODIC_INQ    0x0404
-#define HCI_OP_CREATE_CONN        0x0405
-#define HCI_OP_DISCONNECT                0x0406
-#define HCI_OP_ADD_SCO            0x0407
-#define HCI_OP_CREATE_CONN_CANCEL    0x0408
-#define HCI_OP_ACCEPT_CONN_REQ        0x0409
-#define HCI_OP_REJECT_CONN_REQ        0x040a
-#define HCI_OP_LINK_KEY_REPLY        0x040b
-#define HCI_OP_LINK_KEY_NEG_REPLY    0x040c
-#define HCI_OP_PIN_CODE_REPLY        0x040d
-#define HCI_OP_PIN_CODE_NEG_REPLY    0x040e
-#define HCI_OP_CHANGE_CONN_PTYPE    0x040f
-#define HCI_OP_AUTH_REQUESTED        0x0411
-#define HCI_OP_SET_CONN_ENCRYPT        0x0413
-#define HCI_OP_CHANGE_CONN_LINK_KEY    0x0415
-#define HCI_OP_REMOTE_NAME_REQ        0x0419
-#define HCI_OP_REMOTE_NAME_REQ_CANCEL    0x041a
-#define HCI_OP_READ_REMOTE_FEATURES    0x041b
-#define HCI_OP_READ_REMOTE_EXT_FEATURES    0x041c
-#define HCI_OP_READ_REMOTE_VERSION    0x041d
-#define HCI_OP_SETUP_SYNC_CONN        0x0428
-#define HCI_OP_ACCEPT_SYNC_CONN_REQ    0x0429
-#define HCI_OP_REJECT_SYNC_CONN_REQ    0x042a
-#define HCI_OP_SNIFF_MODE        0x0803
-#define HCI_OP_EXIT_SNIFF_MODE        0x0804
-#define HCI_OP_ROLE_DISCOVERY        0x0809
-#define HCI_OP_SWITCH_ROLE        0x080b
-#define HCI_OP_READ_LINK_POLICY        0x080c
-#define HCI_OP_WRITE_LINK_POLICY    0x080d
-#define HCI_OP_READ_DEF_LINK_POLICY    0x080e
-#define HCI_OP_WRITE_DEF_LINK_POLICY    0x080f
-#define HCI_OP_SNIFF_SUBRATE        0x0811
-#define HCI_OP_Write_Link_Policy_Settings 0x080d
-#define HCI_OP_SET_EVENT_MASK        0x0c01
-#define HCI_OP_RESET            0x0c03
-#define HCI_OP_SET_EVENT_FLT        0x0c05
-#define HCI_OP_Write_Extended_Inquiry_Response        0x0c52
-#define HCI_OP_Write_Simple_Pairing_Mode 0x0c56
-#define HCI_OP_Read_Buffer_Size 0x1005
-#define HCI_OP_Host_Buffer_Size 0x0c33
-#define HCI_OP_Read_Local_Version_Information 0x1001
-#define HCI_OP_Read_BD_ADDR 0x1009
-#define HCI_OP_Read_Local_Supported_Commands 0x1002
-#define HCI_OP_Write_Scan_Enable 0x0c1a
-#define HCI_OP_Write_Current_IAC_LAP 0x0c3a
-#define HCI_OP_Write_Inquiry_Scan_Activity 0x0c1e
-#define HCI_OP_Write_Class_of_Device 0x0c24
-#define HCI_OP_LE_Rand 0x2018
-#define HCI_OP_LE_Set_Random_Address 0x2005
-#define HCI_OP_LE_Set_Extended_Scan_Enable 0x2042
-#define HCI_OP_LE_Set_Extended_Scan_Parameters 0x2041
-#define HCI_OP_Set_Event_Filter 0x0c05
-#define HCI_OP_Write_Voice_Setting 0x0c26
-#define HCI_OP_Change_Local_Name 0x0c13
-#define HCI_OP_Read_Local_Name 0x0c14
-#define HCI_OP_Wirte_Page_Timeout 0x0c18
-#define HCI_OP_LE_Clear_Resolving_List 0x0c29
-#define HCI_OP_LE_Set_Addres_Resolution_Enable_Command 0x0c2e
-#define HCI_OP_Write_Inquiry_mode 0x0c45
-#define HCI_OP_Write_Page_Scan_Type 0x0c47
-#define HCI_OP_Write_Inquiry_Scan_Type 0x0c43
-
-#define HCI_OP_Delete_Stored_Link_Key 0x0c12
-#define HCI_OP_LE_Read_Local_Resolvable_Address 0x202d
-#define HCI_OP_LE_Extended_Create_Connection 0x2043
-#define HCI_OP_Read_Remote_Version_Information 0x041d
-#define HCI_OP_LE_Start_Encryption 0x2019
-#define HCI_OP_LE_Add_Device_to_Resolving_List 0x2027
-#define HCI_OP_LE_Set_Privacy_Mode 0x204e
-#define HCI_OP_LE_Connection_Update 0x2013
-
-/* -----  HCI events---- */
-#define HCI_OP_DISCONNECT        0x0406
-#define HCI_EV_INQUIRY_COMPLETE        0x01
-#define HCI_EV_INQUIRY_RESULT        0x02
-#define HCI_EV_CONN_COMPLETE        0x03
-#define HCI_EV_CONN_REQUEST            0x04
-#define HCI_EV_DISCONN_COMPLETE        0x05
-#define HCI_EV_AUTH_COMPLETE        0x06
-#define HCI_EV_REMOTE_NAME            0x07
-#define HCI_EV_ENCRYPT_CHANGE        0x08
-#define HCI_EV_CHANGE_LINK_KEY_COMPLETE    0x09
-
-#define HCI_EV_REMOTE_FEATURES        0x0b
-#define HCI_EV_REMOTE_VERSION        0x0c
-#define HCI_EV_QOS_SETUP_COMPLETE    0x0d
-#define HCI_EV_CMD_COMPLETE            0x0e
-#define HCI_EV_CMD_STATUS            0x0f
-
-#define HCI_EV_ROLE_CHANGE            0x12
-#define HCI_EV_NUM_COMP_PKTS        0x13
-#define HCI_EV_MODE_CHANGE            0x14
-#define HCI_EV_PIN_CODE_REQ            0x16
-#define HCI_EV_LINK_KEY_REQ            0x17
-#define HCI_EV_LINK_KEY_NOTIFY        0x18
-#define HCI_EV_CLOCK_OFFSET            0x1c
-#define HCI_EV_PKT_TYPE_CHANGE        0x1d
-#define HCI_EV_PSCAN_REP_MODE        0x20
-
-#define HCI_EV_INQUIRY_RESULT_WITH_RSSI    0x22
-#define HCI_EV_REMOTE_EXT_FEATURES    0x23
-#define HCI_EV_SYNC_CONN_COMPLETE    0x2c
-#define HCI_EV_SYNC_CONN_CHANGED    0x2d
-#define HCI_EV_SNIFF_SUBRATE            0x2e
-#define HCI_EV_EXTENDED_INQUIRY_RESULT    0x2f
-#define HCI_EV_IO_CAPA_REQUEST        0x31
-#define HCI_EV_SIMPLE_PAIR_COMPLETE    0x36
-#define HCI_EV_REMOTE_HOST_FEATURES    0x3d
-#define HCI_EV_LE_Meta 0x3e
-
-/* ULP Event sub code */
-#define HCI_BLE_CONN_COMPLETE_EVT 0x01
-#define HCI_BLE_ADV_PKT_RPT_EVT 0x02
-#define HCI_BLE_LL_CONN_PARAM_UPD_EVT 0x03
-#define HCI_BLE_READ_REMOTE_FEAT_CMPL_EVT 0x04
-#define HCI_BLE_LTK_REQ_EVT 0x05
-#define HCI_BLE_RC_PARAM_REQ_EVT 0x06
-#define HCI_BLE_DATA_LENGTH_CHANGE_EVT 0x07
-#define HCI_BLE_ENHANCED_CONN_COMPLETE_EVT 0x0a
-#define HCI_BLE_DIRECT_ADV_EVT 0x0b
-#define HCI_BLE_PHY_UPDATE_COMPLETE_EVT 0x0c
-#define HCI_LE_EXTENDED_ADVERTISING_REPORT_EVT 0x0D
-#define HCI_BLE_PERIODIC_ADV_SYNC_EST_EVT      0x0E
-#define HCI_BLE_PERIODIC_ADV_REPORT_EVT        0x0F
-#define HCI_BLE_PERIODIC_ADV_SYNC_LOST_EVT     0x10
-#define HCI_BLE_SCAN_TIMEOUT_EVT               0x11
-#define HCI_LE_ADVERTISING_SET_TERMINATED_EVT 0x12
-#define HCI_BLE_SCAN_REQ_RX_EVT                0x13
-#define HCI_BLE_CIS_EST_EVT 0x19
-#define HCI_BLE_CIS_REQ_EVT 0x1a
-#define HCI_BLE_CREATE_BIG_CPL_EVT 0x1b
-#define HCI_BLE_TERM_BIG_CPL_EVT 0x1c
-#define HCI_BLE_BIG_SYNC_EST_EVT 0x1d
-#define HCI_BLE_BIG_SYNC_LOST_EVT 0x1e
-#define HCI_BLE_REQ_PEER_SCA_CPL_EVT 0x1f
-
-#define HCI_VENDOR_SPECIFIC_EVT 0xFF /* Vendor specific events */
 
 #define CONFIG_MAC_OFFSET_GEN_1_2       (0x3C)      //MAC's OFFSET in config/efuse for aic generation 1~2 bluetooth chip
 #define CONFIG_MAC_OFFSET_GEN_3PLUS     (0x44)      //MAC's OFFSET in config/efuse for aic generation 3+ bluetooth chip
@@ -688,25 +701,57 @@ typedef struct {
 
 #define FW_RAM_ADID_BASE_ADDR           0x101788
 #define FW_RAM_PATCH_BASE_ADDR          0x184000
-#define FW_ADID_BASE_NAME               "fw_adid_8800dc.bin"
-#define FW_PATCH_TABLE_NAME             "fw_patch_table_8800dc.bin"
-#define FW_PATCH_BASE_NAME              "fw_patch_8800dc.bin"
-#define FW_PATCH_TABLE_NAME_U02         "fw_patch_table_8800dc_u02.bin"
-#define FW_PATCH_BASE_NAME_U02          "fw_patch_8800dc_u02.bin"
-#define FW_PATCH_TABLE_NAME_U02H        "fw_patch_table_8800dc_u02h.bin"
-#define FW_PATCH_BASE_NAME_U02H         "fw_patch_8800dc_u02h.bin"
 #define AICBT_PT_TAG                    "AICBT_PT_TAG"
 
 enum aicbt_patch_table_type {
-    AICBT_PT_NULL = 0x00,
-    AICBT_PT_TRAP,
-    AICBT_PT_B4,
-    AICBT_PT_BTMODE,
-    AICBT_PT_PWRON,
-    AICBT_PT_AF,
-    AICBT_PT_VER,
-    AICBT_PT_MAX,
+	AICBT_PT_INF  = 0x00,
+	AICBT_PT_TRAP = 0x1,
+	AICBT_PT_B4,
+	AICBT_PT_BTMODE,
+	AICBT_PT_PWRON,
+	AICBT_PT_AF,
+	AICBT_PT_VER,
+	AICBT_PT_MAX,
 };
+
+enum AIC_DC_SUBID{
+    DC_U01 = 0,
+    DC_U02,
+    DC_U02H,
+};
+
+struct aicbt_firmware {
+	const char *desc;
+	const char *bt_adid;
+	const char *bt_patch;
+	const char *bt_table;
+    const char *bt_ext_patch;
+};
+
+const struct aicbt_firmware fw_8800dc[] = {
+	[DC_U01] = {
+        .desc          = "aic8800dc u01 bt patch",
+        .bt_adid       = "fw_adid_8800dc.bin",
+        .bt_patch      = "fw_patch_8800dc.bin",
+        .bt_table      = "fw_patch_table_8800dc.bin",
+        .bt_ext_patch  = "fw_patch_8800dc_ext"
+	},
+    [DC_U02] = {
+        .desc          = "aic8800dc u02 bt patch",
+        .bt_adid       = "fw_adid_8800dc_u02.bin",
+        .bt_patch      = "fw_patch_8800dc_u02.bin",
+        .bt_table      = "fw_patch_table_8800dc_u02.bin",
+        .bt_ext_patch  = "fw_patch_8800dc_u02_ext"
+	},
+    [DC_U02H] = {
+        .desc          = "aic8800dch u02 bt patch",
+        .bt_adid       = "fw_adid_8800dc_u02h.bin",
+        .bt_patch      = "fw_patch_8800dc_u02h.bin",
+        .bt_table      = "fw_patch_table_8800dc_u02h.bin",
+        .bt_ext_patch  = "fw_patch_8800dc_u02h_ext"
+    },
+};
+
 
 #define HCI_VSC_FW_STATUS_GET_CMD          0xFC78
 
@@ -793,6 +838,25 @@ struct aicbt_patch_table {
     uint32_t len;
     struct aicbt_patch_table *next;
 };
+
+struct aicbt_patch_info_t {
+    uint32_t info_len;
+//base len start
+    uint32_t adid_addrinf;
+    uint32_t addr_adid;
+    uint32_t patch_addrinf;
+    uint32_t addr_patch;
+    uint32_t reset_addr;
+    uint32_t reset_val;
+    uint32_t adid_flag_addr;
+    uint32_t adid_flag;
+//base len end
+//ext patch nb
+    uint32_t ext_patch_nb_addr;
+    uint32_t ext_patch_nb;
+    uint32_t *ext_patch_param;
+};
+
 
 struct aicbt_patch_table_cmd {
     uint8_t patch_num;

@@ -5,6 +5,7 @@
 #include "aic_txrxif.h"
 #include "md5.h"
 #include "aicbluetooth.h"
+#include "aicwf_debug.h"
 #ifdef CONFIG_USE_FW_REQUEST
 #include <linux/firmware.h>
 #endif
@@ -146,7 +147,9 @@ enum aicbsp_cpmode_type {
 ///aic bt tx pwr lvl :lsb->msb: first byte, min pwr lvl; second byte, max pwr lvl;
 ///pwr lvl:20(min), 30 , 40 , 50 , 60(max)
 #define AICBT_TXPWR_LVL            0x00006020
-#define AICBT_TXPWR_LVL_8800d80     0x00006F2F
+#define AICBT_TXPWR_LVL_8800d80    0x00006F2F
+#define AICBT_TXPWR_LVL_8800d80x2  0x00006F2F
+
 
 #define AICBSP_MODE_BT_HCI_MODE_NULL              0
 #define AICBSP_MODE_BT_HCI_MODE_MB                1
@@ -155,6 +158,7 @@ enum aicbsp_cpmode_type {
 #define AICBSP_HWINFO_DEFAULT       (-1)
 #define AICBSP_CPMODE_DEFAULT       AICBSP_CPMODE_WORK
 
+#define AICBT_BTMODE_DEFAULT_8800d80x2      AICBT_BTMODE_BT_ONLY_COANT
 #define AICBT_BTMODE_DEFAULT_8800d80        AICBT_BTMODE_BT_ONLY_COANT
 #define AICBT_BTMODE_DEFAULT                AICBT_BTMODE_BT_ONLY
 #define AICBT_BTPORT_DEFAULT                AICBT_BTPORT_MB
@@ -163,6 +167,7 @@ enum aicbsp_cpmode_type {
 #define AICBT_LPM_ENABLE_DEFAULT            0
 #define AICBT_TXPWR_LVL_DEFAULT             AICBT_TXPWR_LVL
 #define AICBT_TXPWR_LVL_DEFAULT_8800d80     AICBT_TXPWR_LVL_8800d80
+#define AICBT_TXPWR_LVL_DEFAULT_8800d80x2   AICBT_TXPWR_LVL_8800d80x2
 
 
 #define AIC_HW_INFO 0x21
@@ -274,7 +279,9 @@ static int aic_load_firmware(u32 ** fw_buf, const char *name, struct device *dev
             len = snprintf(path, FW_PATH_MAX, "%s/%s/%s",aic_default_fw_path, "aic8800", name);
         } else if (usb_dev->chipid == PRODUCT_ID_AIC8800D80) {
             len = snprintf(path, FW_PATH_MAX, "%s/%s/%s",aic_default_fw_path, "aic8800D80", name);
-        } else {
+        } else if (usb_dev->chipid == PRODUCT_ID_AIC8800D80X2) {
+            len = snprintf(path, FW_PATH_MAX, "%s/%s/%s",aic_default_fw_path, "aic8800D80X2", name);
+        }else {
             printk("%s unknown chipid %d\n", __func__, usb_dev->chipid);
         }
 	#else
@@ -1172,6 +1179,14 @@ static struct aicbt_info_t aicbt_info[] = {
     },//PRODUCT_ID_AIC8800D80
     {
     },//PRODUCT_ID_AIC8800D81
+    {
+        .btmode        = AICBT_BTMODE_DEFAULT_8800d80x2,
+        .btport        = AICBT_BTPORT_DEFAULT,
+        .uart_baud     = AICBT_UART_BAUD_DEFAULT,
+        .uart_flowctrl = AICBT_UART_FC_DEFAULT,
+        .lpm_enable    = AICBT_LPM_ENABLE_DEFAULT,
+        .txpwr_lvl     = AICBT_TXPWR_LVL_DEFAULT_8800d80x2,
+    },//PRODUCT_ID_AIC8800D80X2
 };
 
 int aicbt_patch_table_load(struct aic_usb_dev *usbdev, struct aicbt_patch_table *_head)
@@ -1223,13 +1238,47 @@ int aicbt_patch_table_load(struct aic_usb_dev *usbdev, struct aicbt_patch_table 
 
 int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_patch_table *head_t)
 {
+    uint8_t *patch_info_array = (uint8_t*)patch_info;
+    int base_len = 0;
+    int memcpy_len = 0;
+    
     if (AICBT_PT_INF == head_t->type) {
-        patch_info->info_len = head_t->len;
-        if(patch_info->info_len == 0)
+        base_len = ((offsetof(struct aicbt_patch_info_t,  ext_patch_nb_addr) - offsetof(struct aicbt_patch_info_t,  adid_addrinf) )/sizeof(uint32_t))/2;
+        AICWFDBG(LOGDEBUG, "%s head_t->len:%d base_len:%d \r\n", __func__, head_t->len, base_len);
+
+        if (head_t->len > base_len){
+            patch_info->info_len = base_len;
+            memcpy_len = patch_info->info_len + 1;//include ext patch nb     
+        } else{
+            patch_info->info_len = head_t->len;
+            memcpy_len = patch_info->info_len;
+        }
+        AICWFDBG(LOGDEBUG, "%s memcpy_len:%d \r\n", __func__, memcpy_len);   
+
+        if (patch_info->info_len == 0)
             return 0;
-        memcpy(&patch_info->adid_addrinf, head_t->data, patch_info->info_len * sizeof(uint32_t) * 2);
+       
+        memcpy(((patch_info_array) + sizeof(patch_info->info_len)), 
+            head_t->data, 
+            memcpy_len * sizeof(uint32_t) * 2);
+        AICWFDBG(LOGDEBUG, "%s adid_addrinf:%x addr_adid:%x \r\n", __func__, 
+            ((struct aicbt_patch_info_t *)patch_info_array)->adid_addrinf,
+            ((struct aicbt_patch_info_t *)patch_info_array)->addr_adid);
+
+        if (patch_info->ext_patch_nb > 0){
+            int index = 0;
+            patch_info->ext_patch_param = (uint32_t *)(head_t->data + ((memcpy_len) * 2));
+            
+            for(index = 0; index < patch_info->ext_patch_nb; index++){
+                AICWFDBG(LOGDEBUG, "%s id:%x addr:%x \r\n", __func__, 
+                    *(patch_info->ext_patch_param + (index * 2)),
+                    *(patch_info->ext_patch_param + (index * 2) + 1));
+            }
+        }
+
     }
     return 0;
+
 }
 
 int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char *filename){

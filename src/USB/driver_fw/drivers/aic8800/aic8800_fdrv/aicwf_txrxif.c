@@ -221,7 +221,7 @@ void aicwf_bus_deinit(struct device *dev)
     }else{
     	AICWFDBG(LOGINFO, "%s g_rwnx_plat->enabled is false\r\n", __func__);
 	}
-    	
+
 #endif
 #ifdef AICWF_SDIO_SUPPORT
     sdiodev =bus_if->bus_priv.sdio;
@@ -257,7 +257,7 @@ void aicwf_bus_deinit(struct device *dev)
     rwnx_cmd_mgr_deinit(&usb->cmd_mgr);
 
 #ifdef CONFIG_TX_TASKLET//AIDEN tasklet
-		tasklet_kill(&usb->xmit_tasklet);
+	tasklet_kill(&usb->xmit_tasklet);
 #endif
 
 	AICWFDBG(LOGINFO, "%s Exit \n", __func__);
@@ -329,7 +329,11 @@ static bool aicwf_another_ptk_1(struct rx_buff *buffer)
     u8 *read = buffer->read;
     u16 aggr_len = 0;
 
-    if(read == NULL || read >= buffer->end) {
+    if(read == NULL || read >= (buffer->end - 2)) {
+        return false;
+    }
+
+    if(buffer->len < 2) {
         return false;
     }
 
@@ -346,7 +350,7 @@ static bool aicwf_another_ptk(struct sk_buff *skb)
 	u8 *data;
 	u16 aggr_len = 0;
 
-	if (skb->data == NULL || skb->len == 0) {
+	if (skb->data == NULL || skb->len < 2) {
 		return false;
 	}
 	data = skb->data;
@@ -367,54 +371,55 @@ void rwnx_frame_parser(char* tag, char* data, unsigned long len);
 #ifdef CONFIG_RX_TASKLET
 int aicwf_tasklet_rxframes(struct aicwf_rx_priv *rx_priv)
 {
+	int ret = 0;
+	unsigned long flags = 0;
+	struct sk_buff *skb = NULL; /* Packet for event or data frames */
+	u16 pkt_len = 0;
+	//struct sk_buff *skb_inblock = NULL;
+	u16 aggr_len = 0, adjust_len = 0;
+	u8 *data = NULL;
+	u8_l *msg = NULL;
 
-		int ret = 0;
-		unsigned long flags = 0;
-		struct sk_buff *skb = NULL; /* Packet for event or data frames */
-		u16 pkt_len = 0;
-		//struct sk_buff *skb_inblock = NULL;
-		u16 aggr_len = 0, adjust_len = 0;
-		u8 *data = NULL;
-		u8_l *msg = NULL;
-	
-		while (1) {
-			//aicwf_usb_rx_submit_all_urb_(rx_priv->usbdev);
-			spin_lock_irqsave(&rx_priv->rxqlock, flags);
-			if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
-				usb_info("no more rxdata\n");
-				spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
-				break;
-			}
-			skb = aicwf_frame_dequeue(&rx_priv->rxq);		
-			spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
-			if (skb == NULL) {
-				txrx_err("skb_error\r\n");
-				break;
-			}
-			data = skb->data;
-			pkt_len = (*skb->data | (*(skb->data + 1) << 8));
-			//printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
-			if (pkt_len > 1600) {
-				dev_kfree_skb(skb);
-				atomic_dec(&rx_priv->rx_cnt);
-					continue;
-			}
-	
-			if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
+	while (1) {
+		//aicwf_usb_rx_submit_all_urb_(rx_priv->usbdev);
+		spin_lock_irqsave(&rx_priv->rxqlock, flags);
+		if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
+			usb_info("no more rxdata\n");
+			spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
+			break;
+		}
+		skb = aicwf_frame_dequeue(&rx_priv->rxq);		
+		spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
+		if (skb == NULL) {
+			txrx_err("skb_error\r\n");
+			break;
+		}
+		data = skb->data;
+		pkt_len = (*skb->data | (*(skb->data + 1) << 8));
+		//printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
+#ifndef CONFIG_USB_RX_REASSEMBLE
+		if (pkt_len > skb->len) {
+			AICWFDBG(LOGERROR, "%s pkt_len:%d skb->len:%d\r\n", __func__, pkt_len, skb->len);
+			dev_kfree_skb(skb);
+			atomic_dec(&rx_priv->rx_cnt);
+			continue;
+		}
+#endif
+		if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
 #if 0
 			aggr_len = pkt_len + RX_HWHRD_LEN;
 			if (aggr_len & (RX_ALIGNMENT - 1))
 				adjust_len = roundup(aggr_len, RX_ALIGNMENT);
 			else
 				adjust_len = aggr_len;
-	
+
 			skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_ATOMIC);//8 is for ccmp mic or wep icv
 			if(skb_inblock == NULL){
 				txrx_err("no more space! skip!\n");
 				skb_pull(skb, adjust_len);
 				continue;
 			}
-	
+
 			skb_put(skb_inblock, aggr_len);
 			memcpy(skb_inblock->data, data, aggr_len);
 #if 0//AIDEN	
@@ -424,14 +429,14 @@ int aicwf_tasklet_rxframes(struct aicwf_rx_priv *rx_priv)
 			rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb, (void *)rx_priv);
 			///TODO: here need to add rx data process
 			//skb_pull(skb, adjust_len);
-			}
-			else { //  type : config
-				aggr_len = pkt_len;
-				if (aggr_len & (RX_ALIGNMENT - 1))
-					adjust_len = roundup(aggr_len, RX_ALIGNMENT);
-				else
-					adjust_len = aggr_len;
-	
+		}
+		else { //  type : config
+			aggr_len = pkt_len;
+			if (aggr_len & (RX_ALIGNMENT - 1))
+				adjust_len = roundup(aggr_len, RX_ALIGNMENT);
+			else
+				adjust_len = aggr_len;
+
 			msg = kmalloc(aggr_len+4, GFP_ATOMIC);
 			if(msg == NULL){
 			txrx_err("no more space for msg!\n");
@@ -441,22 +446,23 @@ int aicwf_tasklet_rxframes(struct aicwf_rx_priv *rx_priv)
 				memcpy(msg, data, aggr_len + 4);
 			if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP)
 					rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
-	
+
 				if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
 					aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
 			skb_pull(skb, adjust_len+4);
 			kfree(msg);
 			dev_kfree_skb(skb);
-			}
-	
-			//dev_kfree_skb(skb);
-			atomic_dec(&rx_priv->rx_cnt);
 		}
-	
-		return ret;
+
+		//dev_kfree_skb(skb);
+		atomic_dec(&rx_priv->rx_cnt);
 	}
+
+	return ret;
+}
 #endif
 
+extern bool rx_urb_sched;
 int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
 {
 #ifdef AICWF_SDIO_SUPPORT
@@ -578,16 +584,18 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                 data = buffer->read;
                 pkt_len = (*data | (*(data + 1) << 8));
                 //printk("%s cnt:%d pkt_len:%d \r\n", __func__, cnt, pkt_len);
-                if (pkt_len > 1600) {
-                    AICWFDBG(LOGERROR, "%s pkt_len > 1600 \r\n", __func__);
+#ifndef CONFIG_USB_RX_REASSEMBLE
+                if (pkt_len > buffer->len) {
+                    AICWFDBG(LOGERROR, "%s pkt_len:%d buffer->len:%d\r\n", __func__, pkt_len, buffer->len);
                     aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
                     atomic_dec(&rx_priv->rx_cnt);
                     return -EBADE;
                 }
-               
+#endif
+
                 if((data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
-                	aggr_len = pkt_len + RX_HWHRD_LEN;
-                    
+                    aggr_len = pkt_len + RX_HWHRD_LEN;
+
                     skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);
                     if (skb_inblock == NULL) {
                         txrx_err("no more space! skip\n");
@@ -595,11 +603,12 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                         atomic_dec(&rx_priv->rx_cnt);
                         return -EBADE;
                     }
-                    
+
                     skb_put(skb_inblock, aggr_len);
                     memcpy(skb_inblock->data, data, aggr_len);
                     rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb_inblock, (void *)rx_priv);
                     buffer->read = buffer->read + aggr_len;
+                    buffer->len -= aggr_len;
                 }
                 else { //  type : config
                     aggr_len = pkt_len;
@@ -615,21 +624,26 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                         return -EBADE;
                     }
                     memcpy(msg, data, aggr_len + 4);
-            
+
                     if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
                         rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
-            
+
                     if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
                         aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
-            
+
                     if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
                         rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
 
                     buffer->read = buffer->read + (adjust_len + 4);
+                    buffer->len -= (adjust_len + 4);
                     kfree(msg);
                 }
             }
             aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
+            if (rx_urb_sched) {
+                schedule_work(&rx_priv->usbdev->rx_urb_work);
+                rx_urb_sched = false;
+            }
             atomic_dec(&rx_priv->rx_cnt);
         }
     }else{
@@ -642,7 +656,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
             }
             buffer = rxbuff_dequeue(&rx_priv->rxq);
             spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
-            
+
             if (buffer == NULL) {
                 txrx_err("skb_error\r\n");
                 ASSERT_ERR(1);
@@ -651,12 +665,14 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
             data = buffer->data;
             pkt_len = (*data | (*(data + 1) << 8));
             //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
-            if (pkt_len > 1600) {
+#ifndef CONFIG_USB_RX_REASSEMBLE
+            if (pkt_len > buffer->len) {
+                AICWFDBG(LOGERROR, "%s pkt_len:%d buffer->len:%d\r\n", __func__, pkt_len, buffer->len);
                 aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
                 atomic_dec(&rx_priv->rx_cnt);
                 continue;
             }
-        
+#endif
             if((data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
                 skb_inblock = __dev_alloc_skb(pkt_len + RX_HWHRD_LEN + CCMP_OR_WEP_INFO, GFP_KERNEL);
                 if (skb_inblock == NULL) {
@@ -665,7 +681,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                     atomic_dec(&rx_priv->rx_cnt);
                     continue;
                 }
-                
+
                 skb_put(skb_inblock, pkt_len + RX_HWHRD_LEN);
                 memcpy(skb_inblock->data, data, pkt_len + RX_HWHRD_LEN);
                 rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb_inblock, (void *)rx_priv);
@@ -676,7 +692,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                     adjust_len = roundup(aggr_len, RX_ALIGNMENT);
                 else
                     adjust_len = aggr_len;
-        
+
                 msg = kmalloc(aggr_len+4, GFP_KERNEL);
                 if(msg == NULL){
                     txrx_err("no more space for msg!\n");
@@ -684,168 +700,176 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
                     return -EBADE;
                 }
                 memcpy(msg, data, aggr_len + 4);
-        
+
                 if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
                     rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
-        
+
                 if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
                     aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
-        
+
                 if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
                     rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
-        
+
                 kfree(msg);
             }
-            
+
             aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
+            if (rx_urb_sched) {
+                schedule_work(&rx_priv->usbdev->rx_urb_work);
+                rx_urb_sched = false;
+            }
             atomic_dec(&rx_priv->rx_cnt);
         }
     }
 #else
-	if(aicwf_usb_rx_aggr){
-	    while (1) {
-	        spin_lock_irqsave(&rx_priv->rxqlock, flags);
-	        if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
-	            usb_info("no more rxdata\n");
-	            spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
-	            break;
-	        }
-	        skb = aicwf_frame_dequeue(&rx_priv->rxq);
-	        spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
+    if(aicwf_usb_rx_aggr){
+        while (1) {
+            spin_lock_irqsave(&rx_priv->rxqlock, flags);
+            if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
+                usb_info("no more rxdata\n");
+                spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
+                break;
+            }
+            skb = aicwf_frame_dequeue(&rx_priv->rxq);
+            spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
 
-	        if (skb == NULL) {
-	            txrx_err("skb_error\r\n");
-	            ASSERT_ERR(1);
-	            break;
-	        }
-	        while(aicwf_another_ptk(skb)) {
-	        cnt++;
-	        if (cnt > 30) {
-	            //printk("%s err, break %d\n", __func__, cnt);
-	            //break;
-	        }
-	        data = skb->data;
-	        pkt_len = (*skb->data | (*(skb->data + 1) << 8));
-	        //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
-	        if (pkt_len > 1600) {
-	            dev_kfree_skb(skb);
-	            atomic_dec(&rx_priv->rx_cnt);
-	                continue;
-	        }
-
-	        if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
-				aggr_len = pkt_len + RX_HWHRD_LEN;
-				adjust_len = aggr_len;
-	            skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);//8 is for ccmp mic or wep icv
-	            if(skb_inblock == NULL){
-	                txrx_err("no more space! skip!\n");
-	                skb_pull(skb, adjust_len);
-	                continue;
-	            }
-
-	            skb_put(skb_inblock, aggr_len);
-	            memcpy(skb_inblock->data, data, aggr_len);
-	            rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb_inblock, (void *)rx_priv);
-
-				///TODO: here need to add rx data process
-
-				skb_pull(skb, adjust_len);
-
-	        }
-	        else { //  type : config
-	            aggr_len = pkt_len;
-	            if (aggr_len & (RX_ALIGNMENT - 1))
-	                adjust_len = roundup(aggr_len, RX_ALIGNMENT);
-	            else
-	                adjust_len = aggr_len;
-
-	            msg = kmalloc(aggr_len+4, GFP_KERNEL);//hdr(4)+config(aggrlen)
-	            if(msg == NULL){
-	                txrx_err("no more space for msg!\n");
-	                aicwf_dev_skb_free(skb);
-	                return -EBADE;
-	            }
-	            memcpy(msg, data, aggr_len + 4);
-
-	            if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
-	                rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
-
-	            if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
-	                aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
-
-	            if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
-	                rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
-
-
-	            skb_pull(skb, adjust_len+4);
-	            kfree(msg);
-
-				}
-			}
-			dev_kfree_skb(skb);
-	        atomic_dec(&rx_priv->rx_cnt);
-	    }
-	}else{
-	    while (1) {
-	        spin_lock_irqsave(&rx_priv->rxqlock, flags);
-	        if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
-	            usb_info("no more rxdata\n");
-	            spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
-	            break;
-	        }
-	        skb = aicwf_frame_dequeue(&rx_priv->rxq);
-	        spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
-
-	        if (skb == NULL) {
-	            txrx_err("skb_error\r\n");
-	            ASSERT_ERR(1);
-	            break;
-	        }
-	        data = skb->data;
-	        pkt_len = (*skb->data | (*(skb->data + 1) << 8));
-	        //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
+            if (skb == NULL) {
+                txrx_err("skb_error\r\n");
+                ASSERT_ERR(1);
+                break;
+            }
+            while(aicwf_another_ptk(skb)) {
+                cnt++;
+                if (cnt > 30) {
+                    //printk("%s err, break %d\n", __func__, cnt);
+                    //break;
+                }
+                data = skb->data;
+                pkt_len = (*skb->data | (*(skb->data + 1) << 8));
+                //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
 #ifndef CONFIG_USB_RX_REASSEMBLE
-	        if (pkt_len > 1600) {
-	            dev_kfree_skb(skb);
-	            atomic_dec(&rx_priv->rx_cnt);
-	                continue;
-	        }
+                if (pkt_len > skb->len) {
+                    AICWFDBG(LOGERROR, "%s pkt_len:%d skb->len:%d\r\n", __func__, pkt_len, skb->len);
+                    //dev_kfree_skb(skb);
+                    //atomic_dec(&rx_priv->rx_cnt);
+                    //continue;
+                    break;
+                }
+#endif
+                if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
+                    aggr_len = pkt_len + RX_HWHRD_LEN;
+                    adjust_len = aggr_len;
+                    skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);//8 is for ccmp mic or wep icv
+                    if(skb_inblock == NULL){
+                        txrx_err("no more space! skip!\n");
+                        skb_pull(skb, adjust_len);
+                        continue;
+                    }
+
+                    skb_put(skb_inblock, aggr_len);
+                    memcpy(skb_inblock->data, data, aggr_len);
+                    rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb_inblock, (void *)rx_priv);
+
+                    ///TODO: here need to add rx data process
+
+                    skb_pull(skb, adjust_len);
+
+                }
+                else { //  type : config
+                    aggr_len = pkt_len;
+                    if (aggr_len & (RX_ALIGNMENT - 1))
+                        adjust_len = roundup(aggr_len, RX_ALIGNMENT);
+                    else
+                        adjust_len = aggr_len;
+
+                    msg = kmalloc(aggr_len+4, GFP_KERNEL);//hdr(4)+config(aggrlen)
+                    if(msg == NULL){
+                        txrx_err("no more space for msg!\n");
+                        aicwf_dev_skb_free(skb);
+                        return -EBADE;
+                    }
+                    memcpy(msg, data, aggr_len + 4);
+
+                    if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+                        rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
+
+                    if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                        aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+
+                    if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
+                        rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
+
+
+                    skb_pull(skb, adjust_len+4);
+                    kfree(msg);
+
+                }
+            }
+            dev_kfree_skb(skb);
+            atomic_dec(&rx_priv->rx_cnt);
+        }
+    }else{
+        while (1) {
+            spin_lock_irqsave(&rx_priv->rxqlock, flags);
+            if(aicwf_is_framequeue_empty(&rx_priv->rxq)) {
+                usb_info("no more rxdata\n");
+                spin_unlock_irqrestore(&rx_priv->rxqlock,flags);
+                break;
+            }
+            skb = aicwf_frame_dequeue(&rx_priv->rxq);
+            spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
+
+            if (skb == NULL) {
+                txrx_err("skb_error\r\n");
+                ASSERT_ERR(1);
+                break;
+            }
+            data = skb->data;
+            pkt_len = (*skb->data | (*(skb->data + 1) << 8));
+            //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
+#ifndef CONFIG_USB_RX_REASSEMBLE
+            if (pkt_len > skb->len) {
+                AICWFDBG(LOGERROR, "%s pkt_len:%d skb->len:%d\r\n", __func__, pkt_len, skb->len);
+                dev_kfree_skb(skb);
+                atomic_dec(&rx_priv->rx_cnt);
+                continue;
+            }
 #endif
 
-	        if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
-				rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb, (void *)rx_priv);
-	        }
-	        else { //  type : config
-	            aggr_len = pkt_len;
-	            if (aggr_len & (RX_ALIGNMENT - 1))
-	                adjust_len = roundup(aggr_len, RX_ALIGNMENT);
-	            else
-	                adjust_len = aggr_len;
+            if((skb->data[2] & USB_TYPE_CFG) != USB_TYPE_CFG) { // type : data
+                rwnx_rxdataind_aicwf(rx_priv->usbdev->rwnx_hw, skb, (void *)rx_priv);
+            }
+            else { //  type : config
+                aggr_len = pkt_len;
+                if (aggr_len & (RX_ALIGNMENT - 1))
+                    adjust_len = roundup(aggr_len, RX_ALIGNMENT);
+                else
+                    adjust_len = aggr_len;
 
-	            msg = kmalloc(aggr_len+4, GFP_KERNEL);
-	            if(msg == NULL){
-	                txrx_err("no more space for msg!\n");
-	                aicwf_dev_skb_free(skb);
-	                return -EBADE;
-	            }
-	            memcpy(msg, data, aggr_len + 4);
+                msg = kmalloc(aggr_len+4, GFP_KERNEL);
+                if(msg == NULL){
+                    txrx_err("no more space for msg!\n");
+                    aicwf_dev_skb_free(skb);
+                    return -EBADE;
+                }
+                memcpy(msg, data, aggr_len + 4);
 
-	            if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
-	                rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
+                if(((*(msg + 2) & 0x7f) == USB_TYPE_CFG_CMD_RSP) && (rx_priv->usbdev->bus_if->state != (int)USB_DOWN_ST))
+                    rwnx_rx_handle_msg(rx_priv->usbdev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
 
-	            if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
-	                aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
+                if((*(msg + 2) & 0x7f) == USB_TYPE_CFG_DATA_CFM)
+                    aicwf_usb_host_tx_cfm_handler(&(rx_priv->usbdev->rwnx_hw->usb_env), (u32 *)(msg + 4));
 
-	            if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
-	                rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
+                if ((*(msg + 2) & 0x7f) == USB_TYPE_CFG_PRINT)
+                    rwnx_rx_handle_print(rx_priv->usbdev->rwnx_hw, msg + 4, aggr_len);
 
-	            skb_pull(skb, adjust_len+4);
-	            kfree(msg);
-				dev_kfree_skb(skb);
-	        }
-	        atomic_dec(&rx_priv->rx_cnt);
-	    }
-	}
+                skb_pull(skb, adjust_len+4);
+                kfree(msg);
+                dev_kfree_skb(skb);
+            }
+            atomic_dec(&rx_priv->rx_cnt);
+        }
+    }
 #endif
 
     return ret;
@@ -882,7 +906,7 @@ int aicwf_process_msg_rxframes(struct aicwf_rx_priv *rx_priv)
         pkt_len = (*skb->data | (*(skb->data + 1) << 8));
         //printk("p:%d, s:%d , %x\n", pkt_len, skb->len, data[2]);
 #if 0 //amsdu > 1600
-	if (pkt_len > 1600) {
+        if (pkt_len > 1600) {
             dev_kfree_skb(skb);
             atomic_dec(&rx_priv->rx_cnt);
                 continue;
@@ -965,7 +989,7 @@ static struct recv_msdu *aicwf_rxframe_queue_init(struct list_head *q, int qsize
     for (i = 0; i < qsize; i++) {
         INIT_LIST_HEAD(&req->rxframe_list);
         list_add(&req->rxframe_list, q);
-        req->len = 0;
+        //req->len = 0;
         req++;
     }
 

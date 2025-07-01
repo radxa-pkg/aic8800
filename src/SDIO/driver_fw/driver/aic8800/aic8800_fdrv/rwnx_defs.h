@@ -580,12 +580,22 @@ struct amsdu_subframe_hdr {
 
 
 /* rwnx driver status */
+void rwnx_set_conn_state(atomic_t *drv_conn_state, int state);
 
 enum rwnx_drv_connect_status { 
 	RWNX_DRV_STATUS_DISCONNECTED = 0,
 	RWNX_DRV_STATUS_DISCONNECTING, 
 	RWNX_DRV_STATUS_CONNECTING, 
-	RWNX_DRV_STATUS_CONNECTED, 
+	RWNX_DRV_STATUS_CONNECTED,
+	RWNX_DRV_STATUS_ROAMING,
+};
+
+static const char *const s_conn_state[] = {
+    "RWNX_DRV_STATUS_DISCONNECTED",
+    "RWNX_DRV_STATUS_DISCONNECTING",
+    "RWNX_DRV_STATUS_CONNECTING",
+    "RWNX_DRV_STATUS_CONNECTED",
+    "RWNX_DRV_STATUS_ROAMING",
 };
 
 
@@ -706,7 +716,12 @@ struct rwnx_hw {
 
 #ifdef CONFIG_SCHED_SCAN
     bool is_sched_scan;
-#endif//CONFIG_SCHED_SCAN 
+#endif//CONFIG_SCHED_SCAN
+#ifdef CONFIG_TEMP_CONTROL
+	unsigned long started_jiffies;
+	s8_l temp;
+#endif
+
 };
 
 u8 *rwnx_build_bcn(struct rwnx_bcn *bcn, struct cfg80211_beacon_data *new);

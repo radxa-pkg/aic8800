@@ -65,6 +65,11 @@ int rwnx_send_rf_config_req(struct rwnx_hw *rwnx_hw, u8_l ofst, u8_l sel, u8_l *
 int rwnx_send_rf_calib_req(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *cfm);
 int rwnx_send_get_macaddr_req(struct rwnx_hw *rwnx_hw, struct mm_get_mac_addr_cfm *cfm);
 
+#ifdef CONFIG_TEMP_COMP
+int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
+int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
+#endif
+
 #ifdef CONFIG_RWNX_FULLMAC
 int rwnx_send_me_config_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw);
@@ -159,6 +164,9 @@ int rwnx_send_dbg_mem_block_write_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
 									  u32 mem_size, u32 *mem_data);
 int rwnx_send_dbg_start_app_req(struct rwnx_hw *rwnx_hw, u32 boot_addr,
 								u32 boot_type);
+int rwnx_send_pwm_init_req(struct rwnx_hw *rwnx_hw, u8 pwm_gpidx, u8 mode, u8 run, u32 tmr_cnt,
+								u32 dty_cnt, u32 step_val, u8 gpio_en, u8 gpio_dir, u8 gpio_val);
+int rwnx_send_pwm_deinit_req(struct rwnx_hw *rwnx_hw, u8 pwm_gpidx, u8 gpio_en, u8 gpio_dir, u8 gpio_val);
 int rwnx_send_cfg_rssi_req(struct rwnx_hw *rwnx_hw, u8 vif_index, int rssi_thold, u32 rssi_hyst);
 int rwnx_send_disable_agg_req(struct rwnx_hw *rwnx_hw, u8_l agg_disable, u8_l agg_disable_rx, u8_l sta_idx);
 int rwnx_send_coex_req(struct rwnx_hw *rwnx_hw, u8_l disable_coexnull, u8_l enable_nullcts);
@@ -177,6 +185,7 @@ int rwnx_send_txpwr_lvl_v3_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_adj_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_resume_restore(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,
 					u8_l fwtrace_redir_en, struct rwnx_vif *vif);
+int rwnx_prepare_resume_restore_req(struct rwnx_hw *rwnx_hw, lmac_msg_id_t const id, void *param, u16_l const param_len);
 
 
 int rwnx_send_reboot(struct rwnx_hw *rwnx_hw);

@@ -59,6 +59,7 @@ struct lmac_msg
 
 struct aicbt_patch_info_t {
     uint32_t info_len;
+//base len start
     uint32_t adid_addrinf;
     uint32_t addr_adid;
     uint32_t patch_addrinf;
@@ -67,6 +68,12 @@ struct aicbt_patch_info_t {
     uint32_t reset_val;
     uint32_t adid_flag_addr;
     uint32_t adid_flag;
+//base len end
+//ext patch nb
+    uint32_t ext_patch_nb_addr;
+    uint32_t ext_patch_nb;
+    uint32_t *ext_patch_param;
+
 };
 
 

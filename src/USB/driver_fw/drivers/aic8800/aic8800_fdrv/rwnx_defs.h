@@ -608,13 +608,41 @@ struct rwnx_phy_info {
     bool limit_bw;
 };
 
+struct defrag_ctrl_info {
+    struct list_head list;
+    u8 sta_idx;
+    u8 tid;
+    u16 sn;
+    u8 next_fn;
+    u16 frm_len;
+    struct sk_buff *skb;
+    struct timer_list defrag_timer;
+    struct rwnx_hw *rwnx_hw;
+};
+
+struct amsdu_subframe_hdr {
+    u8 da[6];
+    u8 sa[6];
+    u16 sublen;
+};
+
 /* rwnx driver status */
+void rwnx_set_conn_state(atomic_t *drv_conn_state, int state);
 
 enum rwnx_drv_connect_status { 
 	RWNX_DRV_STATUS_DISCONNECTED = 0,
 	RWNX_DRV_STATUS_DISCONNECTING, 
 	RWNX_DRV_STATUS_CONNECTING, 
 	RWNX_DRV_STATUS_CONNECTED, 
+	RWNX_DRV_STATUS_ROAMING,
+};
+
+static const char *const s_conn_state[] = {
+    "RWNX_DRV_STATUS_DISCONNECTED",
+    "RWNX_DRV_STATUS_DISCONNECTING",
+    "RWNX_DRV_STATUS_CONNECTING",
+    "RWNX_DRV_STATUS_CONNECTED",
+    "RWNX_DRV_STATUS_ROAMING",
 };
 
 
@@ -720,11 +748,22 @@ struct rwnx_hw {
     atomic_t p2p_alive_timer_count;
     bool band_5g_support;
     bool fwlog_en;
+    bool scanning;
+    bool p2p_working;
 
-	struct work_struct apmStalossWork;
+    struct list_head defrag_list;
+    spinlock_t defrag_lock;
+
+    struct work_struct apmStalossWork;
     struct workqueue_struct *apmStaloss_wq;
     u8 apm_vif_idx;
     u8 sta_mac_addr[6];
+    
+    struct wakeup_source *ws_rx;
+    struct wakeup_source *ws_irqrx;
+    struct wakeup_source *ws_tx;
+    struct wakeup_source *ws_pwrctrl;
+
 #ifdef CONFIG_SCHED_SCAN
         bool is_sched_scan;
 #endif//CONFIG_SCHED_SCAN 
@@ -746,7 +785,7 @@ struct rwnx_hw {
 	bool wext_scan;
 	struct completion wext_scan_com;
 	struct list_head wext_scanre_list;
-	char wext_essid[32];
+	char wext_essid[33];
 	int support_freqs[SCAN_CHANNEL_MAX];
 	int support_freqs_number;
 #endif
@@ -759,7 +798,7 @@ void rwnx_chanctx_link(struct rwnx_vif *vif, u8 idx,
 void rwnx_chanctx_unlink(struct rwnx_vif *vif);
 int  rwnx_chanctx_valid(struct rwnx_hw *rwnx_hw, u8 idx);
 
-extern u32 chip_id;
+extern u8 chip_id;
 static inline bool is_multicast_sta(int sta_idx)
 {
 

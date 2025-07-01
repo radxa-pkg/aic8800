@@ -21,6 +21,7 @@
 #include "rwnx_defs.h"
 #include "rwnx_platform.h"
 #include "aicwf_rx_prealloc.h"
+#include "rwnx_msg_tx.h"
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 #include <linux/pm_wakeirq.h>
 #else
@@ -42,7 +43,7 @@
 extern uint8_t scanning;
 
 #ifdef CONFIG_GPIO_WAKEUP
-extern int rwnx_send_me_set_lp_level(struct rwnx_hw *rwnx_hw, u8 lp_level);
+extern int rwnx_send_me_set_lp_level(struct rwnx_hw *rwnx_hw, u8 lp_level, u8 disable_filter);
 
 #ifdef CONFIG_WIFI_SUSPEND_FOR_LINUX
 #include <linux/proc_fs.h>
@@ -83,6 +84,24 @@ int aicwf_sdio_writeb(struct aic_sdio_dev *sdiodev, uint regaddr, u8 val)
 	return ret;
 }
 
+int aicwf_sdio_func2_readb(struct aic_sdio_dev *sdiodev, uint regaddr, u8 *val)
+{
+	int ret;
+	sdio_claim_host(sdiodev->func2);
+	*val = sdio_readb(sdiodev->func2, regaddr, &ret);
+	sdio_release_host(sdiodev->func2);
+	return ret;
+}
+
+int aicwf_sdio_func2_writeb(struct aic_sdio_dev *sdiodev, uint regaddr, u8 val)
+{
+	int ret;
+	sdio_claim_host(sdiodev->func2);
+	sdio_writeb(sdiodev->func2, val, regaddr, &ret);
+	sdio_release_host(sdiodev->func2);
+	return ret;
+}
+
 #ifdef CONFIG_TX_NETIF_FLOWCTRL
 void aicwf_sdio_tx_netif_flowctrl(struct rwnx_hw *rwnx_hw, bool state)
 {
@@ -95,6 +114,158 @@ void aicwf_sdio_tx_netif_flowctrl(struct rwnx_hw *rwnx_hw, bool state)
         else
             netif_tx_wake_all_queues(rwnx_vif->ndev);//netif_wake_queue(rwnx_vif->ndev);
     }
+}
+#endif
+
+#ifdef CONFIG_TEMP_CONTROL
+//int interval = 30;
+//module_param(interval, int, 0660);
+static int update_state(s8_l value, u8_l current_state)
+{
+	if (value > TEMP_THD_2)
+		return 2;
+	else if (value > (TEMP_THD_2 - BUFFERING_V2) && (current_state == 2))
+		return 2;
+	else if (value > TEMP_THD_1 && current_state != 2)
+		return 1;
+	else if (value > (TEMP_THD_1 - BUFFERING_V1) && current_state == 1)
+		return 1;
+	else if (current_state == 0)
+		return 0;
+	else
+		return 1;
+}
+
+void aicwf_netif_ctrl(struct aic_sdio_dev *sdiodev, int val)
+{
+	unsigned long flags;
+	struct rwnx_vif *rwnx_vif;
+
+	if (sdiodev->net_stop)
+		return;
+
+	spin_lock_irqsave(&sdiodev->tx_flow_lock, flags);
+	list_for_each_entry(rwnx_vif, &sdiodev->rwnx_hw->vifs, list) {
+		if (!rwnx_vif || !rwnx_vif->ndev || !rwnx_vif->up)
+			continue;
+		netif_tx_stop_all_queues(rwnx_vif->ndev);//netif_stop_queue(rwnx_vif->ndev);
+	}
+	spin_unlock_irqrestore(&sdiodev->tx_flow_lock, flags);
+	sdiodev->net_stop = true;
+	mod_timer(&sdiodev->netif_timer, jiffies + msecs_to_jiffies(val));
+
+	return;
+}
+
+void aicwf_temp_ctrl(struct aic_sdio_dev *sdiodev)
+{
+	if (sdiodev->set_level) {
+		if (sdiodev->set_level == 1) {
+			sdiodev->get_level = 1;
+			aicwf_netif_ctrl(sdiodev, sdiodev->interval_t1/*TMR_INTERVAL_1*/);
+			//mdelay(1);
+		} else if (sdiodev->set_level == 2) {
+			sdiodev->get_level = 2;
+			aicwf_netif_ctrl(sdiodev, sdiodev->interval_t2/*TMR_INTERVAL_2*/);
+			//mdelay(2);
+		}
+		return;
+	} else {
+		if (sdiodev->cur_temp > (TEMP_THD_1 - 8)) {
+			//if ((sdiodev->cur_temp > TEMP_THD_1 && sdiodev->cur_temp <= TEMP_THD_2) || (sdiodev->cur_stat == 1)) {
+			if (update_state(sdiodev->cur_temp, sdiodev->cur_stat) == 1) {
+				sdiodev->get_level = 1;
+				sdiodev->cur_stat = 1;
+				aicwf_netif_ctrl(sdiodev, sdiodev->interval_t1/*TMR_INTERVAL_1*/);
+				//mdelay(1);
+				//break;
+			//} else if ((sdiodev->cur_temp > TEMP_THD_2) || (sdiodev->cur_stat == 2)) {
+			} else if (update_state(sdiodev->cur_temp, sdiodev->cur_stat) == 2) {
+				sdiodev->get_level = 2;
+				sdiodev->cur_stat = 2;
+				aicwf_netif_ctrl(sdiodev, sdiodev->interval_t2/*TMR_INTERVAL_2*/);
+				//mdelay(2);
+				//break;
+			}
+			return;
+		}
+
+		if (sdiodev->cur_stat) {
+			AICWFDBG(LOGINFO, "reset cur_stat");
+			sdiodev->cur_stat = 0;
+		}
+
+		return;
+	}
+}
+
+void aicwf_netif_worker(struct work_struct *work)
+{
+	struct aic_sdio_dev *sdiodev = container_of(work, struct aic_sdio_dev, netif_work);
+	unsigned long flags;
+	struct rwnx_vif *rwnx_vif;
+	spin_lock_irqsave(&sdiodev->tx_flow_lock, flags);
+	list_for_each_entry(rwnx_vif, &sdiodev->rwnx_hw->vifs, list) {
+		if (!rwnx_vif || !rwnx_vif->ndev || !rwnx_vif->up)
+			continue;
+		netif_tx_wake_all_queues(rwnx_vif->ndev);//netif_wake_queue(rwnx_vif->ndev);
+	}
+	spin_unlock_irqrestore(&sdiodev->tx_flow_lock, flags);
+	sdiodev->net_stop = false;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+static void aicwf_netif_timer(ulong data)
+#else
+static void aicwf_netif_timer(struct timer_list *t)
+#endif
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+		struct aic_sdio_dev *sdiodev = (struct aic_sdio_dev *) data;
+#else
+		struct aic_sdio_dev *sdiodev = from_timer(sdiodev, t, netif_timer);
+#endif
+
+	if (!work_pending(&sdiodev->netif_work))
+		schedule_work(&sdiodev->netif_work);
+
+	return;
+}
+
+void aicwf_temp_ctrl_worker(struct work_struct *work)
+{
+	struct rwnx_hw *rwnx_hw;
+	struct mm_set_vendor_swconfig_cfm cfm;
+	struct aic_sdio_dev *sdiodev = container_of(work, struct aic_sdio_dev, tp_ctrl_work);
+	rwnx_hw = sdiodev->rwnx_hw;
+	//AICWFDBG(LOGINFO, "%s\n", __func__);
+
+	rwnx_hw->started_jiffies = jiffies;
+
+	rwnx_send_get_temp_req(rwnx_hw, &cfm);
+	sdiodev->cur_temp = cfm.temp_comp_get_cfm.degree;
+
+	mod_timer(&sdiodev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+
+	return;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+static void aicwf_temp_ctrl_timer(ulong data)
+#else
+static void aicwf_temp_ctrl_timer(struct timer_list *t)
+#endif
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	struct aic_sdio_dev *sdiodev = (struct aic_sdio_dev *) data;
+#else
+	struct aic_sdio_dev *sdiodev = from_timer(sdiodev, t, tp_ctrl_timer);
+#endif
+
+	if (!work_pending(&sdiodev->tp_ctrl_work))
+		schedule_work(&sdiodev->tp_ctrl_work);
+
+	return;
 }
 #endif
 
@@ -539,13 +710,17 @@ static int aicwf_sdio_chipmatch(struct aic_sdio_dev *sdio_dev, u16_l vid, u16_l 
 		sdio_dev->chipid = PRODUCT_ID_AIC8800D80;
 		AICWFDBG(LOGINFO, "%s USE AIC8800D80\r\n", __func__);
 		return 0;
+	}else if(vid == SDIO_VENDOR_ID_AIC8800D80X2 && did == SDIO_DEVICE_ID_AIC8800D80X2){
+		sdio_dev->chipid = PRODUCT_ID_AIC8800D80X2;
+		AICWFDBG(LOGINFO, "%s USE AIC8800D80X2\r\n", __func__);
+		return 0;
 	}else{
 		return -1;
 	}
 }
 
 
-extern int rwnx_send_me_set_lp_level(struct rwnx_hw *rwnx_hw, u8 lp_level);
+extern int rwnx_send_me_set_lp_level(struct rwnx_hw *rwnx_hw, u8 lp_level, u8 disable_filter);
 
 static int aicwf_sdio_probe(struct sdio_func *func,
 	const struct sdio_device_id *id)
@@ -602,8 +777,13 @@ static int aicwf_sdio_probe(struct sdio_func *func,
 	dev_set_drvdata(&func->dev, bus_if);
 	sdiodev->dev = &func->dev;
 
+	if (sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800DC ||
+		sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
+		sdiodev->func2 = func->card->sdio_func[1];
+	}
+
 	//sdio func init start
-	if (sdiodev->chipid != PRODUCT_ID_AIC8800D80) {
+	if (sdiodev->chipid != PRODUCT_ID_AIC8800D80 && sdiodev->chipid != PRODUCT_ID_AIC8800D80X2) {
 	    err = aicwf_sdio_func_init(sdiodev);
     } else {
         err = aicwf_sdiov3_func_init(sdiodev);
@@ -707,6 +887,38 @@ void aicwf_sdio_remove_(struct sdio_func *func){
     aicwf_sdio_remove(func);
 }
 
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
+#ifdef CONFIG_SHUTDOWN_CALLBACK
+int rwnx_close_(struct net_device *dev);
+
+void aicwf_sdio_shutdown(struct device *dev)
+{
+    struct rwnx_vif *rwnx_vif, *tmp;
+    struct aicwf_bus *bus_if = dev_get_drvdata(dev);
+    struct aic_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
+    
+    AICWFDBG(LOGINFO, "%s Enter", __func__);
+    list_for_each_entry_safe(rwnx_vif, tmp, &sdiodev->rwnx_hw->vifs, list) {
+            if (rwnx_vif->ndev && test_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags)){
+                            AICWFDBG(LOGINFO, "%s rwnx_close by shutdown", __func__);
+                            rwnx_close_(rwnx_vif->ndev);
+
+            }else{
+                if(!rwnx_vif->ndev){
+                    AICWFDBG(LOGERROR, "%s rwnx_vif->ndev is NULL \r\n", __func__);
+                }
+                if(!test_bit(RWNX_DEV_STARTED, &rwnx_vif->drv_flags)){
+                    AICWFDBG(LOGERROR, "%s rwnx_vif->drv_flags close\r\n", __func__);
+                }
+            }
+          
+    }
+    AICWFDBG(LOGINFO, "%s Exit", __func__);
+
+}
+#endif
+#endif
+
 static int aicwf_sdio_suspend(struct device *dev)
 {
 	int ret = 0;
@@ -731,6 +943,16 @@ static int aicwf_sdio_suspend(struct device *dev)
 		return ret;
 	}
 
+#ifdef CONFIG_TEMP_CONTROL
+	del_timer_sync(&sdiodev->tp_ctrl_timer);
+	cancel_work_sync(&sdiodev->tp_ctrl_work);
+
+	mod_timer(&sdiodev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+
+	del_timer_sync(&sdiodev->netif_timer);
+	cancel_work_sync(&sdiodev->netif_work);
+#endif
+
 
 	while (sdiodev->state == SDIO_ACTIVE_ST) {
 		if (down_interruptible(&sdiodev->tx_priv->txctl_sema))
@@ -745,6 +967,15 @@ static int aicwf_sdio_suspend(struct device *dev)
 //	rwnx_enable_hostwake_irq();
 #endif
 
+#if defined(CONFIG_AUTO_POWERSAVE) && defined(CONFIG_SDIO_PWRCTRL)
+    if(sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
+        sdio_dbg("autops set\n");
+        ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 0x8);
+        if(ret) {
+            sdio_err("sdio set autops fail\n");
+        }
+    }
+#endif
 
 #if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
 	if(sdiodev->chipid == PRODUCT_ID_AIC8801){
@@ -772,11 +1003,16 @@ static int aicwf_sdio_resume(struct device *dev)
 	struct aicwf_bus *bus_if = dev_get_drvdata(dev);
 	struct aic_sdio_dev *sdiodev = bus_if->bus_priv.sdio;
 	struct rwnx_vif *rwnx_vif, *tmp;
-#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2) || defined(CONFIG_AUTO_POWERSAVE)
 	int ret;
 #endif
 
 	sdio_dbg("%s enter \n", __func__);
+
+#ifdef CONFIG_TEMP_CONTROL
+	mod_timer(&sdiodev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+#endif
+
 //#ifdef CONFIG_GPIO_WAKEUP
 //	rwnx_disable_hostwake_irq();
 //#endif
@@ -789,6 +1025,16 @@ static int aicwf_sdio_resume(struct device *dev)
 	#if defined(CONFIG_SDIO_PWRCTRL)
 	aicwf_sdio_pwr_stctl(sdiodev, SDIO_ACTIVE_ST);
 	#endif
+
+#if defined(CONFIG_AUTO_POWERSAVE) && defined(CONFIG_SDIO_PWRCTRL)
+    if(sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
+        sdio_dbg("autops clear\n");
+        ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 0x8);
+        if(ret) {
+            sdio_err("sdio clear autops fail\n");
+        }
+    }
+#endif
 
 //	aicwf_sdio_hal_irqhandler(sdiodev->func);
 
@@ -820,6 +1066,7 @@ static const struct sdio_device_id aicwf_sdmmc_ids[] = {
 	{SDIO_DEVICE(SDIO_VENDOR_ID_AIC8801, SDIO_DEVICE_ID_AIC8801)},
 	{SDIO_DEVICE(SDIO_VENDOR_ID_AIC8800DC, SDIO_DEVICE_ID_AIC8800DC)},
     {SDIO_DEVICE(SDIO_VENDOR_ID_AIC8800D80, SDIO_DEVICE_ID_AIC8800D80)},
+    {SDIO_DEVICE(SDIO_VENDOR_ID_AIC8800D80X2, SDIO_DEVICE_ID_AIC8800D80X2)},
 	{ },
 };
 
@@ -837,6 +1084,11 @@ static struct sdio_driver aicwf_sdio_driver = {
 	.id_table = aicwf_sdmmc_ids,
 	.drv = {
 		.pm = &aicwf_sdio_pm_ops,
+#if defined(CONFIG_PLATFORM_ROCKCHIP) || defined(CONFIG_PLATFORM_ROCKCHIP2)
+#ifdef CONFIG_SHUTDOWN_CALLBACK
+		.shutdown = aicwf_sdio_shutdown,
+#endif
+#endif
 	},
 };
 #endif
@@ -906,6 +1158,19 @@ void aicwf_sdio_register(void)
 void aicwf_sdio_exit(void)
 {
 	if (g_rwnx_plat && g_rwnx_plat->enabled){
+#ifdef CONFIG_TEMP_CONTROL
+		if (timer_pending(&g_rwnx_plat->sdiodev->tp_ctrl_timer)) {
+			AICWFDBG(LOGINFO, "%s del tp_ctrl_timer\n", __func__);
+			del_timer_sync(&g_rwnx_plat->sdiodev->tp_ctrl_timer);
+		}
+		cancel_work_sync(&g_rwnx_plat->sdiodev->tp_ctrl_work);
+
+		if (timer_pending(&g_rwnx_plat->sdiodev->netif_timer)) {
+			AICWFDBG(LOGINFO, "%s del netif_timer\n", __func__);
+			del_timer_sync(&g_rwnx_plat->sdiodev->netif_timer);
+		}
+		cancel_work_sync(&g_rwnx_plat->sdiodev->netif_work);
+#endif
 		rwnx_platform_deinit(g_rwnx_plat->sdiodev->rwnx_hw);
 	}else{
 		AICWFDBG(LOGERROR, "%s g_rwnx_plat is not ready \r\n", __func__);
@@ -944,14 +1209,14 @@ int aicwf_sdio_wakeup(struct aic_sdio_dev *sdiodev)
 {
 	int ret = 0;
 	int read_retry;
-	int write_retry = 20;
+	int write_retry = 1;
     int wakeup_reg_val = 0;
 
     if (sdiodev->chipid == PRODUCT_ID_AIC8801 ||
         sdiodev->chipid == PRODUCT_ID_AIC8800DC ||
         sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
         wakeup_reg_val = 1;
-    } else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80) {
+    } else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
         wakeup_reg_val = 0x11;
     }
 
@@ -966,13 +1231,13 @@ int aicwf_sdio_wakeup(struct aic_sdio_dev *sdiodev)
 				txrx_err("sdio wakeup fail\n");
 				ret = -1;
 			} else {
-				read_retry = 10;
+				read_retry = 50;
 				while (read_retry) {
 					u8 val;
-					ret = aicwf_sdio_readb(sdiodev, sdiodev->sdio_reg.sleep_reg, &val);
+					ret = aicwf_sdio_readb(sdiodev, sdiodev->sdio_reg.wakeup_reg, &val);
 					if (ret < 0)
 						txrx_err("sdio wakeup read fail\n");
-					else if (val & 0x10) {
+					else if ((val & 0x1) == 0) {
 						break;
 					}
 					read_retry--;
@@ -997,6 +1262,8 @@ int aicwf_sdio_sleep_allow(struct aic_sdio_dev *sdiodev)
 	int ret = 0;
 	struct aicwf_bus *bus_if = sdiodev->bus_if;
 	struct rwnx_hw *rwnx_hw = sdiodev->rwnx_hw;
+	u8 read_retry;
+	u8 val;
 
 	if (bus_if->state == BUS_DOWN_ST) {
 		ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.sleep_reg, 0x10);
@@ -1009,11 +1276,34 @@ int aicwf_sdio_sleep_allow(struct aic_sdio_dev *sdiodev)
 
 	sdio_info("sleep: %d, %d\n", sdiodev->state, scanning);
 	if (sdiodev->state == SDIO_ACTIVE_ST  && !scanning && !rwnx_hw->is_p2p_alive \
-				&& !rwnx_hw->is_p2p_connected) {
+		&& !rwnx_hw->is_p2p_connected && (int)(atomic_read(&sdiodev->tx_priv->tx_pktcnt) <= 0) \
+		&& (sdiodev->tx_priv->cmd_txstate == false) && (int)(atomic_read(&sdiodev->rx_priv->rx_cnt) == 0)) {
 		AICWFDBG(LOGSDPWRC, "%s s\n", __func__);
-		ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.sleep_reg, 0x10);
-		if (ret)
-			sdio_err("Write sleep fail!\n");
+		if (sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
+			if (aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 0x02) < 0) {
+				sdio_err("reg:%d write failed!\n", sdiodev->sdio_reg.wakeup_reg);
+			}
+		} else if (sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800DC || 
+				sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
+			if (aicwf_sdio_func2_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 0x2) < 0) {
+				sdio_err("reg:%d write failed!\n", sdiodev->sdio_reg.wakeup_reg);
+			}
+			read_retry = 100;
+			while (read_retry) {
+				val = 0;
+				if (aicwf_sdio_func2_readb(sdiodev, sdiodev->sdio_reg.wakeup_reg, &val) < 0){
+					sdio_err("reg %d read fail\n", sdiodev->sdio_reg.wakeup_reg);
+				}else if ((val & 0x2) == 0) {
+					break;
+				} else {
+					sdio_err("val:%d\n", val);
+				}
+				read_retry--;
+				if(read_retry < 90)
+					printk("warning: read cnt %d\n", read_retry);
+				udelay(500);
+			}
+		}
 		sdiodev->state = SDIO_SLEEP_ST;
 		aicwf_sdio_pwrctl_timer(sdiodev, 0);
         //rwnx_pm_relax(sdiodev);
@@ -1237,7 +1527,8 @@ static int aicwf_sdio_tx_msg(struct aic_sdio_dev *sdiodev)
 	} else
 		len = payload_len;
 
-	if(sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800D80){
+	if(sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
 		buffer_cnt = aicwf_sdio_flow_ctrl_msg(sdiodev);
 		while ((buffer_cnt <= 0 || (buffer_cnt > 0 && len > (buffer_cnt * BUFFER_SIZE))) && retry < 10) {
 			retry++;
@@ -1247,7 +1538,8 @@ static int aicwf_sdio_tx_msg(struct aic_sdio_dev *sdiodev)
 	}
 	down(&sdiodev->tx_priv->cmd_txsema);
 
-	if(sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800D80){
+	if(sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
 		if (buffer_cnt > 0 && len < (buffer_cnt * BUFFER_SIZE)) {
 			err = aicwf_sdio_send_pkt(sdiodev, payload, len);
 			if (err) {
@@ -1310,7 +1602,6 @@ static void aicwf_sdio_tx_process(struct aic_sdio_dev *sdiodev)
 			txrx_err("txctl up bus->txctl_sema fail\n");
 			return;
 		}
-
 		err = aicwf_sdio_tx_msg(sdiodev);
 		up(&sdiodev->tx_priv->txctl_sema);
 		if (waitqueue_active(&sdiodev->tx_priv->cmd_txdone_wait))
@@ -1337,6 +1628,11 @@ static void aicwf_sdio_tx_process(struct aic_sdio_dev *sdiodev)
 		if(sdiodev->bus_if->state == BUS_DOWN_ST) {
 			break;
 		}
+#ifdef CONFIG_TEMP_CONTROL
+		if (sdiodev->on_off)
+			aicwf_temp_ctrl(sdiodev);
+#endif
+
 	        if (sdiodev->tx_priv->fw_avail_bufcnt <= DATA_FLOW_CTRL_THRESH) {
         	    if (sdiodev->tx_priv->cmd_txstate)
                 	break;
@@ -1475,7 +1771,7 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
 		|| ((atomic_read(&tx_priv->aggr_count) != 0) && (aggr_len == 0))) {
 		if (aggr_len > 0)
 			aicwf_sdio_aggrbuf_reset(tx_priv);
-		goto done;
+		return 0;
 	}
 
 	if (atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH)) {
@@ -1483,15 +1779,16 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
 			tx_priv->fw_avail_bufcnt -= atomic_read(&tx_priv->aggr_count);
 			aicwf_sdio_aggr_send(tx_priv); //send and check the next pkt;
 		}
+		return 0;
 	} else {
 		spin_lock_bh(&sdiodev->tx_priv->txqlock);
 		pkt = aicwf_frame_dequeue(&sdiodev->tx_priv->txq);
 		if (pkt == NULL) {
 			sdio_err("txq no pkt\n");
 			spin_unlock_bh(&sdiodev->tx_priv->txqlock);
-			goto done;
+			return 0;
 		}
-		atomic_dec(&sdiodev->tx_priv->tx_pktcnt);
+		//atomic_dec(&sdiodev->tx_priv->tx_pktcnt);
 		spin_unlock_bh(&sdiodev->tx_priv->txqlock);
 
 #ifdef CONFIG_TX_NETIF_FLOWCTRL
@@ -1512,19 +1809,21 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
 		if (aicwf_sdio_aggr(tx_priv, pkt)) {
 			aicwf_sdio_aggrbuf_reset(tx_priv);
 			sdio_err("add aggr pkts failed!\n");
-			goto done;
+			atomic_dec(&sdiodev->tx_priv->tx_pktcnt);
+			return 0;
 		}
 
 		//when aggr finish or there is cmd to send, just send this aggr pkt to fw
-		if ((int)atomic_read(&sdiodev->tx_priv->tx_pktcnt) == 0 || txnow || (atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH))) {
+		if ((int)atomic_read(&sdiodev->tx_priv->tx_pktcnt) == 1 || txnow || (atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH))) {
 			tx_priv->fw_avail_bufcnt -= atomic_read(&tx_priv->aggr_count);
 			aicwf_sdio_aggr_send(tx_priv);
-		} else
-			goto done;
+			atomic_dec(&sdiodev->tx_priv->tx_pktcnt);
+			return 0;
+		} else {
+			atomic_dec(&sdiodev->tx_priv->tx_pktcnt);
+			return 0;
+		}
 	}
-
-done:
-	return 0;
 }
 
 int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
@@ -1544,7 +1843,7 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
         tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800DC ||
         tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800DW)
         sdio_header[3] = 0; //reserved
-    else if (tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80)
+    else if (tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2)
 	    sdio_header[3] = crc8_ponl_107(&sdio_header[0], 3); // crc8
 
 	memcpy(tx_priv->tail, (u8 *)&sdio_header, sizeof(sdio_header));
@@ -1627,7 +1926,7 @@ static int aicwf_sdio_bus_start(struct device *dev)
 #else
     set_irq_handler(aicwf_sdio_hal_irqhandler);  
 #endif
-    if(sdiodev->chipid == PRODUCT_ID_AIC8800D80){
+    if(sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
         sdio_f0_writeb(sdiodev->func, 0x07, 0x04, &ret);
         if (ret) {
             sdio_err("set func0 int en fail %d\n", ret);
@@ -1663,6 +1962,27 @@ int busrx_thread_prio = 1;
 module_param_named(busrx_thread_prio, busrx_thread_prio, int, 0644);
 //module_param(busrx_thread_prio, int, 0);
 #endif
+
+
+static inline void aic_thread_wait_stop(void)
+{
+#if 1// PLATFORM_LINUX
+	#if 0
+	while (!kthread_should_stop()){
+        AICWFDBG(LOGINFO, "%s waiting for thread_stop notify \r\n", __func__);
+		msleep(100);
+    }
+	#else
+	set_current_state(TASK_INTERRUPTIBLE);
+	while (!kthread_should_stop()) {
+        AICWFDBG(LOGINFO, "%s waiting for thread_stop notify \r\n", __func__);
+		schedule();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
+	#endif
+#endif
+}
 
 #ifdef CONFIG_OOB
 int rx_thread_wait_to = 1000;
@@ -1701,17 +2021,21 @@ int sdio_busirq_thread(void *data){
     
     
     while (1) {
+#if 0
             if (kthread_should_stop()) {
                 AICWFDBG(LOGERROR, "sdio busirq thread stop\n");
                 break;
             }
-
+#endif
             if(!wait_for_completion_timeout(&bus_if->busirq_trgg, msecs_to_jiffies(rx_thread_wait_to))){
                 AICWFDBG(LOGRXPOLL, "%s wait for completion timout \r\n", __func__);
             }
        
-            if (bus_if->state == BUS_DOWN_ST)
-                continue;
+            if (bus_if->state == BUS_DOWN_ST){
+                AICWFDBG(LOGERROR, "%s bus down thread exit \r\n", __func__);
+                break;
+            }
+                //continue;
 #if 1
 #ifdef CONFIG_SDIO_PWRCTRL
             while(atomic_read(&bus_if->bus_priv.sdio->is_bus_suspend) == 1){
@@ -1723,6 +2047,8 @@ int sdio_busirq_thread(void *data){
 #endif
             aicwf_sdio_hal_irqhandler(bus_if->bus_priv.sdio->func);
         }
+    
+    aic_thread_wait_stop();
 
     return 0;
 }
@@ -1772,14 +2098,16 @@ int sdio_bustx_thread(void *data)
     AICWFDBG(LOGINFO, "%s the current pid is:%d\n", __func__, current->pid);
 
 	while (1) {
+        #if 0
 		if (kthread_should_stop()) {
 			AICWFDBG(LOGERROR, "sdio bustx thread stop\n");
 			break;
 		}
-        
+        #endif
 	    if (!wait_for_completion_interruptible(&bus->bustx_trgg)) {
 			if (sdiodev->bus_if->state == BUS_DOWN_ST)
-				continue;
+				break;
+				//continue;
 
             rwnx_wakeup_lock(sdiodev->rwnx_hw->ws_tx);
 			if ((int)(atomic_read(&sdiodev->tx_priv->tx_pktcnt) > 0) || (sdiodev->tx_priv->cmd_txstate == true)){
@@ -1788,7 +2116,9 @@ int sdio_bustx_thread(void *data)
             rwnx_wakeup_unlock(sdiodev->rwnx_hw->ws_tx);
 		}
 	}
-
+    
+	aic_thread_wait_stop();
+	AICWFDBG(LOGINFO, "%s Exit\r\n", __func__);
 	return 0;
 }
 
@@ -1894,19 +2224,24 @@ int sdio_busrx_thread(void *data)
     AICWFDBG(LOGINFO, "%s the current pid is:%d\n", __func__, current->pid);
     
     while (1) {
+        #if 0
         if (kthread_should_stop()) {
             AICWFDBG(LOGERROR, "sdio busrx thread stop\n");
             break;
         }
+        #endif
         if (!wait_for_completion_interruptible(&bus_if->busrx_trgg)) {
 
             if (bus_if->state == BUS_DOWN_ST)
-                continue;
+				break;
+				//continue;
             rwnx_wakeup_lock(rx_priv->sdiodev->rwnx_hw->ws_rx);
             aicwf_process_rxframes(rx_priv);
             rwnx_wakeup_unlock(rx_priv->sdiodev->rwnx_hw->ws_rx);
         }
     }
+    aic_thread_wait_stop();
+	AICWFDBG(LOGINFO, "%s Exit\r\n", __func__);
     return 0;
 
 }
@@ -2012,6 +2347,12 @@ void aicwf_sdio_hal_irqhandler(struct sdio_func *func)
 	#endif
 	int ret;
 
+
+    if ((sdiodev->rwnx_hw) == NULL) {
+		sdio_err("waiting for rwnx_hw->irq_enable is true\r\n");
+		return;
+	}
+
 	//AICWFDBG(LOGDEBUG, "fdrv %s enter \r\n", __func__);
     rwnx_wakeup_lock(sdiodev->rwnx_hw->ws_irqrx);
 
@@ -2060,7 +2401,7 @@ void aicwf_sdio_hal_irqhandler(struct sdio_func *func)
             complete(&bus_if->busrx_trgg);
         }
 
-    }else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80) {
+    }else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
         do {
             ret = aicwf_sdio_readb(sdiodev, sdiodev->sdio_reg.misc_int_status_reg, &intstatus);
             if (!ret) {
@@ -2157,24 +2498,31 @@ static struct aicwf_bus_ops aicwf_sdio_bus_ops = {
 void aicwf_sdio_release(struct aic_sdio_dev *sdiodev)
 {
 	struct aicwf_bus *bus_if;
-#ifdef CONFIG_OOB
-    int ret;
-#endif
+    	int ret = 0;
 	AICWFDBG(LOGINFO, "%s Enter\n", __func__);
 
 	bus_if = dev_get_drvdata(sdiodev->dev);
 	bus_if->state = BUS_DOWN_ST;
 #ifdef CONFIG_OOB
-    if(sdiodev->oob_enable){
-    	sdio_claim_host(sdiodev->func);
-    	//disable sdio interrupt
-        ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.intr_config_reg, 0x0);
-    	if (ret < 0) {
-    		AICWFDBG(LOGERROR, "reg:%d write failed!\n", sdiodev->sdio_reg.intr_config_reg);
-    	}
-    	sdio_release_irq(sdiodev->func);
-    	sdio_release_host(sdiodev->func);
-    }
+	if(sdiodev->oob_enable){
+		sdio_claim_host(sdiodev->func);
+		//disable sdio interrupt
+		ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.intr_config_reg, 0x0);
+		if (ret < 0) {
+			AICWFDBG(LOGERROR, "reg:%d write failed!\n", sdiodev->sdio_reg.intr_config_reg);
+		}
+		sdio_release_irq(sdiodev->func);
+		sdio_release_host(sdiodev->func);
+	}
+#else
+	sdio_claim_host(sdiodev->func);
+	//disable sdio interrupt
+	ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.intr_config_reg, 0x0);
+	if (ret < 0) {
+		sdio_err("reg:%d write failed!\n", sdiodev->sdio_reg.intr_config_reg);
+	}
+	sdio_release_irq(sdiodev->func);
+	sdio_release_host(sdiodev->func);
 #endif
 	if (sdiodev->dev)
 		aicwf_bus_deinit(sdiodev->dev);
@@ -2216,7 +2564,7 @@ void aicwf_sdio_reg_init(struct aic_sdio_dev *sdiodev)
         sdiodev->sdio_reg.block_cnt_reg =          SDIOWIFI_BLOCK_CNT_REG;
         sdiodev->sdio_reg.rd_fifo_addr =           SDIOWIFI_RD_FIFO_ADDR;
         sdiodev->sdio_reg.wr_fifo_addr =           SDIOWIFI_WR_FIFO_ADDR;
-	} else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80){
+	} else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80 || sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
         sdiodev->sdio_reg.bytemode_len_reg =       SDIOWIFI_BYTEMODE_LEN_REG_V3;
         sdiodev->sdio_reg.intr_config_reg =        SDIOWIFI_INTR_ENABLE_REG_V3;
         sdiodev->sdio_reg.sleep_reg =              SDIOWIFI_INTR_PENDING_REG_V3;
@@ -2236,7 +2584,7 @@ int aicwf_sdio_func_init(struct aic_sdio_dev *sdiodev)
 	u8 byte_mode_disable = 0x1;//1: no byte mode
 	int ret = 0;
 	struct aicbsp_feature_t feature;
-	u8 val = 0;
+	//u8 val = 0;
 
 	aicbsp_get_feature(&feature, NULL);
     aicwf_sdio_reg_init(sdiodev);
@@ -2276,6 +2624,41 @@ int aicwf_sdio_func_init(struct aic_sdio_dev *sdiodev)
 
 	sdio_release_host(sdiodev->func);
 
+	if (sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800DC ||
+			sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
+		sdio_claim_host(sdiodev->func2);
+		//set sdio blocksize
+		ret = sdio_set_block_size(sdiodev->func2, SDIOWIFI_FUNC_BLOCKSIZE);
+		if (ret < 0) {
+			AICWFDBG(LOGERROR, "set func2 blocksize fail %d\n", ret);
+			sdio_release_host(sdiodev->func2);
+			return ret;
+		}
+
+		//set sdio enable func
+		ret = sdio_enable_func(sdiodev->func2);
+		if (ret < 0) {
+			sdio_release_host(sdiodev->func2);
+			AICWFDBG(LOGERROR, "enable func2 fail %d.\n", ret);
+			return ret;
+		}
+
+		sdio_release_host(sdiodev->func2);
+
+		ret = aicwf_sdio_func2_writeb(sdiodev, sdiodev->sdio_reg.register_block, block_bit0);
+		if (ret < 0) {
+			AICWFDBG(LOGERROR, "reg:%d write failed!\n", sdiodev->sdio_reg.register_block);
+			return ret;
+		}
+
+		//1: no byte mode
+		ret = aicwf_sdio_func2_writeb(sdiodev, sdiodev->sdio_reg.bytemode_enable_reg, byte_mode_disable);
+		if (ret < 0) {
+			AICWFDBG(LOGERROR, "reg:%d write failed!\n", sdiodev->sdio_reg.bytemode_enable_reg);
+			return ret;
+		}
+	}
+
 	ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.register_block, block_bit0);
 	if (ret < 0) {
 		AICWFDBG(LOGERROR, "reg:%d write failed!\n", sdiodev->sdio_reg.register_block);
@@ -2289,13 +2672,13 @@ int aicwf_sdio_func_init(struct aic_sdio_dev *sdiodev)
 		return ret;
 	}
 
+#if 0
 	ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 1);
 	if (ret < 0) {
         AICWFDBG(LOGERROR, "reg:%d write failed!\n", sdiodev->sdio_reg.wakeup_reg);
 		return ret;
 	}
 
-#if 1
 	mdelay(5);
 	ret = aicwf_sdio_readb(sdiodev, sdiodev->sdio_reg.sleep_reg, &val);
 	if (ret < 0) {
@@ -2308,6 +2691,8 @@ int aicwf_sdio_func_init(struct aic_sdio_dev *sdiodev)
 	}else{
 		AICWFDBG(LOGINFO, "sdio ready\n");
 	}
+#else
+	mdelay(10);
 #endif
 	return ret;
 }
@@ -2419,6 +2804,13 @@ void aicwf_sdio_func_deinit(struct aic_sdio_dev *sdiodev)
 	sdio_claim_host(sdiodev->func);
 	sdio_disable_func(sdiodev->func);
 	sdio_release_host(sdiodev->func);
+
+	if(sdiodev->chipid == PRODUCT_ID_AIC8801 || sdiodev->chipid == PRODUCT_ID_AIC8800DC ||
+			sdiodev->chipid == PRODUCT_ID_AIC8800DW){
+		sdio_claim_host(sdiodev->func2);
+		sdio_disable_func(sdiodev->func2);
+		sdio_release_host(sdiodev->func2);
+	}
 }
 
 void *aicwf_sdio_bus_init(struct aic_sdio_dev *sdiodev)
@@ -2485,6 +2877,31 @@ void *aicwf_sdio_bus_init(struct aic_sdio_dev *sdiodev)
 	spin_lock_init(&sdiodev->tx_flow_lock);
 #endif
 
+#ifdef CONFIG_TEMP_CONTROL
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	init_timer(&sdiodev->tp_ctrl_timer);
+	sdiodev->tp_ctrl_timer.data = (ulong) sdiodev;
+	sdiodev->tp_ctrl_timer.function = aicwf_temp_ctrl_timer;
+	init_timer(&sdiodev->netif_timer);
+	sdiodev->netif_timer.data = (ulong) sdiodev;
+	sdiodev->netif_timer.function = aicwf_netif_timer;
+#else
+	timer_setup(&sdiodev->tp_ctrl_timer, aicwf_temp_ctrl_timer, 0);
+	timer_setup(&sdiodev->netif_timer, aicwf_netif_timer, 0);
+#endif
+	INIT_WORK(&sdiodev->tp_ctrl_work, aicwf_temp_ctrl_worker);
+	INIT_WORK(&sdiodev->netif_work, aicwf_netif_worker);
+	mod_timer(&sdiodev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+	sdiodev->net_stop = false;;
+	sdiodev->on_off = true;
+	sdiodev->cur_temp = 0;
+	sdiodev->get_level = 0;
+	sdiodev->set_level = 0;
+	sdiodev->interval_t1 = TMR_INTERVAL_1;
+	sdiodev->interval_t2 = TMR_INTERVAL_2;
+	sdiodev->cur_stat = 0;
+#endif
+
 	ret = aicwf_bus_init(0, sdiodev->dev);
 	if (ret < 0) {
 		sdio_err("bus init fail\n");
@@ -2534,10 +2951,10 @@ void rwnx_set_wifi_suspend(char onoff){
 	int ret = 0;
 	if (onoff == '0') {
 		printk("%s resume \r\n", __func__);
-		rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, 0);
+		rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, 0, 1);
 	}else{
 		printk("%s suspend \r\n", __func__);
-		ret = rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, 1);
+		ret = rwnx_send_me_set_lp_level(g_rwnx_plat->sdiodev->rwnx_hw, 1, 0);
 		if (!ret) {
 			aicwf_sdio_pwr_stctl(g_rwnx_plat->sdiodev, SDIO_SLEEP_ST);
 			ret = aicwf_sdio_writeb(g_rwnx_plat->sdiodev, SDIOWIFI_WAKEUP_REG, 2);

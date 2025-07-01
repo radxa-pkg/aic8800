@@ -47,44 +47,23 @@ u16 tx_legrates_lut_rate[] = {
 	540
 };
 
-
-u16 legrates_lut_rate[] = {
-	10,
-	20,
-	55,
-	110,
-	0,
-	0,
-	0,
-	0,
-	480,
-	240,
-	120,
-	60,
-	540,
-	360,
-	180,
-	90
-};
-
-
-const u8 legrates_lut[] = {
-	0,                          /* 0 */
-	1,                          /* 1 */
-	2,                          /* 2 */
-	3,                          /* 3 */
-	-1,                         /* 4 */
-	-1,                         /* 5 */
-	-1,                         /* 6 */
-	-1,                         /* 7 */
-	10,                         /* 8 */
-	8,                          /* 9 */
-	6,                          /* 10 */
-	4,                          /* 11 */
-	11,                         /* 12 */
-	9,                          /* 13 */
-	7,                          /* 14 */
-	5                           /* 15 */
+struct rwnx_legrate legrates_lut[] = {
+	[0] = { .idx = 0, .rate = 10},
+	[1] = { .idx = 1, .rate = 20},
+	[2] = { .idx = 2, .rate = 55},
+	[3] = { .idx = 3, .rate = 110},
+	[4] = { .idx = -1, .rate = 0},
+	[5] = { .idx = -1, .rate = 0},
+	[6] = { .idx = -1, .rate = 0},
+	[7] = { .idx = -1, .rate = 0},
+	[8] = { .idx = 10, .rate = 480},
+	[9] = { .idx = 8, .rate = 240},
+	[10] = { .idx = 6, .rate = 120},
+	[11] = { .idx = 4, .rate = 60},
+	[12] = { .idx = 11, .rate = 540},
+	[13] = { .idx = 9, .rate = 360},
+	[14] = { .idx = 7, .rate = 180},
+	[15] = { .idx = 5, .rate = 90},
 };
 
 struct vendor_radiotap_hdr {
@@ -283,7 +262,7 @@ static void rwnx_rx_statistic(struct rwnx_hw *rwnx_hw, struct hw_rxhdr *hw_rxhdr
 			break;
 		}
 	} else {
-		int idx = legrates_lut[rxvect->leg_rate];
+		int idx = legrates_lut[rxvect->leg_rate].idx;
 		if (idx < 4) {
 			rate_idx = idx * 2 + rxvect->pre_type;
 		} else {
@@ -1021,7 +1000,7 @@ static void rwnx_rx_add_rtap_hdr(struct rwnx_hw *rwnx_hw,
 		struct ieee80211_supported_band *band =
 				rwnx_hw->wiphy->bands[phy_info->phy_band];
 		rtap->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RATE);
-		BUG_ON((rate_idx = legrates_lut[rxvect->leg_rate]) == -1);
+		BUG_ON((rate_idx = legrates_lut[rxvect->leg_rate].idx) == -1);
 		if (phy_info->phy_band == NL80211_BAND_5GHZ)
 			rate_idx -= 4;  /* rwnx_ratetable_5ghz[0].hw_value == 4 */
 		*pos = DIV_ROUND_UP(band->bitrates[rate_idx].bitrate, 5);
@@ -1435,6 +1414,7 @@ int reord_flush_tid(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u8 tid)
 	return 0;
 }
 
+
 void reord_deinit_sta(struct aicwf_rx_priv *rx_priv, struct reord_ctrl_info *reord_info)
 {
 	u8 i = 0;
@@ -1450,6 +1430,13 @@ void reord_deinit_sta(struct aicwf_rx_priv *rx_priv, struct reord_ctrl_info *reo
 	for (i = 0; i < 8; i++) {
 		struct recv_msdu *req, *next;
 		preorder_ctrl = &reord_info->preorder_ctrl[i];
+		if(preorder_ctrl->enable){
+			preorder_ctrl->enable = false;
+			if (timer_pending(&preorder_ctrl->reord_timer)) {
+				ret = del_timer_sync(&preorder_ctrl->reord_timer);
+			}
+			cancel_work_sync(&preorder_ctrl->reord_timer_work);
+		}
 		spin_lock_irqsave(&preorder_ctrl->reord_list_lock, flags);
 		list_for_each_entry_safe(req, next, &preorder_ctrl->reord_list, reord_pending_list) {
 			list_del_init(&req->reord_pending_list);
@@ -1459,12 +1446,11 @@ void reord_deinit_sta(struct aicwf_rx_priv *rx_priv, struct reord_ctrl_info *reo
 			reord_rxframe_free(&rx_priv->freeq_lock, &rx_priv->rxframes_freequeue, &req->rxframe_list);
 		}
 		spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
-		if (timer_pending(&preorder_ctrl->reord_timer)) {
-			ret = del_timer_sync(&preorder_ctrl->reord_timer);
-		}
-		cancel_work_sync(&preorder_ctrl->reord_timer_work);
+
 	}
+	spin_lock_bh(&rx_priv->stas_reord_lock);
 	list_del(&reord_info->list);
+	spin_unlock_bh(&rx_priv->stas_reord_lock);
 	kfree(reord_info);
 }
 
@@ -1547,7 +1533,7 @@ int reord_single_frame_ind(struct aicwf_rx_priv *rx_priv, struct recv_msdu *prfr
     	memset(rx_skb->cb, 0, sizeof(rx_skb->cb));
 
 #ifdef CONFIG_FILTER_TCP_ACK
-	filter_rx_tcp_ack(rwnx_vif->rwnx_hw,rx_skb->data, cpu_to_le16(skb->len));
+	filter_rx_tcp_ack(rwnx_vif->rwnx_hw,rx_skb->data, cpu_to_le16(rx_skb->len));
 #endif
 
 #ifdef CONFIG_RX_NETIF_RECV_SKB//AIDEN test
@@ -2008,11 +1994,13 @@ u8 rwnx_rxdataind_aicwf(struct rwnx_hw *rwnx_hw, void *hostid, void *rx_priv)
 	const struct ethhdr *eth;
 
 	hw_rxhdr = (struct hw_rxhdr *)skb->data;
-
+    
+#ifdef AICWF_RX_REORDER
 	if (hw_rxhdr->is_monitor_vif) {
 		status = RX_STAT_MONITOR;
-		printk("monitor rx\n");
+		//printk("monitor rx\n");
 	}
+#endif
 
 	if (hw_rxhdr->flags_upload)
 		status |= RX_STAT_FORWARD;
@@ -2029,76 +2017,77 @@ u8 rwnx_rxdataind_aicwf(struct rwnx_hw *rwnx_hw, void *hostid, void *rx_priv)
 	}
 
 	/* Check if we need to forward the buffer coming from a monitor interface */
-	if (status & RX_STAT_MONITOR) {
-		struct sk_buff *skb_monitor;
-		struct hw_rxhdr hw_rxhdr_copy;
-		u8 rtap_len;
-		u16 frm_len;
+    if (status & RX_STAT_MONITOR) {
+        struct sk_buff *skb_monitor = NULL;
+        struct hw_rxhdr hw_rxhdr_copy;
+        u8 rtap_len;
+        u16 frm_len = 0;
 
-		//Check if monitor interface exists and is open
-		rwnx_vif = rwnx_rx_get_vif(rwnx_hw, rwnx_hw->monitor_vif);
-		if (!rwnx_vif) {
-			dev_err(rwnx_hw->dev, "Received monitor frame but there is no monitor interface open\n");
-			goto check_len_update;
-		}
+        //Check if monitor interface exists and is open
+        rwnx_vif = rwnx_rx_get_vif(rwnx_hw, rwnx_hw->monitor_vif);
+        if (!rwnx_vif) {
+            dev_err(rwnx_hw->dev, "Received monitor frame but there is no monitor interface open\n");
+            goto check_len_update;
+        }
 
-		rwnx_rx_vector_convert(rwnx_hw,
-							   &hw_rxhdr->hwvect.rx_vect1,
-							   &hw_rxhdr->hwvect.rx_vect2);
-		rtap_len = rwnx_rx_rtap_hdrlen(&hw_rxhdr->hwvect.rx_vect1, false);
+        rwnx_rx_vector_convert(rwnx_hw,
+                               &hw_rxhdr->hwvect.rx_vect1,
+                               &hw_rxhdr->hwvect.rx_vect2);
+        rtap_len = rwnx_rx_rtap_hdrlen(&hw_rxhdr->hwvect.rx_vect1, false);
 
-		// Move skb->data pointer to MAC Header or Ethernet header
-		skb->data += (msdu_offset + 2); //sdio/usb word allign
+        if (status == RX_STAT_MONITOR) 
+        {
+            /* Remove the SK buffer from the rxbuf_elems table. It will also
+               unmap the buffer and then sync the buffer for the cpu */
+            //rwnx_ipc_rxbuf_elem_pull(rwnx_hw, skb);
+            skb->data += (msdu_offset + 2); //sdio/usb word allign
 
-		//Save frame length
-		frm_len = le32_to_cpu(hw_rxhdr->hwvect.len);
+            //Save frame length
+            frm_len = le32_to_cpu(hw_rxhdr->hwvect.len);
 
-		// Reserve space for frame
-		skb->len = frm_len;
+            // Reserve space for frame
+            skb->len = frm_len;
 
-		if (status == RX_STAT_MONITOR) {
-			/* Remove the SK buffer from the rxbuf_elems table. It will also
-			   unmap the buffer and then sync the buffer for the cpu */
-			//rwnx_ipc_rxbuf_elem_pull(rwnx_hw, skb);
+            //Check if there is enough space to add the radiotap header
+            if (skb_headroom(skb) > rtap_len) {
 
-			//Check if there is enough space to add the radiotap header
-			if (skb_headroom(skb) > rtap_len) {
-				skb_monitor = skb;
+                skb_monitor = skb;
 
-				//Duplicate the HW Rx Header to override with the radiotap header
-				memcpy(&hw_rxhdr_copy, hw_rxhdr, sizeof(hw_rxhdr_copy));
+                //Duplicate the HW Rx Header to override with the radiotap header
+                memcpy(&hw_rxhdr_copy, hw_rxhdr, sizeof(hw_rxhdr_copy));
 
-				hw_rxhdr = &hw_rxhdr_copy;
-			} else {
-				//Duplicate the skb and extend the headroom
-				skb_monitor = skb_copy_expand(skb, rtap_len, 0, GFP_ATOMIC);
+                hw_rxhdr = &hw_rxhdr_copy;
+            } else {
+                //Duplicate the skb and extend the headroom
+                skb_monitor = skb_copy_expand(skb, rtap_len, 0, GFP_ATOMIC);
 
-				//Reset original skb->data pointer
-				skb->data = (void *)hw_rxhdr;
-			}
-		} else {
-			skb->data = (void *)hw_rxhdr;
+                //Reset original skb->data pointer
+                skb->data = (void*) hw_rxhdr;
+            }
+        } else {
+    #ifdef CONFIG_RWNX_MON_DATA
+        skb_monitor = skb_copy_expand(skb, rtap_len, 0, GFP_ATOMIC);
+        skb_monitor->data += (msdu_offset + 2); //sdio/usb word allign
 
-			wiphy_err(rwnx_hw->wiphy, "RX status %d is invalid when MON_DATA is disabled\n", status);
-			goto check_len_update;
-		}
+        //Save frame length
+        frm_len = le32_to_cpu(hw_rxhdr->hwvect.len);
+    #endif
+        }
 
-		skb_reset_tail_pointer(skb);
-		skb->len = 0;
-		skb_reset_tail_pointer(skb_monitor);
-		skb_monitor->len = 0;
+        skb_reset_tail_pointer(skb_monitor);
+        skb_monitor->len = 0;
+        skb_put(skb_monitor, frm_len);
 
-		skb_put(skb_monitor, frm_len);
-		if (rwnx_rx_monitor(rwnx_hw, rwnx_vif, skb_monitor, hw_rxhdr, rtap_len))
-			dev_kfree_skb(skb_monitor);
+        if (rwnx_rx_monitor(rwnx_hw, rwnx_vif, skb_monitor, hw_rxhdr, rtap_len))
+            dev_kfree_skb(skb_monitor);
 
-		if (status == RX_STAT_MONITOR) {
-			status |= RX_STAT_ALLOC;
-			if (skb_monitor != skb) {
-				dev_kfree_skb(skb);
-			}
-		}
-	}
+        if (status == RX_STAT_MONITOR) {
+            if (skb_monitor != skb) {
+                dev_kfree_skb(skb);
+            }
+        }
+    }
+
 
 check_len_update:
 	/* Check if we need to update the length */

@@ -397,6 +397,14 @@ enum mm_msg_tag {
     MM_SET_TXPWR_LVL_ADJ_REQ,
     MM_SET_TXPWR_LVL_ADJ_CFM,
 
+	MM_RADAR_DETECT_IND,
+
+	MM_SET_APF_PROG_REQ,
+	MM_SET_APF_PROG_CFM,
+
+	MM_GET_APF_PROG_REQ,
+	MM_GET_APF_PROG_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -2707,11 +2715,23 @@ struct mesh_path_update_ind {
 
 ///Structure containing the parameters of the pcie_resume message
 struct mm_all_restore_param {
-	struct mm_set_stack_start_req stack_req;
+	struct mm_set_stack_start_req stack_start_req;
+	struct mm_set_txpwr_lvl_req txpwr_lvl_req;
+	struct mm_set_txpwr_lvl_adj_req txpwr_lvl_adj_req;
+	struct mm_set_txpwr_ofst_req txpwr_ofst_req;
+	struct mm_set_rf_calib_req rf_calib_req;
 	struct me_config_req config_req;
 	struct me_chan_config_req chan_config_req;
+	struct mm_set_coex_req coex_req;
 	struct mm_start_req start_req;
+	struct mm_set_vendor_swconfig_req vendor_swconfig_req[4];
+	u8_l pwm_init_req[20];
 	struct mm_add_if_req add_if_req;
+
+	u16_l sub_msg_id[16];
+	u8_l sub_msg_cnt;
+	u8_l vendor_swconfig_req_cnt;
+
 	int add_vif_cnt;
 };
 
@@ -2932,6 +2952,39 @@ struct dbg_start_app_cfm {
 /// Structure containing the parameters of the @ref MM_GET_WIFI_DISABLE_CFM message.
 struct dbg_wifi_disable_cfm {
 	uint8_t wifi_disable;
+};
+
+/// Structure containing the parameters of the @ref DBG_PWM_INIT_REQ message.
+struct dbg_pwm_init_req
+{
+    /// PWM_CHANNEL_GPIO
+    u8 pwm_gpidx;
+    /// 0 normal 1 breath
+    u8 mode;
+    /// 0 config only 1 run after config
+    u8 run;
+    u32 tmr_cnt;
+    u32 dty_cnt;
+    u32 step_val;
+    /// 0 disable 1 enable
+    u8 gpio_en;
+    /// 0 input 1 output
+    u8 gpio_dir;
+    /// 0 low 1 high
+    u8 gpio_val;
+};
+
+/// Structure containing the parameters of the @ref DBG_PWM_DEINIT_REQ message.
+struct dbg_pwm_deinit_req
+{
+    /// PWM_CHANNEL_GPIO
+    u8 pwm_gpidx;
+    /// 0 disable 1 enable
+    u8 gpio_en;
+    /// 0 input 1 output
+    u8 gpio_dir;
+    /// 0 low 1 high
+    u8 gpio_val;
 };
 
 enum {

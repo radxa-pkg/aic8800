@@ -1,0 +1,16 @@
+[Unit]
+Description=dis bt
+Before=sleep.target
+
+[Service]
+Type=oneshot
+#ExecStart=/usr/bin/bash -c "/sbin/rfkill block bluetooth"
+#ExecStop=/usr/bin/bash -c "/usr/bin/systemctl restart bluetooth"
+
+ExecStart=/usr/bin/bash -c "/usr/bin/bluetoothctl power off"; /usr/bin/bash -c "/sbin/rmmod btusb"
+#ExecStart=/usr/bin/bash -c "/usr/bin/bluetoothctl power off"
+ExecStop=/usr/bin/bash -c "/sbin/insmod /lib/modules/$(uname -r)/kernel/drivers/bluetooth/btusb.ko";/usr/bin/bash -c "/usr/bin/systemctl restart bluetooth"
+
+[Install]
+WantedBy=sleep.target
+

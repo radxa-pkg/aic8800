@@ -28,6 +28,7 @@
 /**
  *
  */
+extern int wifi_fail;
 extern int aicwf_sdio_writeb(struct aic_sdio_dev *sdiodev, uint regaddr, u8 val);
 
 void rwnx_cmd_free(struct rwnx_cmd *cmd);
@@ -47,8 +48,8 @@ static void cmd_complete(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
 	lockdep_assert_held(&cmd_mgr->lock);
 
-	list_del(&cmd->list);
-	cmd_mgr->queue_sz--;
+	//list_del(&cmd->list);
+	//cmd_mgr->queue_sz--;
 
 	cmd->flags |= RWNX_CMD_FLAG_DONE;
 	if (cmd->flags & RWNX_CMD_FLAG_NONBLOCK) {
@@ -128,12 +129,34 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 #endif
 
 	bool defer_push = false;
+	u8_l empty = 0;
+	int i = 0;
 
 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
 #ifdef CREATE_TRACE_POINTS
 	trace_msg_send(cmd->id);
 #endif
-	spin_lock_bh(&cmd_mgr->lock);
+	if(cmd->e2a_msg != NULL) {
+		do {
+			if(cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED)
+				break;
+			spin_lock_bh(&cmd_mgr->lock);
+			empty = list_empty(&cmd_mgr->cmds);
+			if(!empty) {
+				spin_unlock_bh(&cmd_mgr->lock);
+				if(in_softirq()) {
+					printk("in_softirq:check cmdqueue empty\n");
+					mdelay(10);
+				} else {
+					printk("check cmdqueue empty\n");
+					msleep(50);
+				}
+			}
+		} while(!empty);//wait for cmd queue empty
+	} else {
+		spin_lock_bh(&cmd_mgr->lock);
+	}
+
 
 	if (cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
 		printk(KERN_CRIT"cmd queue crashed\n");
@@ -232,6 +255,20 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 		unsigned long tout = msecs_to_jiffies(RWNX_80211_CMD_TIMEOUT_MS * cmd_mgr->queue_sz);
 		if (!wait_for_completion_timeout(&cmd->complete, tout)) {
 			printk(KERN_CRIT"cmd timed-out\n");
+			wifi_fail = 1;
+
+			//aic debug add
+			printk("rxbuf_idx %d ",rwnx_hw->ipc_env->rxbuf_idx);
+			for(i=0; i < rwnx_hw->ipc_env->rxbuf_nb; i++){
+				printk("%d dma %x ,pattern %x",i,rwnx_hw->ipc_env->shared->host_rxbuf[i].dma_addr,rwnx_hw->ipc_env->shared->host_rxbuf[i].pattern);
+			}
+
+			printk("txdesc_idx %d",rwnx_hw->ipc_env->txdmadesc_idx);
+			for(i=0; i < IPC_TXDMA_DESC_CNT; i++){
+				printk("%d dma %x ,ready %x ,pt %x",i,rwnx_hw->ipc_env->shared->txdesc[i].packet_dma_addr,rwnx_hw->ipc_env->shared->txdesc[i].ready,rwnx_hw->ipc_env->shared->txdesc[i].pattern);
+			}
+			//aic debug end
+
 		#ifdef AICWF_SDIO_SUPPORT
 			ret = aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 2);
 			if (ret < 0) {
@@ -249,6 +286,10 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 			err = -ETIMEDOUT;
 			spin_unlock_bh(&cmd_mgr->lock);
 		} else {
+			spin_lock_bh(&cmd_mgr->lock);
+			list_del(&cmd->list);
+			cmd_mgr->queue_sz--;
+			spin_unlock_bh(&cmd_mgr->lock);
 			rwnx_cmd_free(cmd);//kfree(cmd);
 			if (!list_empty(&cmd_mgr->cmds))
 				WAKE_CMD_WORK(cmd_mgr);
@@ -326,6 +367,7 @@ void cmd_mgr_task_process(struct work_struct *work)
 	struct aic_pci_dev *pcidev = container_of(cmd_mgr, struct aic_pci_dev, cmd_mgr);
 	struct rwnx_hw *rwnx_hw = pcidev->rwnx_hw;
 #endif
+	int i = 0;
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
@@ -367,6 +409,20 @@ void cmd_mgr_task_process(struct work_struct *work)
 #endif
 			if (!wait_for_completion_timeout(&next->complete, tout)) {
 				printk(KERN_CRIT"cmd timed-out\n");
+				wifi_fail = 1;
+
+				//aic debug add
+				printk("rxbuf_idx %d ",rwnx_hw->ipc_env->rxbuf_idx);
+				for(i=0; i < rwnx_hw->ipc_env->rxbuf_nb; i++){
+					printk("%d dma %x ,pattern %x",i,rwnx_hw->ipc_env->shared->host_rxbuf[i].dma_addr,rwnx_hw->ipc_env->shared->host_rxbuf[i].pattern);
+				}
+
+				printk("txdesc_idx %d",rwnx_hw->ipc_env->txdmadesc_idx);
+				for(i=0; i < IPC_TXDMA_DESC_CNT; i++){
+					printk("%d dma %x ,ready %x ,pt %x",i,rwnx_hw->ipc_env->shared->txdesc[i].packet_dma_addr,rwnx_hw->ipc_env->shared->txdesc[i].ready,rwnx_hw->ipc_env->shared->txdesc[i].pattern);
+				}
+				//aic debug end
+
 #ifdef AICWF_SDIO_SUPPORT
 				if (aicwf_sdio_writeb(sdiodev, sdiodev->sdio_reg.wakeup_reg, 2) < 0) {
 					sdio_err("reg:%d write failed!\n", sdiodev->sdio_reg.wakeup_reg);
@@ -384,6 +440,10 @@ void cmd_mgr_task_process(struct work_struct *work)
 				rwnx_pm_relax_pc(rwnx_hw);
 #endif
 			} else {
+				spin_lock_bh(&cmd_mgr->lock);
+				list_del(&next->list);
+				cmd_mgr->queue_sz--;
+				spin_unlock_bh(&cmd_mgr->lock);
 				rwnx_cmd_free(next);//kfree(next);
 #ifdef CONFIG_WS
 				rwnx_pm_relax_pc(rwnx_hw);

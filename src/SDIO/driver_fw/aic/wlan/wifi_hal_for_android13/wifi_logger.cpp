@@ -1029,6 +1029,7 @@ public:
 
         memset(mReportBufs, 0, (mNoReqFates * sizeof(wifi_tx_report)));
         nlattr *data = request.attr_start(NL80211_ATTR_VENDOR_DATA);
+#if 0//AIDEN Temp comment it for pass gms
         result = request.put_u32(LOGGER_ATTRIBUTE_PKT_FATE_NUM, mNoReqFates);
         if (result < 0) {
             return result;
@@ -1037,6 +1038,7 @@ public:
         if (result < 0) {
             return result;
         }
+#endif
         request.attr_end(data);
         return result;
     }
@@ -1049,6 +1051,7 @@ public:
 
         memset(mReportBufs, 0, (mNoReqFates * sizeof(wifi_rx_report)));
         nlattr *data = request.attr_start(NL80211_ATTR_VENDOR_DATA);
+#if 0//AIDEN Temp comment it for pass gms
         result = request.put_u32(LOGGER_ATTRIBUTE_PKT_FATE_NUM, mNoReqFates);
         if (result < 0) {
             return result;
@@ -1057,6 +1060,7 @@ public:
         if (result < 0) {
             return result;
         }
+#endif
         request.attr_end(data);
         return result;
     }

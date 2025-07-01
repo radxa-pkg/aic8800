@@ -41,6 +41,7 @@
 
 #define FW_PATH_MAX_LEN 200
 extern char aic_fw_path[FW_PATH_MAX_LEN];
+extern char aic_fw_path_8800d80x2[FW_PATH_MAX_LEN];
 
 //Parser state
 #define INIT 0
@@ -179,6 +180,11 @@ u32 adaptivity_patch_tbl_8800d80[][2] = {
 	{0x0168, 0x00010000}, //tx_adaptivity_en
 };
 
+u32 adaptivity_patch_tbl_8800d80_tp[][2] = {
+	{0x000C, 0x0000320A}, //linkloss_thd
+	{0x0168, 0x00010000}, //tx_adaptivity_en
+};
+
 u32 patch_tbl_8800d80[][2] = {
     #if CFG_USER_EXT_FLAGS_EN
     {0x0188, 0x00000001
@@ -190,6 +196,15 @@ u32 patch_tbl_8800d80[][2] = {
         #endif
     }, // user_ext_flags
     #endif
+	#ifdef CONFIG_RADAR_OR_IR_DETECT
+	{0x0019c,0x00000100},
+	#endif
+};
+
+u32 patch_tbl_8800d80_tp[][2] = {
+    {0x009C, 0x00138000}, //ac_param_conf
+    {0x0194, 0x00000000}, //hebcc_violation_check
+    {0x0198, 0xB0ABC201}, //cca_adj_over_bcn
 };
 
 #ifdef CONFIG_RWNX_TL4
@@ -316,7 +331,7 @@ static int rwnx_plat_bin_fw_upload(struct rwnx_plat *rwnx_plat, u8 *fw_addr,
 #define MD5(x) x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15]
 #define MD5PINRT "file md5:%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\r\n"
 
-static int rwnx_load_firmware(u32 **fw_buf, const char *name, struct device *device)
+static int rwnx_load_firmware(struct rwnx_hw *rwnx_hw, u32 **fw_buf, const char *name, struct device *device)
 {
 #ifdef CONFIG_USE_FW_REQUEST
 	const struct firmware *fw = NULL;
@@ -378,7 +393,10 @@ static int rwnx_load_firmware(u32 **fw_buf, const char *name, struct device *dev
         return -1;
     }
 
-	len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", aic_fw_path, name);
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+	    len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", aic_fw_path, name);
+    else
+        len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", aic_fw_path_8800d80x2, name);
 
     //len = snprintf(path, FW_PATH_MAX_LEN, "%s", name);
     if (len >= FW_PATH_MAX_LEN) {
@@ -486,7 +504,7 @@ int rwnx_request_firmware_common(struct rwnx_hw *rwnx_hw, u32** buffer, const ch
 
     AICWFDBG(LOGINFO, "### Load file %s\n", filename);
 
-    size = rwnx_load_firmware(buffer, filename, NULL);
+    size = rwnx_load_firmware(rwnx_hw, buffer, filename, NULL);
 
     return size;
 }
@@ -522,7 +540,7 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr,
 {
 	int err = 0;
 	unsigned int i = 0, size;
-//	  u32 *src;
+//	u32 *src;
 	u32 *dst=NULL;
 
 	/* Copy the file on the Embedded side */
@@ -534,44 +552,94 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr,
 		return -1;
 	}
 	if (size <= 0) {
-			AICWFDBG(LOGERROR, "wrong size of firmware file\n");
-			dst = NULL;
-			err = -1;
+		AICWFDBG(LOGERROR, "wrong size of firmware file\n");
+		dst = NULL;
+		err = -1;
 	}
 
-	AICWFDBG(LOGINFO, "size=%d, dst[0]=%x\n", size, dst[0]);
-#if 1
-	if(size > 0) {
-		volatile u32 *download_dst =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + fw_addr);
-		volatile u32 *download_src = dst;
-		for (i=0; i<size; i+=4)
-		{
-			*download_dst++ = *download_src++;
-		}
-	}
+	AICWFDBG(LOGINFO, "size=%d, dst[0]=%x, %x\n", size, dst[0], dst[256]);
+
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (rwnx_hw->pcidev->bar_count == 1) {
+			u8 rem;
+#ifdef CONFIG_USE_FW_REQUEST
+			rem = 1;// 1 if <dst> not kmalloc
 #else
-    if (size > 1024) {
-        for (i = 0; i < (size - 1024); i += 1024) {
-            //printk("wr blk 0: %p -> %x\r\n", dst + i / 4, fw_addr + i);
-            err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, 1024, dst + i / 4);
-            if (err) {
-                printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
-                break;
-            }
-        }
-    }
-    if (!err && (i < size)) {
-        //printk("wr blk 1: %p -> %x\r\n", dst + i / 4, fw_addr + i);
-        err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, size - i, dst + i / 4);
-        if (err) {
-            printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
-        }
-    }
+			rem = 0;
 #endif
 
-    if (dst) {
-        rwnx_release_firmware_common(&dst);
-    }
+			if (0 == strcmp(filename, FW_PATCH_BASE_NAME_8800D80_U02)) {
+				u32 cache_bypass_addr = 0x40100020;
+				u32 cache_bypass_val = 0x03;
+				err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)cache_bypass_addr, (void *)&cache_bypass_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+				if (err) {
+					printk("bin upload fail: %x, err:%d\r\n", cache_bypass_addr, err);
+					goto exit;
+				}
+			}
+
+			if (size > AIC_DMA_MPS_AIC8800D80) {
+				for (i = 0; i < (size - AIC_DMA_MPS_AIC8800D80); i += AIC_DMA_MPS_AIC8800D80) {
+					//printk("wr blk 0: %p -> %x\r\n", dst + i / 4, fw_addr + i);
+					err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(fw_addr + i), dst + i/4, AIC_DMA_MPS_AIC8800D80, AIC_TRAN_DRV2EMB, rem);
+					if (err) {
+						printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+						break;
+					}
+				}
+			}
+	
+			if (!err && (i < size)) {
+				//printk("wr blk 1: %p -> %x\r\n", dst + i / 4, fw_addr + i);
+				//err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, size - i, dst + i / 4);
+				err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(fw_addr + i), dst + i/4, size - i, AIC_TRAN_DRV2EMB, rem);
+				if (err) {
+					printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+				}
+			}
+		} else {
+			if(size > 0) {
+				volatile u32 *download_dst =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + fw_addr);
+				volatile u32 *download_src = dst;
+				for (i=0; i<size; i+=4)
+				{
+					*download_dst++ = *download_src++;
+				}
+			}
+		}
+	} else {
+		u8 rem;
+#ifdef CONFIG_USE_FW_REQUEST
+		rem = 1;// 1 if <dst> not kmalloc
+#else
+		rem = 0;
+#endif
+
+		if (size > 1024) {
+			for (i = 0; i < (size - 1024); i += 1024) {
+				//printk("wr blk 0: %p -> %x\r\n", dst + i / 4, fw_addr + i);
+				err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(fw_addr + i), dst + i/4, 1024, AIC_TRAN_DRV2EMB, rem);
+				if (err) {
+					printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+					break;
+				}
+			}
+		}
+
+		if (!err && (i < size)) {
+			//printk("wr blk 1: %p -> %x\r\n", dst + i / 4, fw_addr + i);
+			//err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, size - i, dst + i / 4);
+			err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(fw_addr + i), dst + i/4, size - i, AIC_TRAN_DRV2EMB, rem);
+			if (err) {
+				printk("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+			}
+		}
+	}
+
+exit:
+	if (dst) {
+		rwnx_release_firmware_common(&dst);
+	}
 
 	return err;
 }
@@ -579,13 +647,25 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr,
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr)
 {
 	int err = 0;
-	volatile unsigned int *reset_addr = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500044);
-	volatile unsigned int *reset_bit = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500128);
-	volatile unsigned int *clear_bit = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x50012c);
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (rwnx_hw->pcidev->bar_count == 1) {
+			writel(fw_addr, rwnx_hw->pcidev->emb_sctl + 0x044);
+			writel((1<<5),  rwnx_hw->pcidev->emb_sctl + 0x128);
+			writel((1<<5),  rwnx_hw->pcidev->emb_sctl + 0x12c);
+		} else {
+			volatile unsigned int *reset_addr = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500044);
+			volatile unsigned int *reset_bit = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500128);
+			volatile unsigned int *clear_bit = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x50012c);
 
-	reset_addr[0] = fw_addr; //reset firmware to fw_addr
-	reset_bit[0] = (0X01<<5);
-	clear_bit[0] = (0X01<<5);
+			reset_addr[0] = fw_addr; //reset firmware to fw_addr
+			reset_bit[0] = (0X01<<5);
+			clear_bit[0] = (0X01<<5);
+		}
+	} else {
+		writel(fw_addr, rwnx_hw->pcidev->emb_sctl + 0x044);
+		writel((1<<5),  rwnx_hw->pcidev->emb_sctl + 0x128);
+		writel((1<<5),  rwnx_hw->pcidev->emb_sctl + 0x12c);
+	}
 
 	if (testmode == 0)
 		mdelay(500);
@@ -710,7 +790,7 @@ s8_l get_txpwr_max(s8_l power){
 		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_2g4[i])
 			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_2g4[i];
     }
-	for (i = 0; i <= 11; i++){
+	for (i = 4; i <= 11; i++){
 		if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11a_5g[i])
 			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11a_5g[i];
 	}
@@ -743,7 +823,7 @@ void set_txpwr_loss_ofst(s8_l value)
 	for (i = 0; i <= 11; i++){
 		userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_2g4[i] += value;
 	}
-	for (i = 0; i <= 11; i++){
+	for (i = 4; i <= 11; i++){
 		userconfig_info.txpwr_lvl_v3.pwrlvl_11a_5g[i] += value;
 	}
 	for (i = 0; i <= 9; i++){
@@ -1176,17 +1256,17 @@ void rwnx_plat_nvram_set_value_v3(char *command, char *value)
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[1] = rwnx_atoi(value);
     } else if (!strcmp(command, "lvl_adj_2g4_chan_10_13")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[2] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_42")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_42")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[0] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_58")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_58")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[1] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_106")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_106")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[2] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_122")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_122")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[3] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_138")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_138")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[4] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_155")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_155")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[5] = rwnx_atoi(value);
     } else if (!strcmp(command, "loss_enable")) {
         userconfig_info.txpwr_loss.loss_enable = rwnx_atoi(value);
@@ -1226,7 +1306,7 @@ void rwnx_plat_nvram_set_value_v3(char *command, char *value)
     } else if (!strcmp(command, "ofst_2g4_ofdm_lowrate_chan_5_9")) {
         userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_2g4[2][1] = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_2g4_ofdm_lowrate_chan_10_13")) {
-        userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_2g4[2][0] = rwnx_atoi(value);
+        userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_2g4[2][2] = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_5g_ofdm_lowrate_chan_42")) {
         userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_5g[0][0] = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_5g_ofdm_lowrate_chan_58")) {
@@ -1665,76 +1745,230 @@ int patch_config(struct rwnx_hw *rwnx_hw)
 	u32 patch_buff_addr, patch_buff_base, rd_version_addr, rd_version_val;
 	#endif
 	#ifdef CONFIG_USB_BT
-	uint32_t start_addr = 0x00175000;
+	uint32_t start_addr = 0x0017B000;
 	#else
-	uint32_t start_addr = 0x00170000;
+	uint32_t start_addr = 0x00176000;
 	#endif
 	u32 patch_addr = start_addr;
 	u32 patch_cnt = sizeof(patch_tbl_8800d80)/sizeof(u32)/2;
+	u32 (*patch_tbl_ptr)[2];
 	int cnt = 0;
 	//adap test
 	int adap_patch_cnt = 0;
+	u32 (*adap_patch_tbl_ptr)[2];
 	int tmp_cnt = 0;
 	int tbl_idx = 0;
+	int tran_err = 0;
+	volatile u32 *patch_0 = NULL;
+	volatile u32 *patch_1 = NULL;
+	volatile u32 *patch_2 = NULL;
+	volatile u32 *patch_3 = NULL;
+	volatile u32 *patch_4 = NULL;
+	volatile u32 *patch_5 = NULL;
+	volatile u32 *patch_6 = NULL;
+	volatile u32 *patch_7 = NULL;
+	volatile u32 *patch_8 = NULL;
+	u32 patch_0_val, patch_1_val, patch_2_val, patch_3_val, patch_4_val, patch_5_val, patch_6_val, patch_7_val, patch_8_val;
 
-	if (adap_test) {
-		adap_patch_cnt = sizeof(adaptivity_patch_tbl_8800d80)/sizeof(u32)/2;
-	}
-
-	aic_patch_addr = rd_patch_addr + 8;
-	config_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + rd_patch_addr));
-	aic_patch_str_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + aic_patch_addr));
-	AICWFDBG(LOGINFO, "%s: cfg_base:%x,patch_str_base:%x,adap_test=%d\n", __func__, config_base, aic_patch_str_base, adap_test);
-
-	#if (NEW_PATCH_BUFFER_MAP)
-	rd_version_addr = RAM_FMAC_FW_ADDR + 0x01C;
-	rd_version_val = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + rd_version_addr));
-	AICWFDBG(LOGINFO, "rd_version_val=%08X\n", rd_version_val);
-	rwnx_hw->pcidev->fw_version_uint = rd_version_val;
-	if (rd_version_val > 0x06090100) {
-		patch_buff_addr = rd_patch_addr + 12;
-		patch_buff_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + patch_buff_addr));
-		patch_addr = start_addr = patch_buff_base;
-		AICWFDBG(LOGINFO, "%s: patch_buff_base:%x\n", __func__, patch_buff_base);
-	}
-	#endif
-
-	volatile u32 *patch_0 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(magic_num));
-	volatile u32 *patch_1 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(magic_num_2));
-	if ((patch_cnt + adap_patch_cnt) == 0) {
-		*patch_0 = 0;
-		*patch_1 = 0;
-		return 0;
-	}
-	*patch_0 = AIC_PATCH_MAGIG_NUM;
-	*patch_1 = AIC_PATCH_MAGIG_NUM_2;
-	volatile u32 *patch_2 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(pair_start));
-	*patch_2 = patch_addr;
-	volatile u32 *patch_3 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(pair_count));
-	*patch_3 = patch_cnt + adap_patch_cnt;
-
-	for (cnt = 0; cnt < patch_cnt; cnt++) {
-		volatile u32 *patch_4 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt);
-		*patch_4 = patch_tbl_8800d80[cnt][0]+config_base;
-		volatile u32 *patch_5 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt + 4);
-		*patch_5 = patch_tbl_8800d80[cnt][1];
-		printk("0x%x: 0x%x\n",start_addr+8*cnt, patch_tbl_8800d80[cnt][0]+config_base);
-	}
-	if (adap_test){
-		tmp_cnt = patch_cnt + adap_patch_cnt;
-		for (cnt = patch_cnt; cnt < tmp_cnt; cnt++) {
-			tbl_idx = cnt - patch_cnt;
-			volatile u32 *patch_6 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt);
-			*patch_6 = adaptivity_patch_tbl_8800d80[tbl_idx][0]+config_base;
-			volatile u32 *patch_7 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt + 4);
-			*patch_7 = adaptivity_patch_tbl_8800d80[tbl_idx][1];
+	if (rwnx_hw->pcidev->pci_dev->subsystem_vendor == 0x0001) {
+		patch_cnt = sizeof(patch_tbl_8800d80_tp)/sizeof(u32)/2;
+		patch_tbl_ptr = patch_tbl_8800d80_tp;
+		if (adap_test) {
+			adap_patch_cnt = sizeof(adaptivity_patch_tbl_8800d80_tp)/sizeof(u32)/2;
+			adap_patch_tbl_ptr = adaptivity_patch_tbl_8800d80_tp;
+		}
+	} else {
+		patch_cnt = sizeof(patch_tbl_8800d80)/sizeof(u32)/2;
+		patch_tbl_ptr = patch_tbl_8800d80;
+		if (adap_test) {
+			adap_patch_cnt = sizeof(adaptivity_patch_tbl_8800d80)/sizeof(u32)/2;
+			adap_patch_tbl_ptr = adaptivity_patch_tbl_8800d80;
 		}
 	}
 
-	for (cnt = 0; cnt < 4; cnt++) {
-		volatile u32 *patch_8 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(block_size[cnt]));
-		*patch_8 = 0;
+	if (rwnx_hw->pcidev->bar_count == 1) {
+		aic_patch_addr = rd_patch_addr + 8;
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(rd_patch_addr), (void *)&config_base, sizeof(u32), AIC_TRAN_EMB2DRV, 1);
+		if (tran_err) {
+			printk("%s fail: %x, err:%d\r\n", __func__, rd_patch_addr, tran_err);
+			return -1;
+		}
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(aic_patch_addr), (void *)&aic_patch_str_base, sizeof(u32), AIC_TRAN_EMB2DRV, 1);
+		if (tran_err) {
+			printk("%s fail: %x, err:%d\r\n", __func__, aic_patch_addr, tran_err);
+			return -1;
+		}
+		AICWFDBG(LOGINFO, "%s: cfg_base:%x,patch_str_base:%x,adap_test=%d\n", __func__, config_base, aic_patch_str_base, adap_test);
+
+		#if (NEW_PATCH_BUFFER_MAP)
+		rd_version_addr = RAM_FMAC_FW_ADDR + 0x01C;
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(rd_version_addr), (void *)&rd_version_val, sizeof(u32), AIC_TRAN_EMB2DRV, 1);
+		if (tran_err) {
+			printk("%s fail: %x, err:%d\r\n", __func__, rd_version_addr, tran_err);
+			return -1;
+		}
+		AICWFDBG(LOGINFO, "rd_version_val=%08X\n", rd_version_val);
+		rwnx_hw->pcidev->fw_version_uint = rd_version_val;
+		if (rd_version_val > 0x06090100) {
+			patch_buff_addr = rd_patch_addr + 12;
+			tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_buff_addr), (void *)&patch_buff_base, sizeof(u32), AIC_TRAN_EMB2DRV, 1);
+			if (tran_err) {
+				printk("%s fail: %x, err:%d\r\n", __func__, patch_buff_addr, tran_err);
+				return -1;
+			}
+			patch_addr = start_addr = patch_buff_base;
+			AICWFDBG(LOGINFO, "%s: patch_buff_base:%x\n", __func__, patch_buff_base);
+		}
+		#endif
+
+		patch_0 =(volatile u32 *) (AIC_PATCH_ADDR(magic_num));
+		patch_1 =(volatile u32 *) (AIC_PATCH_ADDR(magic_num_2));
+		if ((patch_cnt + adap_patch_cnt) == 0) {
+			patch_0_val = 0;
+			patch_1_val = 0;
+			tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_0), (void *)&patch_0_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+			if (tran_err) {
+				printk("%s fail: %p, err:%d\r\n", __func__, patch_0, tran_err);
+				return -1;
+			}
+			tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_1), (void *)&patch_1_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+			if (tran_err) {
+				printk("%s fail: %p, err:%d\r\n", __func__, patch_1, tran_err);
+				return -1;
+			}
+			return 0;
+		}
+		patch_0_val = AIC_PATCH_MAGIG_NUM;
+		patch_1_val = AIC_PATCH_MAGIG_NUM_2;
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_0), (void *)&patch_0_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+		if (tran_err) {
+			printk("%s fail: %p, err:%d\r\n", __func__, patch_0, tran_err);
+			return -1;
+		}
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_1), (void *)&patch_1_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+		if (tran_err) {
+			printk("%s fail: %p, err:%d\r\n", __func__, patch_1, tran_err);
+			return -1;
+		}
+		patch_2 =(volatile u32 *) (AIC_PATCH_ADDR(pair_start));
+		patch_2_val = patch_addr;
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_2), (void *)&patch_2_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+		if (tran_err) {
+			printk("%s fail: %p, err:%d\r\n", __func__, patch_2, tran_err);
+			return -1;
+		}
+		patch_3 =(volatile u32 *) (AIC_PATCH_ADDR(pair_count));
+		patch_3_val = patch_cnt + adap_patch_cnt;
+		tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_3), (void *)&patch_3_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+		if (tran_err) {
+			printk("%s fail: %p, err:%d\r\n", __func__, patch_3, tran_err);
+			return -1;
+		}
+
+		for (cnt = 0; cnt < patch_cnt; cnt++) {
+			patch_4 =(volatile u32 *) (start_addr+8*cnt);
+			patch_4_val = patch_tbl_ptr[cnt][0]+config_base;
+			tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_4), (void *)&patch_4_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+			if (tran_err) {
+				printk("%s fail: %p, err:%d\r\n", __func__, patch_4, tran_err);
+				return -1;
+			}
+			patch_5 =(volatile u32 *) (start_addr+8*cnt + 4);
+			patch_5_val = patch_tbl_ptr[cnt][1];
+			tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_5), (void *)&patch_5_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+			if (tran_err) {
+				printk("%s fail: %p, err:%d\r\n", __func__, patch_5, tran_err);
+				return -1;
+			}
+			AICWFDBG(LOGINFO, "0x%x: 0x%x\n",start_addr+8*cnt, patch_tbl_ptr[cnt][0]+config_base);
+		}
+		if (adap_test) {
+			tmp_cnt = patch_cnt + adap_patch_cnt;
+			for (cnt = patch_cnt; cnt < tmp_cnt; cnt++) {
+				tbl_idx = cnt - patch_cnt;
+				patch_6 =(volatile u32 *) (start_addr+8*cnt);
+				patch_6_val = adap_patch_tbl_ptr[tbl_idx][0]+config_base;
+				tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_6), (void *)&patch_6_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+				if (tran_err) {
+					printk("%s fail: %p, err:%d\r\n", __func__, patch_6, tran_err);
+					return -1;
+				}
+				patch_7 =(volatile u32 *) (start_addr+8*cnt + 4);
+				patch_7_val = adap_patch_tbl_ptr[tbl_idx][1];
+				tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_7), (void *)&patch_7_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+				if (tran_err) {
+					printk("%s fail: %p, err:%d\r\n", __func__, patch_7, tran_err);
+					return -1;
+				}
+			}
+		}
+
+		for (cnt = 0; cnt < 4; cnt++) {
+			patch_8 =(volatile u32 *) (AIC_PATCH_ADDR(block_size[cnt]));
+			patch_8_val = 0;
+			tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(patch_8), (void *)&patch_8_val, sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+			if (tran_err) {
+				printk("%s fail: %p, err:%d\r\n", __func__, patch_8, tran_err);
+				return -1;
+			}
+		}
+	} else {
+		aic_patch_addr = rd_patch_addr + 8;
+		config_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + rd_patch_addr));
+		aic_patch_str_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + aic_patch_addr));
+		AICWFDBG(LOGINFO, "%s: cfg_base:%x,patch_str_base:%x,adap_test=%d\n", __func__, config_base, aic_patch_str_base, adap_test);
+
+		#if (NEW_PATCH_BUFFER_MAP)
+		rd_version_addr = RAM_FMAC_FW_ADDR + 0x01C;
+		rd_version_val = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + rd_version_addr));
+		AICWFDBG(LOGINFO, "rd_version_val=%08X\n", rd_version_val);
+		rwnx_hw->pcidev->fw_version_uint = rd_version_val;
+		if (rd_version_val > 0x06090100) {
+			patch_buff_addr = rd_patch_addr + 12;
+			patch_buff_base = *((volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + patch_buff_addr));
+			patch_addr = start_addr = patch_buff_base;
+			AICWFDBG(LOGINFO, "%s: patch_buff_base:%x\n", __func__, patch_buff_base);
+		}
+		#endif
+
+		patch_0 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(magic_num));
+		patch_1 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(magic_num_2));
+		if ((patch_cnt + adap_patch_cnt) == 0) {
+			*patch_0 = 0;
+			*patch_1 = 0;
+			return 0;
+		}
+		*patch_0 = AIC_PATCH_MAGIG_NUM;
+		*patch_1 = AIC_PATCH_MAGIG_NUM_2;
+		patch_2 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(pair_start));
+		*patch_2 = patch_addr;
+		patch_3 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(pair_count));
+		*patch_3 = patch_cnt + adap_patch_cnt;
+
+		for (cnt = 0; cnt < patch_cnt; cnt++) {
+			patch_4 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt);
+			*patch_4 = patch_tbl_ptr[cnt][0]+config_base;
+			patch_5 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt + 4);
+			*patch_5 = patch_tbl_ptr[cnt][1];
+			printk("0x%x: 0x%x\n",start_addr+8*cnt, patch_tbl_ptr[cnt][0]+config_base);
+		}
+		if (adap_test){
+			tmp_cnt = patch_cnt + adap_patch_cnt;
+			for (cnt = patch_cnt; cnt < tmp_cnt; cnt++) {
+				tbl_idx = cnt - patch_cnt;
+				patch_6 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt);
+				*patch_6 = adap_patch_tbl_ptr[tbl_idx][0]+config_base;
+				patch_7 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + start_addr+8*cnt + 4);
+				*patch_7 = adap_patch_tbl_ptr[tbl_idx][1];
+			}
+		}
+
+		for (cnt = 0; cnt < 4; cnt++) {
+			patch_8 =(volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + AIC_PATCH_ADDR(block_size[cnt]));
+			*patch_8 = 0;
+		}
 	}
+
 	return 0;
 
 }
@@ -2263,6 +2497,7 @@ int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *_h
 {
 	struct aicbt_patch_table *head, *p;
 	int ret = 0, i;
+	int tran_err = 0;
 	uint32_t *data = NULL;
 
 	head = _head;
@@ -2292,26 +2527,37 @@ int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *_h
 			volatile u32 *mem_addr;
 			u32 mem_data;
 			int bar_index;
-			if (*data < 0x40000000) {
-				mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + *data - 0);
-				bar_index = 0;
-			} else if (*data < 0x40700000) {
-				mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar1_vaddr + *data - 0x40000000);
-				bar_index = 1;
+			if (rwnx_hw->pcidev->bar_count == 1) {
+				tran_err = aicwf_pcie_tran(rwnx_hw->pcidev, (void *)(*data), (void *)(data + 1), sizeof(u32), AIC_TRAN_DRV2EMB, 1);
+				if (tran_err) {
+					printk("%s fail: %x, err:%d\r\n", __func__, *data, tran_err);
+					ret = -1;
+					goto exit;
+				}
 			} else {
-				mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar2_vaddr + *data - 0x40700000);
-				bar_index = 2;
+				if (*data < 0x40000000) {
+					mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + *data - 0);
+					bar_index = 0;
+				} else if (*data < 0x40700000) {
+					mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar1_vaddr + *data - 0x40000000);
+					bar_index = 1;
+				} else {
+					mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar2_vaddr + *data - 0x40700000);
+					bar_index = 2;
+				}
+				mem_data = *(data + 1);
+				//printk("%s addr:0x%x data:0x%x bar%d\n", __func__, *data, *(data + 1), bar_index);
+				*mem_addr = mem_data;
 			}
-			mem_data = *(data + 1);
-			//printk("%s addr:0x%x data:0x%x bar%d\n", __func__, *data, *(data + 1), bar_index);
-			*mem_addr = mem_data;
 			data += 2;
 		}
 		if (p->type == AICBT_PT_PWRON)
 			udelay(500);
 	}
+
+exit:
 	aicbt_patch_table_free(head);
-	return 0;
+	return ret;
 }
 
 int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_patch_table *head_t)
@@ -2403,8 +2649,98 @@ err:
 	}
 	return ret;
 }
+
+void rwnx_plat_bt_halt(struct rwnx_hw *rwnx_hw)
+{
+    if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (rwnx_hw->pcidev->bar_count == 1) {
+            // resetn_set
+            writel(0x01UL << 5, rwnx_hw->pcidev->emb_sctl  + 0x00000128);
+        } else {
+            // resetn_set
+            writel(0x01UL << 5, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00500128);
+        }
+    } else if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) {
+        // resetn_set
+        writel(0x01UL << 5, rwnx_hw->pcidev->emb_sctl  + 0x00000128);
+    }
+}
+
+void rwnx_plat_bt_clear(struct rwnx_hw *rwnx_hw)
+{
+    if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (rwnx_hw->pcidev->bar_count == 1) {
+            // app2emb_unmaskclear
+            writel(0x7FFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000110);
+            // app2emb_ack
+            writel(0x7FFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000108);
+        } else {
+            // app2emb_unmaskclear
+            writel(0x7FFUL << 16, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00035110);
+            // app2emb_ack
+            writel(0x7FFUL << 16, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00035108);
+        }
+    } else if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) {
+        // app2emb_unmaskclear
+        writel(0x7FFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000110);
+        // app2emb_ack
+        writel(0x7FFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000108);
+    }
+}
 #endif
 
+void rwnx_plat_fmac_halt(struct rwnx_hw *rwnx_hw)
+{
+    if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (rwnx_hw->pcidev->bar_count == 1) {
+            // resetn_set
+            writel(0x01UL << 5, rwnx_hw->pcidev->emb_sctl  + 0x00000128);
+        } else {
+            // resetn_set
+            writel(0x01UL << 5, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00500128);
+        }
+    } else if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) {
+        // resetn_set
+        writel(0x01UL << 5, rwnx_hw->pcidev->emb_sctl  + 0x00000128);
+    }
+}
+
+void rwnx_plat_fmac_clear(struct rwnx_hw *rwnx_hw)
+{
+    if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (rwnx_hw->pcidev->bar_count == 1) {
+            // emb2app_unmaskclear
+            writel(0xFFFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000010);
+            // emb2app_ack
+            writel(0xFFFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000008);
+
+            // g1_emb2app_unmaskclear
+            writel(0x3FUL << 0, rwnx_hw->pcidev->emb_mbox  + 0x00000210);
+            // g1_emb2app_ack
+            writel(0x3FUL << 0, rwnx_hw->pcidev->emb_mbox  + 0x00000208);
+        } else {
+            // emb2app_unmaskclear
+            writel(0xFFFUL << 16, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00035010);
+            // emb2app_ack
+            writel(0xFFFUL << 16, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00035008);
+
+            // g1_emb2app_unmaskclear
+            writel(0x3FUL << 0, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00035210);
+            // g1_emb2app_ack
+            writel(0x3FUL << 0, rwnx_hw->pcidev->pci_bar1_vaddr  + 0x00035208);
+        }
+    } else if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) {
+        // emb2app_unmaskclear
+        writel(0xFFFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000010);
+        // emb2app_ack
+        writel(0xFFFUL << 16, rwnx_hw->pcidev->emb_mbox  + 0x00000008);
+
+        // g1_emb2app_unmaskclear
+        writel(0x3FUL << 0, rwnx_hw->pcidev->emb_mbox  + 0x00000210);
+        // g1_emb2app_ack
+        writel(0x3FUL << 0, rwnx_hw->pcidev->emb_mbox  + 0x00000208);
+    }
+}
 
 /**
  * rwnx_platform_on() - Start the platform
@@ -2431,64 +2767,93 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
 	if (rwnx_plat->enabled)
 		return 0;
 
+    // halt cpu
+#ifdef CONFIG_USB_BT
+    rwnx_plat_bt_halt(rwnx_hw);
+#endif
+    rwnx_plat_fmac_halt(rwnx_hw);
+
+    // clear interrupt source
+#ifdef CONFIG_USB_BT
+    rwnx_plat_bt_clear(rwnx_hw);
+#endif
+    rwnx_plat_fmac_clear(rwnx_hw);
+
 	#ifdef CONFIG_USB_BT
-    struct aicbt_patch_table *head = NULL;
-    struct aicbt_patch_info_t patch_info = {
-        .info_len          = 0,
-        .adid_addrinf      = 0,
-        .addr_adid         = 0,
-        .patch_addrinf     = 0,
-        .addr_patch        = 0,
-        .reset_addr        = 0,
-        .reset_val         = 0,
-        .adid_flag_addr    = 0,
-        .adid_flag         = 0,
-    };
+    {
+        struct aicbt_patch_table *head = NULL;
+        struct aicbt_patch_info_t patch_info = {
+            .info_len          = 0,
+            .adid_addrinf      = 0,
+            .addr_adid         = 0,
+            .patch_addrinf     = 0,
+            .addr_patch        = 0,
+            .reset_addr        = 0,
+            .reset_val         = 0,
+            .adid_flag_addr    = 0,
+            .adid_flag         = 0,
+        };
 
-    head = aicbt_patch_table_alloc(rwnx_hw, FW_PATCH_TABLE_NAME_8800D80_U02);
-    if (head == NULL){
-        printk("aicbt_patch_table_alloc fail\n");
-        return -1;
+        head = aicbt_patch_table_alloc(rwnx_hw, FW_PATCH_TABLE_NAME_8800D80_U02);
+        if (head == NULL){
+            printk("aicbt_patch_table_alloc fail\n");
+            return -1;
+        }
+
+        patch_info.addr_adid = FW_RAM_ADID_BASE_ADDR_8800D80_U02;
+        patch_info.addr_patch = FW_RAM_PATCH_BASE_ADDR_8800D80_U02;
+
+        aicbt_patch_info_unpack(&patch_info, head);
+        if(patch_info.info_len == 0) {
+            printk("%s, aicbt_patch_info_unpack fail\n", __func__);
+            return -1;
+        }
+
+        printk("addr_adid 0x%x, addr_patch 0x%x\n", patch_info.addr_adid, patch_info.addr_patch);
+
+        if(rwnx_plat_bin_fw_upload_2(rwnx_hw, patch_info.addr_adid, FW_ADID_BASE_NAME_8800D80_U02)) {
+            return -1;
+        }
+        if(rwnx_plat_bin_fw_upload_2(rwnx_hw, patch_info.addr_patch, FW_PATCH_BASE_NAME_8800D80_U02)) {
+            return -1;
+        }
+        if (aicbt_patch_table_load(rwnx_hw, head)) {
+            return -1;
+        }
+
+        mdelay(100);
     }
-
-    patch_info.addr_adid = FW_RAM_ADID_BASE_ADDR_8800D80_U02;
-    patch_info.addr_patch = FW_RAM_PATCH_BASE_ADDR_8800D80_U02;
-
-    aicbt_patch_info_unpack(&patch_info, head);
-    if(patch_info.info_len == 0) {
-        printk("%s, aicbt_patch_info_unpack fail\n", __func__);
-        return -1;
-    }
-
-    printk("addr_adid 0x%x, addr_patch 0x%x\n", patch_info.addr_adid, patch_info.addr_patch);
-
-	if(rwnx_plat_bin_fw_upload_2(rwnx_hw, patch_info.addr_adid, FW_ADID_BASE_NAME_8800D80_U02)) {
-		return -1;
-	}
-	if(rwnx_plat_bin_fw_upload_2(rwnx_hw, patch_info.addr_patch, FW_PATCH_BASE_NAME_8800D80_U02)) {
-		return -1;
-	}
-    if (aicbt_patch_table_load(rwnx_hw, head)) {
-        return -1;
-    }
-
-	mdelay(100);
 	#endif
 
 	#ifndef CONFIG_ROM_PATCH_EN
 	#ifdef CONFIG_DOWNLOAD_FW
-	if (testmode == 0)
-		#ifdef CONFIG_USB_BT
-		ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_BT_NAME);
-		#else
-		ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_NAME);
-		#endif
-	else
-		ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_RF_FW_NAME);
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (testmode == 0)
+            #ifdef CONFIG_USB_BT
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_BT_NAME);
+            #else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_NAME);
+            #endif
+        else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_RF_FW_NAME);
+    } else {
+        if (testmode == 0)
+            #ifdef CONFIG_USB_BT
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FW_BT_NAME);
+            #else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FW_NAME);
+            #endif
+        else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_RF_FW_NAME);
+    }
 	if (ret)
 		return ret;
 
-	patch_config(rwnx_hw);
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+		patch_config(rwnx_hw);
+	else {
+		// tbd
+	}
 
 	pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
 

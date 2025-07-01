@@ -1,0 +1,28 @@
+#!/bin/bash
+echo "Uninstall aic8800D80 wifi driver!!!!!"
+echo "Waiting ......"
+rmmod aic8800D80_fdrv
+#rmmod aic_btusb
+
+cd /AIC8800/drivers/aic8800/aic8800_fdrv/
+make clean
+make uninstall
+
+cd /AIC8800/aicrf_test
+make clean
+#make uninstall
+
+#cd /AIC8800/drivers/aic8800/aic_btusb/
+#make clean
+#make uninstall
+#cd /usr/lib/modules/$(uname -r)/kernel/drivers/bluetooth
+#mv btusb.ko.bak btusb.ko
+
+rm -rf /lib/firmware/aic8800D80/
+#rm -rf /etc/pm
+
+#systemctl stop dis_bt.service
+#systemctl disable dis_bt.service
+#rm /etc/systemd/system/dis_bt.service
+
+exit 0

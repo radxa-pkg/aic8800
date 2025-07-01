@@ -43,9 +43,10 @@ irqreturn_t rwnx_irq_hdlr(int irq, void *dev_id)
 void rwnx_task(unsigned long data)
 {
     struct rwnx_hw *rwnx_hw = (struct rwnx_hw *)data;
+    struct aic_pci_dev *adev = rwnx_hw->pcidev;
 
 #ifdef AICWF_PCIE_SUPPORT
-    struct rwnx_plat *rwnx_plat = rwnx_hw->plat;
+    //struct rwnx_plat *rwnx_plat = rwnx_hw->plat;
 
     uint32_t status;
     bool rxdata_pause = false;
@@ -62,13 +63,29 @@ void rwnx_task(unsigned long data)
         return;
     }
 
-    status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET);
+    if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (rwnx_hw->pcidev->bar_count == 1) {
+            status = readl(adev->emb_mbox + AIC8800D80_PCIE_IRQ_STATUS_OFFSET - AIC8800D80_PCIE_IRQ_OFFSET);
+        } else {
+            status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + AIC8800D80_PCIE_IRQ_STATUS_OFFSET);
+        }
+    } else {
+        status = readl(adev->emb_mbox + AIC8800D80X2_PCIE_IRQ_STATUS_OFFSET);
+    }
 
     //printk("task status = %x \n",status);
     while(status) {
         //printk(" status = %x \n",status);
-        volatile unsigned int *ack = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_ACK_OFFSET);
-        ack[0] = status;
+        if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+            if (rwnx_hw->pcidev->bar_count == 1) {
+                writel(status, adev->emb_mbox + AIC8800D80_PCIE_IRQ_ACK_OFFSET - AIC8800D80_PCIE_IRQ_OFFSET);
+            } else {
+                volatile unsigned int *ack = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + AIC8800D80_PCIE_IRQ_ACK_OFFSET);
+                ack[0] = status;
+            }
+        } else {
+            writel(status, adev->emb_mbox + AIC8800D80X2_PCIE_IRQ_ACK_OFFSET);
+        }
 
         if(status & PCIE_RX_MSG_BIT) {
             struct rwnx_ipc_buf *buf = rwnx_hw->ipc_env->msgbuf[rwnx_hw->ipc_env->msgbuf_idx];
@@ -129,9 +146,10 @@ void rwnx_task(unsigned long data)
 
         if((status & PCIE_RX_DATA_BIT) || rxdata_pause)
         {
-            u32_l hostid;
+            //u32_l hostid;
             struct rwnx_ipc_buf *ipc_buf;
             struct sk_buff *skb ;
+            struct hw_rxhdr *hw_rxhdr = NULL;
 
             volatile struct ipc_shared_rx_buf *rxbuf = &rwnx_hw->ipc_env->shared->host_rxbuf[data_cnt];
             rxdata_successive_cnt = 0;
@@ -150,9 +168,23 @@ void rwnx_task(unsigned long data)
                     break;
                 }
                 if(rxdata_successive_cnt >= 10 ){
-                    if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
-                        rxdata_pause = true;
-                        break;
+                    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+                        if (rwnx_hw->pcidev->bar_count == 1) {
+                            if (readl(adev->emb_mbox + AIC8800D80_PCIE_IRQ_STATUS_OFFSET - AIC8800D80_PCIE_IRQ_OFFSET) & PCIE_RX_MSG_BIT) {
+                                rxdata_pause = true;
+                                break;
+                            }
+                        } else {
+                            if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + AIC8800D80_PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                                rxdata_pause = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        if(readl(adev->emb_mbox + AIC8800D80X2_PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                            rxdata_pause = true;
+                            break;
+                        }
                     }
                 }
 
@@ -175,9 +207,9 @@ void rwnx_task(unsigned long data)
                 }
 
                 #ifdef AICWF_RX_REORDER
-                struct hw_rxhdr *hw_rxhdr = (struct hw_rxhdr *)skb->data;
+                hw_rxhdr = (struct hw_rxhdr *)skb->data;
                 if(hw_rxhdr->is_monitor_vif) {
-                    printk("rx data:cnt=%d, skb=%p, dma=%lx, len=%x, %x\n", data_cnt, ipc_buf->addr, ipc_buf->dma_addr, skb->data[1], skb->data[0] );
+                    printk("rx data:cnt=%d, skb=%p, dma=%lx, len=%x, %x\n", data_cnt, ipc_buf->addr, (long unsigned int)ipc_buf->dma_addr, skb->data[1], skb->data[0] );
                     rwnx_data_dump("data:", skb->data - 128, 128 + 64);
                 }
                 #endif
@@ -223,10 +255,23 @@ void rwnx_task(unsigned long data)
                 struct sk_buff *skb_tmp = sw_txhdr->skb;
 
                 if(txdata_successive_cnt >= 10 ){
-                    if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
-                        //printk("m%d\n",txcfm_idx);
-                        txdata_pause = true;
-                        break;
+                    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+                        if (rwnx_hw->pcidev->bar_count == 1) {
+                            if(readl(adev->emb_mbox + AIC8800D80_PCIE_IRQ_STATUS_OFFSET - AIC8800D80_PCIE_IRQ_OFFSET) & PCIE_RX_MSG_BIT) {
+                                txdata_pause = true;
+                                break;
+                            }
+                        } else {
+                            if(*(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + AIC8800D80_PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                                txdata_pause = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        if(readl(adev->emb_mbox + AIC8800D80X2_PCIE_IRQ_STATUS_OFFSET) & PCIE_RX_MSG_BIT) {
+                            txdata_pause = true;
+                            break;
+                        }
                     }
                 }
 
@@ -264,7 +309,15 @@ void rwnx_task(unsigned long data)
             }
         }
 
-        status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + PCIE_IRQ_STATUS_OFFSET);
+        if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+            if (rwnx_hw->pcidev->bar_count == 1) {
+                status = readl(adev->emb_mbox + AIC8800D80_PCIE_IRQ_STATUS_OFFSET - AIC8800D80_PCIE_IRQ_OFFSET);
+            } else {
+                status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + AIC8800D80_PCIE_IRQ_STATUS_OFFSET);
+            }
+        } else {
+            status = readl(adev->emb_mbox + AIC8800D80X2_PCIE_IRQ_STATUS_OFFSET);
+        }
     }
 
     //printk("d%d\n",atomic_read(&rwnx_hw->txdata_cnt_push));

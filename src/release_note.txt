@@ -1,15 +1,185 @@
-aic8800d_linux_sdk_V3.0_2024_0327_3561b08f
+==================================Driver Version======================================
+aic8800d_linux_sdk_V4.0_2024_1119_06da8476
+======================================================================================
 
-	[USB/SDIO/PCIE driver update]
-		fix driver crash cause by tx/rx thread create fail
-		Optimize PCIE driver workflow
-		Optimize the adaptation of certain platforms
-		fix p2p vif bug when use P2P0
-		Fix some build errors and compile warning.
+==================================Update Instructions=================================
+[USB/SDIO/PCIE driver update]
+1. [SDIO/driver]add power_limit && adjust power_limit, loss_value calculation; 
+				add D80X2 support;
+				add CONFIG_AUTO_POWERSAVE for LINUX.
+2. [USB/driver] add remove_1m2m for aic_ipc_setting.
+3. [PCIE/driver] append TEMP_CTRL and add AP DFS CONFIG_RADAR_OR_IR_DETECT.
+4. [driver] fix memery leck bug in debugfs;
+5. [aic_btusb]fix loading exception for dct ext patch.
+6. [AIC_Docs] add D80X2 rftest docs; update aic u boot ble wakeup user guide.
 
-	[USB/SDIO/PCIE firmware update]
-		Optimize the use of BLE in multiple scenarios
-		Fix BT anomaly issues in some extreme scenarios
+[USB/SDIO/PCIE firmware update]
+1. [aic8800d80] fix H pll lock problem of last sdk, fix DHCP problem. 
+2. [aic8800d80x2] fix wifi's poor performance on 2.4G when bt is on, fix amsdu.
+3.bt_patch
+	[aic8800d] Solve the problem of low speed caused by simultaneous BT and Wi-Fi distance
+	[aic8800d] Solve the process problem of authentication using SET ENC
+	[aic8800d] Solve the problem of unsniff failure caused by unsniff too short
+	[aic8800dc] Fix the problem of low adv power caused by txpwr setting
+	[aic8800dc] Fix the problem of patch failure caused by aon reg
+	[aic8800dc] Re-enable ver print
+	[aic8800dch] Solve the problem of adv send failure caused by adv buf
+	[aic8800d80] Fix the leakage problem of le rx buf
+	[aic8800d80] Fix the leakage problem of ke mem caused by switching sniff state to pending
+	[aic8800d80] Add HCI tx protection to solve tx queue problem
+	[aic8800d80] Add HCI cmd nb protection to solve nb overflow assertion problem
+
+======================================================================================
+
+==================================Firmware Update=====================================
+
+SDIO/driver_fw/fw
+	SDIO/driver_fw/fw/aic8800
+		SDIO/driver_fw/fw/aic8800/aic_userconfig.txt	5f135f0abb011e18bfecdc41ca2b27ed
+		SDIO/driver_fw/fw/aic8800/fmacfw.bin	56dcd664d810208e2fcb037e14ff528b
+		SDIO/driver_fw/fw/aic8800/fmacfw_8800m_custmsg.bin	22db5a84972deb84eb37b54aac27e398
+		SDIO/driver_fw/fw/aic8800/fmacfw_patch.bin	7fb3df536e5ce604762ef81ccd0f9c13
+		SDIO/driver_fw/fw/aic8800/fmacfw_rf.bin	c9ca1bb26054c7427096605fa8473528
+		SDIO/driver_fw/fw/aic8800/fmacfwbt.bin	b65c6ab8501acaf91d7d9cfc8ced9d30
+		SDIO/driver_fw/fw/aic8800/fw_adid.bin	75ad9d37ebbd2e078392067ee568b432
+		SDIO/driver_fw/fw/aic8800/fw_adid_u03.bin	cf3ee68167beda73aaa5cb7a17169b4d
+		SDIO/driver_fw/fw/aic8800/fw_patch.bin	bea524b9eaccb9f539138b5a8adf0926
+		SDIO/driver_fw/fw/aic8800/fw_patch_table.bin	ea92c8dfa257426ef55d2f2eef8fd239
+		SDIO/driver_fw/fw/aic8800/fw_patch_table_u03.bin	23180da431e942c144d4abc4fa31d2e1
+		SDIO/driver_fw/fw/aic8800/fw_patch_test.bin	3876dbe0e910ab1b9e8ad78bd6af29ed
+		SDIO/driver_fw/fw/aic8800/fw_patch_u03.bin	97712a33e735e429c4de5a6cd50cbf52
+	SDIO/driver_fw/fw/aic8800D80
+		SDIO/driver_fw/fw/aic8800D80/aic_powerlimit_8800d80.txt	8fdea0a743ac6ae78572bbda3df884ce
+		SDIO/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt	4c1619f2ad65562412588a297dfbc86f
+		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_h_u02.bin	a276153cb94641facc6071b6d3d76ab2
+		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_h_u02_ipc.bin	c5387bd063d966dc4f78b63902a70669
+		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin	bfab40aa1988fa3f1e8af84c26423ab3
+		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02_ipc.bin	f6c2cd3ee29bcdaee34616ac9d02422a
+		SDIO/driver_fw/fw/aic8800D80/fmacfwbt_8800d80_h_u02.bin	daf1f3270c0f04e395797a7054313355
+		SDIO/driver_fw/fw/aic8800D80/fmacfwbt_8800d80_u02.bin	bd76e4d0bf3ce06291d53312d6015053
+		SDIO/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin	f546881a81b960d89a672578eb45a809
+		SDIO/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin	6ef0dc3eb798477555461169a77ed4f8
+		SDIO/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02_ext0.bin	2110a40c713998d743127d65239a71fe
+		SDIO/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin	2a860bc9f2ec72ed45ed20c464ec66ba
+		SDIO/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin	35d09e0e6ffe6347abce15bd9274daf5
+	SDIO/driver_fw/fw/aic8800D80X2
+		SDIO/driver_fw/fw/aic8800D80X2/aic_powerlimit_8800d80x2.txt	9fc993fef3712602f75cbf78687c3e4f
+		SDIO/driver_fw/fw/aic8800D80X2/aic_userconfig_8800d80x2.txt	cf1c5c7c68b248d108254ddfdf757a72
+		SDIO/driver_fw/fw/aic8800D80X2/fmacfw_8800d80x2.bin	6fb9d1a7a2b8028ac5b116431dd0a337
+		SDIO/driver_fw/fw/aic8800D80X2/fw_adid_8800d80x2_u05.bin	cdf8e2a582a88c765a47ca0538711390
+		SDIO/driver_fw/fw/aic8800D80X2/fw_patch_8800d80x2_u05.bin	7b8e2d9f5a6004b71300b64943ebb95f
+		SDIO/driver_fw/fw/aic8800D80X2/fw_patch_table_8800d80x2_u05.bin	2fed8cc115301adc251fcff64b55734c
+		SDIO/driver_fw/fw/aic8800D80X2/lmacfw_rf_8800d80x2.bin	7ca4d9409b40b1d8495dfcc5b09ea698
+	SDIO/driver_fw/fw/aic8800DC
+		SDIO/driver_fw/fw/aic8800DC/aic_userconfig_8800dc.txt	159af09b93ce2f8f042cb57d287e0df2
+		SDIO/driver_fw/fw/aic8800DC/aic_userconfig_8800dw.txt	159af09b93ce2f8f042cb57d287e0df2
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_h_u02.bin	0cc56598f0b98b69ea8e0dfc0143398d
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_hbt_u02.bin	6dc27a3623e38505f725fdcfa6a5c4d0
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_u02.bin	e57d8aa88d70b34a3febfe8c1e31f0d5
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin	ccbfecba23e5820c49a31209a397bf8c
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_hbt_u02.bin	9974b96f77cbf8fab0cec8ab0bf515fd
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_ipc_u02.bin	2f2098cd33848cebe0942fda4e182c5e
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_u02.bin	72ad679ca537a8bf69a5cc85b012259c
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin	091e89204f53e834530463a0e86107a9
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_hbt_u02.bin	660b7fbb6947b72eb256a2bc41037d16
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_ipc_u02.bin	ce22bd9812ed63686bfdff1aaf389106
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_u02.bin	a209a9637a3006445224ec153d02d908
+		SDIO/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02.bin	95d10e6288e4d3413c0e3508cb9d711a
+		SDIO/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02h.bin	f00fbd9fe6509b786018967936203dd3
+		SDIO/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02.bin	53c44a3e9ba893f63e928b4eb3471c28
+		SDIO/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02_ext0.bin	4f87eff3ea60d8449c8a7722de082561
+		SDIO/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02h.bin	0a2af17f1fac7f4e54d60f5d7130d594
+		SDIO/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02.bin	5fd46dc3e8d2a165302915ea5fa63713
+		SDIO/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02h.bin	c147cdf0ce5ab4d4ef005c5cb7906866
+		SDIO/driver_fw/fw/aic8800DC/lmacfw_rf_8800dc.bin	9a90e1b0006a13126eab49e77bfa4941
+
+USB/driver_fw/fw
+	USB/driver_fw/fw/aic8800
+		USB/driver_fw/fw/aic8800/aic_userconfig.txt	818dd65893c9dcc5879a0ff3112bb485
+		USB/driver_fw/fw/aic8800/fmacfw.bin	b9f89ccb6f3b33a68a396ee183f439e3
+		USB/driver_fw/fw/aic8800/fmacfw_m2d.bin	861e413d729d5513fd89bc7213c13ebe
+		USB/driver_fw/fw/aic8800/fmacfw_no_msg_ep.bin	e2b630ee121a5197c5206242a92a4254
+		USB/driver_fw/fw/aic8800/fmacfw_no_msg_ep_rf.bin	09fc9d03437de57df3b8d238eb16dd1f
+		USB/driver_fw/fw/aic8800/fmacfw_rf.bin	f439f6dafebdda683039098704bf3dc0
+		USB/driver_fw/fw/aic8800/fw_adid.bin	75ad9d37ebbd2e078392067ee568b432
+		USB/driver_fw/fw/aic8800/fw_adid_rf.bin	75ad9d37ebbd2e078392067ee568b432
+		USB/driver_fw/fw/aic8800/fw_adid_u03.bin	cf3ee68167beda73aaa5cb7a17169b4d
+		USB/driver_fw/fw/aic8800/fw_ble_scan.bin	0bb8aedaaff9ae9164b8a30acd46fd20
+		USB/driver_fw/fw/aic8800/fw_ble_scan_ad_filter_dcdc.bin	f40504b87e4825d0eabfe1a384744947
+		USB/driver_fw/fw/aic8800/fw_ble_scan_ad_filter_ldo.bin	b0e76b51791647f22ab98e7c8f6d2c4d
+		USB/driver_fw/fw/aic8800/fw_patch.bin	bea524b9eaccb9f539138b5a8adf0926
+		USB/driver_fw/fw/aic8800/fw_patch_rf.bin	471fcd92e2bf52454e47fb217a8482cf
+		USB/driver_fw/fw/aic8800/fw_patch_table.bin	ea92c8dfa257426ef55d2f2eef8fd239
+		USB/driver_fw/fw/aic8800/fw_patch_table_u03.bin	23180da431e942c144d4abc4fa31d2e1
+		USB/driver_fw/fw/aic8800/fw_patch_u03.bin	97712a33e735e429c4de5a6cd50cbf52
+		USB/driver_fw/fw/aic8800/m2d_ota.bin	2a1f97f1a6233fbed482f2115ff80084
+	USB/driver_fw/fw/aic8800D80
+		USB/driver_fw/fw/aic8800D80/aic_powerlimit_8800d80.txt	8fdea0a743ac6ae78572bbda3df884ce
+		USB/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt	4c1619f2ad65562412588a297dfbc86f
+		USB/driver_fw/fw/aic8800D80/calibmode_8800d80.bin	34d63c0b5377f73d9a03f6868ef7412a
+		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_h_u02.bin	8f2f416c6104d34bb7cb62652ce1de6c
+		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_h_u02_ipc.bin	cd4515a86299f085f48451552af76cbc
+		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin	7de19f9eeee36c4d48f0a060caf433d3
+		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02_ipc.bin	a0723e3a9953fc0603a1bbed54124e42
+		USB/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin	f546881a81b960d89a672578eb45a809
+		USB/driver_fw/fw/aic8800D80/fw_ble_scan_ad_filter.bin	2f0f4ab4d991fd23662955efaf11f0aa
+		USB/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin	6ef0dc3eb798477555461169a77ed4f8
+		USB/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02_ext0.bin	2110a40c713998d743127d65239a71fe
+		USB/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin	2a860bc9f2ec72ed45ed20c464ec66ba
+		USB/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin	96f612b84665d0cc40a80c5f84e0f66d
+	USB/driver_fw/fw/aic8800D80X2
+		USB/driver_fw/fw/aic8800D80X2/aic_powerlimit_8800d80x2.txt	9fc993fef3712602f75cbf78687c3e4f
+		USB/driver_fw/fw/aic8800D80X2/aic_userconfig_8800d80x2.txt	cf1c5c7c68b248d108254ddfdf757a72
+		USB/driver_fw/fw/aic8800D80X2/fmacfw_8800d80x2.bin	099d29b5c653ef7b43e910bc37dfa72a
+		USB/driver_fw/fw/aic8800D80X2/fw_adid_8800d80x2_u03.bin	046f0272f2c274e11233bddebbd8f887
+		USB/driver_fw/fw/aic8800D80X2/fw_adid_8800d80x2_u05.bin	cdf8e2a582a88c765a47ca0538711390
+		USB/driver_fw/fw/aic8800D80X2/fw_patch_8800d80x2_u03.bin	57ef1c09e1769db1c32940e404ac825a
+		USB/driver_fw/fw/aic8800D80X2/fw_patch_8800d80x2_u05.bin	5ccf6832dfdaa0c9d85295ae7c98de74
+		USB/driver_fw/fw/aic8800D80X2/fw_patch_table_8800d80x2_u03.bin	2c4f3266f2dcef1111038d2ba833a0c8
+		USB/driver_fw/fw/aic8800D80X2/fw_patch_table_8800d80x2_u05.bin	7203fccfdcf5b1079703911623cd28ea
+		USB/driver_fw/fw/aic8800D80X2/lmacfw_rf_8800d80x2.bin	7e04f2017f128d5e516e2c29c9013613
+	USB/driver_fw/fw/aic8800DC
+		USB/driver_fw/fw/aic8800DC/aic_powerlimit_8800dc.txt	18f1f3d7f9ed16b05702c10cc3e829d7
+		USB/driver_fw/fw/aic8800DC/aic_powerlimit_8800dw.txt	66c26ab55b002fb9e1cf2f459b5382ca
+		USB/driver_fw/fw/aic8800DC/aic_userconfig_8800dc.txt	546adac966d71ca97cd9ca247d92180c
+		USB/driver_fw/fw/aic8800DC/aic_userconfig_8800dw.txt	546adac966d71ca97cd9ca247d92180c
+		USB/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_h_u02.bin	0cc56598f0b98b69ea8e0dfc0143398d
+		USB/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_u02.bin	e57d8aa88d70b34a3febfe8c1e31f0d5
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin	ccbfecba23e5820c49a31209a397bf8c
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_ipc_u02.bin	2f2098cd33848cebe0942fda4e182c5e
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_u02.bin	72ad679ca537a8bf69a5cc85b012259c
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin	091e89204f53e834530463a0e86107a9
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_ipc_u02.bin	ce22bd9812ed63686bfdff1aaf389106
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_u02.bin	a209a9637a3006445224ec153d02d908
+		USB/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02.bin	95d10e6288e4d3413c0e3508cb9d711a
+		USB/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02h.bin	f00fbd9fe6509b786018967936203dd3
+		USB/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02.bin	53c44a3e9ba893f63e928b4eb3471c28
+		USB/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02_ext0.bin	4f87eff3ea60d8449c8a7722de082561
+		USB/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02h.bin	0a2af17f1fac7f4e54d60f5d7130d594
+		USB/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02.bin	5fd46dc3e8d2a165302915ea5fa63713
+		USB/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02h.bin	c147cdf0ce5ab4d4ef005c5cb7906866
+		USB/driver_fw/fw/aic8800DC/lmacfw_rf_8800dc.bin	9a90e1b0006a13126eab49e77bfa4941
+
+PCIE/driver_fw/fw
+	PCIE/driver_fw/fw/aic8800D80
+		PCIE/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt	35c8e99f3edd34d2a39bc9920e1da494
+		PCIE/driver_fw/fw/aic8800D80/fmacfw_8800D80_pcie.bin	bce8b83be03820ce358aa6d3c01475d4
+		PCIE/driver_fw/fw/aic8800D80/fmacfwbt_8800D80_pcie.bin	feaad609b0da71b8c017b074a1af3ca4
+		PCIE/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin	f546881a81b960d89a672578eb45a809
+		PCIE/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin	6ef0dc3eb798477555461169a77ed4f8
+		PCIE/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02_ext0.bin	2110a40c713998d743127d65239a71fe
+		PCIE/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin	2a860bc9f2ec72ed45ed20c464ec66ba
+		PCIE/driver_fw/fw/aic8800D80/lmacfw_rf_pcie.bin	6a109929e5457dfda228d132aea277c3
+	PCIE/driver_fw/fw/aic8800D80X2
+		PCIE/driver_fw/fw/aic8800D80X2/aic_userconfig_8800d80x2.txt	2d78411852c71c0908c25be1189605d1
+		PCIE/driver_fw/fw/aic8800D80X2/fmacfw_8800D80X2_pcie.bin	457bce075f2415d8cc5a19641520a609
+		PCIE/driver_fw/fw/aic8800D80X2/fw_adid_8800d80x2_u03.bin	cdf8e2a582a88c765a47ca0538711390
+		PCIE/driver_fw/fw/aic8800D80X2/fw_patch_8800d80x2_u03.bin	cdf954d0c126c3b87aec6b18f2f4c66f
+		PCIE/driver_fw/fw/aic8800D80X2/fw_patch_table_8800d80x2_u03.bin	6b882888549bba4d314216ca5dd60aed
+		PCIE/driver_fw/fw/aic8800D80X2/lmacfw_rf_8800D80X2_pcie.bin	992dc72a8783819b0047351c730af7b0
+=============================================================
+
+aic8800d_linux_sdk_V3.0_2024_0420_83a17a94
 
 
 SDIO/driver_fw/fw
@@ -28,12 +198,13 @@ SDIO/driver_fw/fw
 		SDIO/driver_fw/fw/aic8800/fw_patch_u03.bin	2d21e332a61aa2055b1a557ffa826e13
 	SDIO/driver_fw/fw/aic8800D80
 		SDIO/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt	35c8e99f3edd34d2a39bc9920e1da494
-		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin	13e6f0e58aae342d260d8672ab61c31f
+		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_h_u02.bin	de8efbe0beebe93c8cb40f2e617c2375
+		SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin	b60f10c25a8d6e6d5e9b40e8f809c8b8
 		SDIO/driver_fw/fw/aic8800D80/fmacfwbt_8800d80_u02.bin	a52b105588e7c4888ee64566d7fad866
 		SDIO/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin	f546881a81b960d89a672578eb45a809
 		SDIO/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin	35d137b8a76daaeb4f5034df8e15bcde
 		SDIO/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin	0c9bf9c9c10f7a90a22a4c35fa58c967
-		SDIO/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin	2fddfa919e6e16729d43316003391894
+		SDIO/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin	efa56d1a7d713a27a6fd603155880817
 	SDIO/driver_fw/fw/aic8800DC
 		SDIO/driver_fw/fw/aic8800DC/aic_userconfig_8800dc.txt	159af09b93ce2f8f042cb57d287e0df2
 		SDIO/driver_fw/fw/aic8800DC/aic_userconfig_8800dw.txt	159af09b93ce2f8f042cb57d287e0df2
@@ -41,11 +212,11 @@ SDIO/driver_fw/fw
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_h_u02.bin	10df4a96fc0a4bf7e11a9e6528a6b057
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_u02.bin	c24b6c3449de4abee8927887213b2e33
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_hbt_u02.bin	9974b96f77cbf8fab0cec8ab0bf515fd
-		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin	7726c614f63a38bbc2a8a5496f67aeb5
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin	4c093d5bcdf94c6330a9e2655781c0a2
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_ipc_u02.bin	2f2098cd33848cebe0942fda4e182c5e
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_u02.bin	c4e2325d5f1526dbadb60b09fcd0af98
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_hbt_u02.bin	660b7fbb6947b72eb256a2bc41037d16
-		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin	6d3deb2100280c6b91e79f784bbfd9cd
+		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin	9371b21df415ee5555a5459d153cc18c
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_ipc_u02.bin	ce22bd9812ed63686bfdff1aaf389106
 		SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_u02.bin	d05705afbb9d60c87d54596fc74858e2
 		SDIO/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02.bin	95d10e6288e4d3413c0e3508cb9d711a
@@ -80,13 +251,14 @@ USB/driver_fw/fw
 		USB/driver_fw/fw/aic8800D80/aic_powerlimit_8800d80.txt	012bbcb9576b93118ddd10f4583bb931
 		USB/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt	35c8e99f3edd34d2a39bc9920e1da494
 		USB/driver_fw/fw/aic8800D80/calibmode_8800d80.bin	34d63c0b5377f73d9a03f6868ef7412a
-		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin	fa0e5a6a464492ee139e87b24ef524d8
+		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_h_u02.bin	9c98ddf06434e4fe46b648c6af243b07
+		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin	abd9af6d624471b7478b58bdfc737641
 		USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02_ipc.bin	68f5e0d51a0be8ba32bcb4b4b03f9fdc
 		USB/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin	f546881a81b960d89a672578eb45a809
 		USB/driver_fw/fw/aic8800D80/fw_ble_scan_ad_filter.bin	190bca45a23472c66bacbd5e1b55c169
 		USB/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin	35d137b8a76daaeb4f5034df8e15bcde
 		USB/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin	0c9bf9c9c10f7a90a22a4c35fa58c967
-		USB/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin	abea5f86fe4effd96f3f5ffe79f2e70e
+		USB/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin	01fd9aaf9510492c863f29eb6191e258
 	USB/driver_fw/fw/aic8800DC
 		USB/driver_fw/fw/aic8800DC/aic_powerlimit_8800dc.txt	5f6610b329d80605eede13acbcdf35d2
 		USB/driver_fw/fw/aic8800DC/aic_powerlimit_8800dw.txt	5f6610b329d80605eede13acbcdf35d2
@@ -94,10 +266,10 @@ USB/driver_fw/fw
 		USB/driver_fw/fw/aic8800DC/aic_userconfig_8800dw.txt	b220499c52c07a31d070467b87eb39f5
 		USB/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_h_u02.bin	10df4a96fc0a4bf7e11a9e6528a6b057
 		USB/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_u02.bin	c24b6c3449de4abee8927887213b2e33
-		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin	7726c614f63a38bbc2a8a5496f67aeb5
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin	4c093d5bcdf94c6330a9e2655781c0a2
 		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_ipc_u02.bin	2f2098cd33848cebe0942fda4e182c5e
 		USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_u02.bin	c4e2325d5f1526dbadb60b09fcd0af98
-		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin	6d3deb2100280c6b91e79f784bbfd9cd
+		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin	9371b21df415ee5555a5459d153cc18c
 		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_ipc_u02.bin	ce22bd9812ed63686bfdff1aaf389106
 		USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_u02.bin	d05705afbb9d60c87d54596fc74858e2
 		USB/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02.bin	95d10e6288e4d3413c0e3508cb9d711a
@@ -111,12 +283,137 @@ USB/driver_fw/fw
 PCIE/driver_fw/fw
 	PCIE/driver_fw/fw/aic8800D80
 		PCIE/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt	35c8e99f3edd34d2a39bc9920e1da494
-		PCIE/driver_fw/fw/aic8800D80/fmacfw_8800D80_pcie.bin	f2e6eb3fd1108257be08a1fe9a16c95c
-		PCIE/driver_fw/fw/aic8800D80/fmacfwbt_8800D80_pcie.bin	a12d60c629c7af2f31dfb5f5aab65fb0
+		PCIE/driver_fw/fw/aic8800D80/fmacfw_8800D80_pcie.bin	4c06fb6c2a1486e9fd16c732be11c13b
+		PCIE/driver_fw/fw/aic8800D80/fmacfwbt_8800D80_pcie.bin	eb0b11dd352a1f46e01d4967730afa5d
 		PCIE/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin	f546881a81b960d89a672578eb45a809
 		PCIE/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin	35d137b8a76daaeb4f5034df8e15bcde
 		PCIE/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin	0c9bf9c9c10f7a90a22a4c35fa58c967
 		PCIE/driver_fw/fw/aic8800D80/lmacfw_rf_pcie.bin	19b754b32e1e1238175cff7e4b536f53
+	PCIE/driver_fw/fw/aic8800D80X2
+		PCIE/driver_fw/fw/aic8800D80X2/aic_userconfig_8800d80x2.txt	56dd28bd1223c7648d15ee329803c0e6
+		PCIE/driver_fw/fw/aic8800D80X2/fmacfw_8800D80X2_pcie.bin	f0db279161a166ae17ce0a98888ae9f5
+=============================================================
 
+==================================Driver Version======================================
+aic8800d_linux_sdk_V3.0_2024_0325_66ccc7df
+======================================================================================
 
+==================================Update Instructions=================================
+[USB/SDIO/PCIE driver update]
+1，fix driver crash cause by tx/rx thread create fail
+2，Optimize PCIE driver workflow
+3，Optimize the adaptation of certain platforms
+4，fix p2p vif bug when use P2P0
+5，Fix some build errors and compile warning.
 
+[USB/SDIO/PCIE firmware update]
+1，Optimize the use of BLE in multiple scenarios
+2，Fix BT anomaly issues in some extreme scenarios
+======================================================================================
+
+==================================Firmware Update=====================================
+SDIO/driver_fw/fw
+	SDIO/driver_fw/fw/aic8800
+		5f135f0abb011e18bfecdc41ca2b27ed  SDIO/driver_fw/fw/aic8800/aic_userconfig.txt
+		22db5a84972deb84eb37b54aac27e398  SDIO/driver_fw/fw/aic8800/fmacfw_8800m_custmsg.bin
+		fb076fb5c3a9e4cfae53db59e6cbac36  SDIO/driver_fw/fw/aic8800/fmacfw.bin
+		b65c6ab8501acaf91d7d9cfc8ced9d30  SDIO/driver_fw/fw/aic8800/fmacfwbt.bin
+		c62e4fc544c43834f562dc9b358515e4  SDIO/driver_fw/fw/aic8800/fmacfw_rf.bin
+		75ad9d37ebbd2e078392067ee568b432  SDIO/driver_fw/fw/aic8800/fw_adid.bin
+		cf3ee68167beda73aaa5cb7a17169b4d  SDIO/driver_fw/fw/aic8800/fw_adid_u03.bin
+		bea524b9eaccb9f539138b5a8adf0926  SDIO/driver_fw/fw/aic8800/fw_patch.bin
+		ea92c8dfa257426ef55d2f2eef8fd239  SDIO/driver_fw/fw/aic8800/fw_patch_table.bin
+		454d1b6ee45967b500f775b01b107f57  SDIO/driver_fw/fw/aic8800/fw_patch_table_u03.bin
+		3876dbe0e910ab1b9e8ad78bd6af29ed  SDIO/driver_fw/fw/aic8800/fw_patch_test.bin
+		2d21e332a61aa2055b1a557ffa826e13  SDIO/driver_fw/fw/aic8800/fw_patch_u03.bin
+	SDIO/driver_fw/fw/aic8800D80
+		35c8e99f3edd34d2a39bc9920e1da494  SDIO/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt
+		13e6f0e58aae342d260d8672ab61c31f  SDIO/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin
+		a52b105588e7c4888ee64566d7fad866  SDIO/driver_fw/fw/aic8800D80/fmacfwbt_8800d80_u02.bin
+		f546881a81b960d89a672578eb45a809  SDIO/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin
+		35d137b8a76daaeb4f5034df8e15bcde  SDIO/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin
+		0c9bf9c9c10f7a90a22a4c35fa58c967  SDIO/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin
+		2fddfa919e6e16729d43316003391894  SDIO/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin
+	SDIO/driver_fw/fw/aic8800DC
+		159af09b93ce2f8f042cb57d287e0df2  SDIO/driver_fw/fw/aic8800DC/aic_userconfig_8800dc.txt
+		159af09b93ce2f8f042cb57d287e0df2  SDIO/driver_fw/fw/aic8800DC/aic_userconfig_8800dw.txt
+		6dc27a3623e38505f725fdcfa6a5c4d0  SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_hbt_u02.bin
+		10df4a96fc0a4bf7e11a9e6528a6b057  SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_h_u02.bin
+		c24b6c3449de4abee8927887213b2e33  SDIO/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_u02.bin
+		9974b96f77cbf8fab0cec8ab0bf515fd  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_hbt_u02.bin
+		7726c614f63a38bbc2a8a5496f67aeb5  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin
+		2f2098cd33848cebe0942fda4e182c5e  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_ipc_u02.bin
+		c4e2325d5f1526dbadb60b09fcd0af98  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_u02.bin
+		660b7fbb6947b72eb256a2bc41037d16  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_hbt_u02.bin
+		6d3deb2100280c6b91e79f784bbfd9cd  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin
+		ce22bd9812ed63686bfdff1aaf389106  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_ipc_u02.bin
+		d05705afbb9d60c87d54596fc74858e2  SDIO/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_u02.bin
+		95d10e6288e4d3413c0e3508cb9d711a  SDIO/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02.bin
+		f00fbd9fe6509b786018967936203dd3  SDIO/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02h.bin
+		2b67a2b0c29631f0e23280f2cb6853f5  SDIO/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02.bin
+		d6e698b33c4ba7575e58a01d3cf7930d  SDIO/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02h.bin
+		949f15e05a4975ea56fb7062f9baf198  SDIO/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02.bin
+		131dfe88d71caff1a6ac1504a9c607a9  SDIO/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02h.bin
+		e87ce5eb81f3c97d4dd5af3891658458  SDIO/driver_fw/fw/aic8800DC/lmacfw_rf_8800dc.bin
+
+USB/driver_fw/fw
+	USB/driver_fw/fw/aic8800
+		6978ee9e26c37e429520bc8ab86f1ee2  USB/driver_fw/fw/aic8800/fmacfw.bin
+		861e413d729d5513fd89bc7213c13ebe  USB/driver_fw/fw/aic8800/fmacfw_m2d.bin
+		e2b630ee121a5197c5206242a92a4254  USB/driver_fw/fw/aic8800/fmacfw_no_msg_ep.bin
+		09fc9d03437de57df3b8d238eb16dd1f  USB/driver_fw/fw/aic8800/fmacfw_no_msg_ep_rf.bin
+		50fa03ff5d1c28287a0fd91b20fc507f  USB/driver_fw/fw/aic8800/fmacfw_rf.bin
+		75ad9d37ebbd2e078392067ee568b432  USB/driver_fw/fw/aic8800/fw_adid.bin
+		75ad9d37ebbd2e078392067ee568b432  USB/driver_fw/fw/aic8800/fw_adid_rf.bin
+		cf3ee68167beda73aaa5cb7a17169b4d  USB/driver_fw/fw/aic8800/fw_adid_u03.bin
+		f40504b87e4825d0eabfe1a384744947  USB/driver_fw/fw/aic8800/fw_ble_scan_ad_filter_dcdc.bin
+		b0e76b51791647f22ab98e7c8f6d2c4d  USB/driver_fw/fw/aic8800/fw_ble_scan_ad_filter_ldo.bin
+		0bb8aedaaff9ae9164b8a30acd46fd20  USB/driver_fw/fw/aic8800/fw_ble_scan.bin
+		bea524b9eaccb9f539138b5a8adf0926  USB/driver_fw/fw/aic8800/fw_patch.bin
+		471fcd92e2bf52454e47fb217a8482cf  USB/driver_fw/fw/aic8800/fw_patch_rf.bin
+		ea92c8dfa257426ef55d2f2eef8fd239  USB/driver_fw/fw/aic8800/fw_patch_table.bin
+		454d1b6ee45967b500f775b01b107f57  USB/driver_fw/fw/aic8800/fw_patch_table_u03.bin
+		2d21e332a61aa2055b1a557ffa826e13  USB/driver_fw/fw/aic8800/fw_patch_u03.bin
+		2a1f97f1a6233fbed482f2115ff80084  USB/driver_fw/fw/aic8800/m2d_ota.bin
+	USB/driver_fw/fw/aic8800D80
+		012bbcb9576b93118ddd10f4583bb931  USB/driver_fw/fw/aic8800D80/aic_powerlimit_8800d80.txt
+		35c8e99f3edd34d2a39bc9920e1da494  USB/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt
+		34d63c0b5377f73d9a03f6868ef7412a  USB/driver_fw/fw/aic8800D80/calibmode_8800d80.bin
+		fa0e5a6a464492ee139e87b24ef524d8  USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02.bin
+		68f5e0d51a0be8ba32bcb4b4b03f9fdc  USB/driver_fw/fw/aic8800D80/fmacfw_8800d80_u02_ipc.bin
+		f546881a81b960d89a672578eb45a809  USB/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin
+		190bca45a23472c66bacbd5e1b55c169  USB/driver_fw/fw/aic8800D80/fw_ble_scan_ad_filter.bin
+		35d137b8a76daaeb4f5034df8e15bcde  USB/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin
+		0c9bf9c9c10f7a90a22a4c35fa58c967  USB/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin
+		abea5f86fe4effd96f3f5ffe79f2e70e  USB/driver_fw/fw/aic8800D80/lmacfw_rf_8800d80_u02.bin
+	USB/driver_fw/fw/aic8800DC
+		5f6610b329d80605eede13acbcdf35d2  USB/driver_fw/fw/aic8800DC/aic_powerlimit_8800dc.txt
+		5f6610b329d80605eede13acbcdf35d2  USB/driver_fw/fw/aic8800DC/aic_powerlimit_8800dw.txt
+		b220499c52c07a31d070467b87eb39f5  USB/driver_fw/fw/aic8800DC/aic_userconfig_8800dc.txt
+		b220499c52c07a31d070467b87eb39f5  USB/driver_fw/fw/aic8800DC/aic_userconfig_8800dw.txt
+		10df4a96fc0a4bf7e11a9e6528a6b057  USB/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_h_u02.bin
+		c24b6c3449de4abee8927887213b2e33  USB/driver_fw/fw/aic8800DC/fmacfw_calib_8800dc_u02.bin
+		7726c614f63a38bbc2a8a5496f67aeb5  USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_h_u02.bin
+		2f2098cd33848cebe0942fda4e182c5e  USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_ipc_u02.bin
+		c4e2325d5f1526dbadb60b09fcd0af98  USB/driver_fw/fw/aic8800DC/fmacfw_patch_8800dc_u02.bin
+		6d3deb2100280c6b91e79f784bbfd9cd  USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_h_u02.bin
+		ce22bd9812ed63686bfdff1aaf389106  USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_ipc_u02.bin
+		d05705afbb9d60c87d54596fc74858e2  USB/driver_fw/fw/aic8800DC/fmacfw_patch_tbl_8800dc_u02.bin
+		95d10e6288e4d3413c0e3508cb9d711a  USB/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02.bin
+		f00fbd9fe6509b786018967936203dd3  USB/driver_fw/fw/aic8800DC/fw_adid_8800dc_u02h.bin
+		2b67a2b0c29631f0e23280f2cb6853f5  USB/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02.bin
+		d6e698b33c4ba7575e58a01d3cf7930d  USB/driver_fw/fw/aic8800DC/fw_patch_8800dc_u02h.bin
+		949f15e05a4975ea56fb7062f9baf198  USB/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02.bin
+		131dfe88d71caff1a6ac1504a9c607a9  USB/driver_fw/fw/aic8800DC/fw_patch_table_8800dc_u02h.bin
+		e87ce5eb81f3c97d4dd5af3891658458  USB/driver_fw/fw/aic8800DC/lmacfw_rf_8800dc.bin
+
+PCIE/driver_fw/fw
+	PCIE/driver_fw/fw/aic8800D80
+		35c8e99f3edd34d2a39bc9920e1da494  PCIE/driver_fw/fw/aic8800D80/aic_userconfig_8800d80.txt
+		f2e6eb3fd1108257be08a1fe9a16c95c  PCIE/driver_fw/fw/aic8800D80/fmacfw_8800D80_pcie.bin
+		a12d60c629c7af2f31dfb5f5aab65fb0  PCIE/driver_fw/fw/aic8800D80/fmacfwbt_8800D80_pcie.bin
+		f546881a81b960d89a672578eb45a809  PCIE/driver_fw/fw/aic8800D80/fw_adid_8800d80_u02.bin
+		35d137b8a76daaeb4f5034df8e15bcde  PCIE/driver_fw/fw/aic8800D80/fw_patch_8800d80_u02.bin
+		0c9bf9c9c10f7a90a22a4c35fa58c967  PCIE/driver_fw/fw/aic8800D80/fw_patch_table_8800d80_u02.bin
+		19b754b32e1e1238175cff7e4b536f53  PCIE/driver_fw/fw/aic8800D80/lmacfw_rf_pcie.bin
+======================================================================================

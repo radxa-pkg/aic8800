@@ -174,9 +174,11 @@ int rwnx_send_get_fw_version_req(struct rwnx_hw *rwnx_hw, struct mm_get_fw_versi
 int rwnx_send_txpwr_idx_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_ofst_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_ofst2x_req(struct rwnx_hw *rwnx_hw);
+int rwnx_send_txpwr_ofst2x_v2_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_set_filter(struct rwnx_hw *rwnx_hw, uint32_t filter);
 int rwnx_send_txpwr_lvl_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_v3_req(struct rwnx_hw *rwnx_hw);
+int rwnx_send_txpwr_lvl_v4_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_adj_req(struct rwnx_hw *rwnx_hw);
 
 //#ifdef CONFIG_USB_BT

@@ -36,6 +36,7 @@ void tcp_ack_timeout(struct timer_list *t)
 	struct tcp_ack_info *ack_info;
 	struct msg_buf *msg;
 	struct tcp_ack_manage *ack_m = NULL;
+	struct rwnx_hw *rwnx_hw;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) 
 	ack_info = (struct tcp_ack_info *)data;
@@ -46,6 +47,8 @@ void tcp_ack_timeout(struct timer_list *t)
 	ack_m = container_of(ack_info, struct tcp_ack_manage,
 			     ack_info[ack_info->ack_info_num]);
 
+	rwnx_hw = ack_m->priv;
+
 	write_seqlock_bh(&ack_info->seqlock);
 	msg = ack_info->msgbuf;
 	if (ack_info->busy && msg && !ack_info->in_send_msg) {
@@ -53,7 +56,11 @@ void tcp_ack_timeout(struct timer_list *t)
 		ack_info->drop_cnt = 0;
 		ack_info->in_send_msg = msg;
 		write_sequnlock_bh(&ack_info->seqlock);
-		intf_tx(ack_m->priv, msg);//send skb
+
+		write_seqlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+		rwnx_hw->txdata_reserved--;
+		write_sequnlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+		intf_tx(rwnx_hw, msg);//send skb
 		//ack_info->in_send_msg = NULL;//add by dwx
 		//write_sequnlock_bh(&ack_info->seqlock);
 		//intf_tx(ack_m->priv, msg);
@@ -113,8 +120,12 @@ void tcp_ack_deinit(struct rwnx_hw *priv)
 		ack_m->ack_info[i].msgbuf = NULL;
 		write_sequnlock_bh(&ack_m->ack_info[i].seqlock);
 
-		if (drop_msg)
+		if (drop_msg){
+			write_seqlock_bh(&priv->txdata_reserved_seqlock);
+			priv->txdata_reserved--;
+			write_sequnlock_bh(&priv->txdata_reserved_seqlock);
 			intf_tcp_drop_msg(priv, drop_msg);//drop skb
+		}
 	}
 }
 
@@ -190,7 +201,7 @@ int is_drop_tcp_ack(struct tcphdr *tcphdr, int tcp_tot_len,
 				case TCPOPT_WINDOW:
 					if (*ptr < 15)
 						*win_scale = (1 << (*ptr));
-					printk("%d\n",*win_scale);
+					//printk("%d\n",*win_scale);
 					break;
 				default:
 					drop = 2;
@@ -444,7 +455,8 @@ int tcp_ack_handle_new(struct msg_buf *new_msgbuf,
 	struct tcp_ack_msg *ack;
 	int ret = 0;
 	struct msg_buf *drop_msg = NULL;
-	struct msg_buf * send_msg = NULL;
+	struct rwnx_hw *rwnx_hw = ack_m->priv;
+	//struct msg_buf * send_msg = NULL;
 	//printk("",);
 	write_seqlock_bh(&ack_info->seqlock);
 
@@ -472,10 +484,20 @@ int tcp_ack_handle_new(struct msg_buf *new_msgbuf,
 				  (ack_info->drop_cnt >=
 				   atomic_read(&ack_m->max_drop_cnt)))){
 			ack_info->drop_cnt = 0;
-			send_msg = new_msgbuf;
-			ack_info->in_send_msg = send_msg;
+			//send_msg = new_msgbuf;
+			ack_info->in_send_msg = new_msgbuf;
 			del_timer(&ack_info->timer);
+			if(drop_msg) {
+			write_seqlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+			rwnx_hw->txdata_reserved--;
+			write_sequnlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+			}
 		}else{
+			if(!drop_msg) {
+			write_seqlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+			rwnx_hw->txdata_reserved++;
+			write_sequnlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+			}
 			ret = 1;
 			ack_info->msgbuf = new_msgbuf;
 			if (!timer_pending(&ack_info->timer))
@@ -551,9 +573,6 @@ int filter_send_tcp_ack(struct rwnx_hw *priv,
 	struct tcp_ack_msg *ack;
 	struct tcp_ack_info *ack_info;
 	struct tcp_ack_manage *ack_m = &priv->ack_m;
-
-	if (plen > MAX_TCP_ACK)
-		return 0;
 
 	tcp_ack_update(ack_m);
 	drop = tcp_check_ack(buf, &ack_msg, &win_scale);

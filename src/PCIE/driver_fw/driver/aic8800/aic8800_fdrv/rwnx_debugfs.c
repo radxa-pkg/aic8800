@@ -427,8 +427,8 @@ static ssize_t rwnx_dbgfs_debug_write(struct file *file,
                                     const char __user *user_buf,
                                     size_t count, loff_t *ppos)
 {
-    struct rwnx_hw *rw_hw = file->private_data;
-    struct rwnx_vif *rw_vif;
+    //struct rwnx_hw *rw_hw = file->private_data;
+    //struct rwnx_vif *rw_vif;
     char buf[64];
     size_t len = min_t(size_t, count, sizeof(buf) - 1);
     int debug_level=0;
@@ -1275,6 +1275,12 @@ static ssize_t rwnx_dbgfs_regdbg_write(struct file *file,
     	if(oper== 0) {
 		ret = rwnx_send_dbg_mem_read_req(priv, addr, &mem_read_cfm);
         	printk("[0x%x] = [0x%x]\n", mem_read_cfm.memaddr, mem_read_cfm.memdata);
+	} else if (oper == 1) {
+		ret = rwnx_send_dbg_mem_read_req(priv, addr, &mem_read_cfm);
+		printk("before write : [0x%x] = [0x%x]\n", mem_read_cfm.memaddr, mem_read_cfm.memdata);
+		ret = rwnx_send_dbg_mem_block_write_req(priv, addr, 4, &val);
+		ret = rwnx_send_dbg_mem_read_req(priv, addr, &mem_read_cfm);
+		printk("after write : [0x%x] = [0x%x]\n", mem_read_cfm.memaddr, mem_read_cfm.memdata);
     	}
 
 	return count;
@@ -1303,7 +1309,7 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 
 	buf[len] = '\0';
 	ret = sscanf(buf, "%x %x %x %x %x %x %x %x %x %x %x %x %x %x",
-                            &hwconfig_id, &addr[0], &addr[1], &addr[2], &addr[3], &addr[4], &addr[5], &addr[6], &addr[7], &addr[8], &addr[9], &addr[10], &addr[11]);
+                            &hwconfig_id, &addr[0], &addr[1], &addr[2], &addr[3], &addr[4], &addr[5], &addr[6], &addr[7], &addr[8], &addr[9], &addr[10], &addr[11], &addr[12]);
 	if(ret > 14) {
 		printk("param error > 14\n");
 	} else {
@@ -2071,7 +2077,7 @@ static ssize_t rwnx_dbgfs_last_rx_read(struct file *file,
 			union rwnx_rate_ctrl_info rate_config;
 			int percent = (rate_stats->table[i] * 1000) / rate_stats->cpt;
 			int p;
-			int ru_size;
+			int ru_size = 0;
 
 			idx_to_rate_cfg(i, &rate_config, &ru_size);
 			len += print_rate_from_cfg(&buf[len], bufsz - len,
@@ -2108,7 +2114,7 @@ static ssize_t rwnx_dbgfs_last_rx_read(struct file *file,
 		nss = last_rx->ht.mcs / 8;;
 		gi = last_rx->ht.short_gi;
 	} else {
-		BUG_ON((mcs = legrates_lut[last_rx->leg_rate]) == -1);
+		BUG_ON((mcs = legrates_lut[last_rx->leg_rate].idx) == -1);
 		nss = 0;
 		gi = 0;
 	}

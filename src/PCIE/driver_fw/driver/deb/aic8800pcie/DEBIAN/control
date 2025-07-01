@@ -1,0 +1,6 @@
+package:aic8800pcie
+version:1.0.0
+architecture:amd64
+maintainer:aic
+description:aic8800D80 wifi driver deb package
+

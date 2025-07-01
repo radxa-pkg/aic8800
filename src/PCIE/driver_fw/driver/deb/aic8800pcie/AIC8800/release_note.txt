@@ -1,0 +1,8 @@
+update_date:2023_0420_2000
+
+8800D80
+	PCIE:
+		fw:
+		  tmp
+		aic8800_fdrv:
+		  tmp

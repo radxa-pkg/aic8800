@@ -10,7 +10,7 @@ MAKEFLAGS +=-j$(shell nproc)
 
 ########## config option ##########
 export CONFIG_USE_FW_REQUEST = n
-export CONFIG_PREALLOC_RX_SKB = n
+export CONFIG_PREALLOC_RX_SKB = y
 export CONFIG_PREALLOC_TXQ = y
 export CONFIG_OOB = n
 export CONFIG_GPIO_WAKEUP = n
@@ -61,7 +61,8 @@ KDIR  = /lib/modules/$(shell uname -r)/build
 PWD   = $(shell pwd)
 KVER = $(shell uname -r)
 MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
-ARCH = x86_64
+SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
+ARCH ?= $(SUBARCH)
 CROSS_COMPILE ?=
 endif
 ###########################################

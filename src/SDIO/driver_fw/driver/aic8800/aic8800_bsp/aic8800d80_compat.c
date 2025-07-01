@@ -47,13 +47,15 @@ u32 adaptivity_patch_tbl_8800d80[][2] = {
 	{0x0168, 0x00010000}, //tx_adaptivity_en
 };
 
+#define USER_PWROFST_COVER_CALIB_FLAG	0x01U
 #define USER_CHAN_MAX_TXPWR_EN_FLAG     (0x01U << 1)
 #define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
 
-#define CFG_USER_CHAN_MAX_TXPWR_EN  0
+#define CFG_PWROFST_COVER_CALIB     1
+#define CFG_USER_CHAN_MAX_TXPWR_EN  1
 #define CFG_USER_TX_USE_ANA_F       0
 
-#define CFG_USER_EXT_FLAGS_EN   (CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
+#define CFG_USER_EXT_FLAGS_EN   (CFG_PWROFST_COVER_CALIB || CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
 
 u32 patch_tbl_8800d80[][2] = {
 	#ifdef USE_5G
@@ -62,14 +64,17 @@ u32 patch_tbl_8800d80[][2] = {
 	{0x00b4, 0xf3010000},
 	#endif
 #if defined(CONFIG_AMSDU_RX)
-        {0x170, 0x0100000a}
+        {0x170, 0x0100000a},
 #endif
 #ifdef CONFIG_IRQ_FALL
 	{0x00000170, 0x0000010a}, //irqf
 #endif
 
     #if CFG_USER_EXT_FLAGS_EN
-    {0x0188, 0x00000001
+    {0x0188, 0x00000000
+	#if CFG_PWROFST_COVER_CALIB
+	| USER_PWROFST_COVER_CALIB_FLAG
+	#endif
         #if CFG_USER_CHAN_MAX_TXPWR_EN
         | USER_CHAN_MAX_TXPWR_EN_FLAG
         #endif
@@ -78,6 +83,10 @@ u32 patch_tbl_8800d80[][2] = {
         #endif
     }, // user_ext_flags
     #endif
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	{0x019c, 0x00000100}, //enable radar detect
+#endif
 };
 
 #ifdef CONFIG_OOB

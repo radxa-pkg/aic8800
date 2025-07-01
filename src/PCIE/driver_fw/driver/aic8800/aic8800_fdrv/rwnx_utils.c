@@ -643,18 +643,18 @@ static int rwnx_elems_allocs(struct rwnx_hw *rwnx_hw)
     if (rwnx_ipc_buf_a2e_alloc(rwnx_hw, &rwnx_hw->tx_pattern, sizeof(u32),
                                &rwnx_tx_pattern))
         goto err_alloc;
-	
+
     ipc_host_pattern_push(rwnx_hw->ipc_env, &rwnx_hw->tx_pattern);
 
-	#if 0
-	printk("%s: 8\n", __func__);
+    #if 0
+    printk("%s: 8\n", __func__);
 
     if (rwnx_ipc_buf_e2a_alloc(rwnx_hw, &rwnx_hw->dbgdump.buf,
                                sizeof(struct dbg_debug_dump_tag)))
         goto err_alloc;
 
-		
-	printk("%s: 9\n", __func__);
+
+    printk("%s: 9\n", __func__);
     ipc_host_dbginfo_push(rwnx_hw->ipc_env, &rwnx_hw->dbgdump.buf);
 
     /*
@@ -663,9 +663,9 @@ static int rwnx_elems_allocs(struct rwnx_hw *rwnx_hw)
      * They will be allocated when checking the parameter compatibility between the driver
      * and the underlying components (i.e. during the rwnx_handle_dynparams() execution)
      */
-	printk("%s: 10\n", __func__);
+    printk("%s: 10\n", __func__);
 
-	#endif
+    #endif
 #ifdef CONFIG_RWNX_FULLMAC
     if (rwnx_ipc_buf_pool_alloc(rwnx_hw, &rwnx_hw->rxdesc_pool,
                                  rwnx_hw->ipc_env->rxdesc_nb,
@@ -926,6 +926,7 @@ radar_no_push:
  *
  * @pthis: Pointer to main driver data
  */
+#if 0
 static void rwnx_prim_tbtt_ind(void *pthis)
 {
 #if 0
@@ -933,16 +934,17 @@ static void rwnx_prim_tbtt_ind(void *pthis)
     rwnx_tx_bcns(rwnx_hw);
 #endif
 }
-
+#endif
 /**
  * rwnx_sec_tbtt_ind() - IRQ handler callback for %IPC_IRQ_E2A_TBTT_SEC
  *
  * @pthis: Pointer to main driver data
  */
+#if 0
 static void rwnx_sec_tbtt_ind(void *pthis)
 {
 }
-
+#endif
 /**
  * rwnx_dbgind() - IRQ handler callback for %IPC_IRQ_E2A_DBG
  *
@@ -1114,7 +1116,7 @@ void rwnx_ipc_tx_drain(struct rwnx_hw *rwnx_hw)
             }
         }
 #endif
-		rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
+        rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
         kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
         skb_pull(skb, RWNX_TX_HEADROOM);
         dev_kfree_skb_any(skb);
@@ -1177,15 +1179,16 @@ void rwnx_umh_done(struct rwnx_hw *rwnx_hw)
 
 int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
 {
-	int res = 0;
+    int res = 0;
+    struct ipc_shared_env_tag *shared_env = NULL;
 
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 #ifdef AICWF_SDIO_SUPPORT
-	aicwf_sdio_host_init(&(rwnx_hw->sdio_env), NULL, NULL, rwnx_hw);
+    aicwf_sdio_host_init(&(rwnx_hw->sdio_env), NULL, NULL, rwnx_hw);
 #endif
 
 #ifdef AICWF_USB_SUPPORT
-	aicwf_usb_host_init(&(rwnx_hw->usb_env), NULL, NULL, rwnx_hw);
+    aicwf_usb_host_init(&(rwnx_hw->usb_env), NULL, NULL, rwnx_hw);
 #endif
 
 #ifdef AICWF_PCIE_SUPPORT
@@ -1194,20 +1197,31 @@ int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
     if (!rwnx_hw->ipc_env){
         return -ENOMEM;
     }
-	
-	aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC400), rwnx_hw);
-	struct ipc_shared_env_tag *shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC400);
+
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (rwnx_hw->pcidev->bar_count == 1) {
+            aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm), rwnx_hw);
+            shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm);
+        } else {
+            aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC000), rwnx_hw);
+            shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC000);
+        }
+    } else {
+        aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm), rwnx_hw);
+        shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm);
+    }
+
     res = rwnx_elems_allocs(rwnx_hw);
     if (res) {
         kfree(rwnx_hw->ipc_env);
         rwnx_hw->ipc_env = NULL;
     }
-	printk("sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %lx\n", sizeof(struct ipc_shared_env_tag),
-												(u8 *)&shared_env->host_rxdesc - (u8 *)shared_env,
-												(u8 *)&shared_env->host_rxbuf - (u8 *)shared_env,
-												(u8 *)&shared_env->buffered - (u8 *)shared_env,
-												(u8 *)&rwnx_hw->ipc_env->shared->txdesc - (u8 *)shared_env);
-	printk("txdesc size %ld\n", sizeof(rwnx_hw->ipc_env->shared->txdesc));
+    printk("sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %lx\n", sizeof(struct ipc_shared_env_tag),
+                                                (u8 *)&shared_env->host_rxdesc - (u8 *)shared_env,
+                                                (u8 *)&shared_env->host_rxbuf - (u8 *)shared_env,
+                                                (u8 *)&shared_env->buffered - (u8 *)shared_env,
+                                                (u8 *)&rwnx_hw->ipc_env->shared->txdesc - (u8 *)shared_env);
+    printk("txdesc size %ld\n", sizeof(rwnx_hw->ipc_env->shared->txdesc));
 
 #endif
     rwnx_cmd_mgr_init(rwnx_hw->cmd_mgr);

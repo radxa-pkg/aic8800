@@ -21,7 +21,7 @@
 #define ROM_FMAC_FW_ADDR               0x00010000
 #define RAM_FMAC_FW_ADDR               0x00120000
 #define ROM_FMAC_PATCH_ADDR            0x00180000
-#ifdef CONFIG_DPD
+#if defined(CONFIG_DPD) || defined(CONFIG_LOFT_CALIB)
 #define ROM_FMAC_CALIB_ADDR            0x00130000
 #endif
 

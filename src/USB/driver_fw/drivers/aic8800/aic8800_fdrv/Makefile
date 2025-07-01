@@ -109,16 +109,24 @@ CONFIG_PREALLOC_TXQ ?= y
 CONFIG_USE_WIRELESS_EXT = y
 CONFIG_DPD = y
 CONFIG_FORCE_DPD_CALIB = y
+CONFIG_LOFT_CALIB = n
 CONFIG_GKI = n
 CONFIG_SCHED_SCAN = n
 CONFIG_TEMP_COMP = n
 CONFIG_POWER_LIMIT = n
+CONFIG_EXT_FEM_8800DCDW = n
 # CONFIG_MCC = n for sta and p2p concurrent in same channel.
 CONFIG_MCC = y
 CONFIG_LOAD_BT_PATCH_IN_FDRV = n
 
 ifneq ($(CONFIG_WIRELESS_EXT), y)
 CONFIG_USE_WIRELESS_EXT = n
+endif
+
+ifeq ($(CONFIG_EXT_FEM_8800DCDW), y)
+CONFIG_DPD = n
+CONFIG_FORCE_DPD_CALIB = n
+CONFIG_LOFT_CALIB = y
 endif
 
 # Support of MU-MIMO transmission (need FW support)
@@ -139,7 +147,7 @@ CONFIG_RWNX_MON_DATA =n
 CONFIG_RWNX_MON_XMIT ?= n
 CONFIG_RWNX_MON_RXFILTER ?= n
 
-CONFIG_FILTER_TCP_ACK =n
+CONFIG_FILTER_TCP_ACK =y
 
 # extra DEBUG config
 CONFIG_RWNX_SW_PROFILING ?= n
@@ -148,6 +156,7 @@ BR_NAME = br0
 
 obj-$(CONFIG_AIC8800_WLAN_SUPPORT) := $(MODULE_NAME).o
 $(MODULE_NAME)-y := \
+    rwnx_wakelock.o        \
 	rwnx_msg_tx.o          \
 	rwnx_msg_rx.o          \
 	rwnx_utils.o           \
@@ -170,8 +179,10 @@ $(MODULE_NAME)-y := \
 	regdb.o                \
 	md5.o                  \
 	aic_vendor.o           \
+        aic_priv_cmd.o         \
 	aicwf_compat_8800dc.o  \
-	aicwf_compat_8800d80.o
+	aicwf_compat_8800d80.o \
+	aicwf_compat_8800d80x2.o
 
 $(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
 $(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
@@ -309,11 +320,13 @@ ccflags-$(CONFIG_PREALLOC_TXQ) += -DCONFIG_PREALLOC_TXQ
 ccflags-$(CONFIG_USE_WIRELESS_EXT) += -DCONFIG_USE_WIRELESS_EXT
 ccflags-$(CONFIG_DPD) += -DCONFIG_DPD
 ccflags-$(CONFIG_FORCE_DPD_CALIB) += -DCONFIG_FORCE_DPD_CALIB -DCONFIG_DPD
+ccflags-$(CONFIG_LOFT_CALIB) += -DCONFIG_LOFT_CALIB
 ccflags-$(CONFIG_GKI) += -DCONFIG_GKI
 ccflags-$(CONFIG_SCHED_SCAN) += -DCONFIG_SCHED_SCAN
 ccflags-$(CONFIG_FILTER_TCP_ACK) += -DCONFIG_FILTER_TCP_ACK
 ccflags-$(CONFIG_TEMP_COMP) += -DCONFIG_TEMP_COMP
 ccflags-$(CONFIG_POWER_LIMIT) += -DCONFIG_POWER_LIMIT
+ccflags-$(CONFIG_EXT_FEM_8800DCDW) += -DCONFIG_EXT_FEM_8800DCDW
 MAKEFLAGS +=-j$(shell nproc)
 
 # Platform support list
@@ -359,7 +372,7 @@ KDIR  ?= /lib/modules/$(shell uname -r)/build
 PWD   ?= $(shell pwd)
 KVER ?= $(shell uname -r)
 MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
-UBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
+SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
 ARCH ?= $(SUBARCH)
 CROSS_COMPILE ?=
 endif

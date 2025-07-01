@@ -14,15 +14,14 @@
 #include "lmac_msg.h"
 #include "rwnx_msg_tx.h"
 
-#define AIC8820_PCI_VENDOR_ID	0xa69c//0xadec//0x8820
-#define AIC8820_PCI_DEVICE_ID	0x8d80//0xadec
 extern uint8_t scanning;
 extern u8 dhcped;
 
 #ifdef AICWF_PCIE_SUPPORT
 
 static const struct pci_device_id aic8820_pci_ids[] = {
-    {PCI_DEVICE(AIC8820_PCI_VENDOR_ID,AIC8820_PCI_DEVICE_ID)},
+    {PCI_DEVICE(AIC8800D80_PCI_VENDOR_ID,AIC8800D80_PCI_DEVICE_ID)},
+    {PCI_DEVICE(AIC8800D80X2_PCI_VENDOR_ID,AIC8800D80X2_PCI_DEVICE_ID)},
 };
 
 #ifdef CONFIG_WS
@@ -73,6 +72,182 @@ static void unregister_ws(void)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
 	wakeup_source_unregister(pci_ws);
 #endif
+}
+#endif
+
+#ifdef CONFIG_TEMP_CONTROL
+//int interval = 30;
+//module_param(interval, int, 0660);
+static int update_state(s8_l value, u8_l current_state)
+{
+	s8_l thd_1 = g_rwnx_plat->pcidev->tp_thd_1;
+	s8_l thd_2 = g_rwnx_plat->pcidev->tp_thd_2;
+
+	if (value > thd_2)
+		return 2;
+	else if (value > (thd_2 - BUFFERING_V2) && (current_state == 2))
+		return 2;
+	else if (value > thd_1 && current_state != 2)
+		return 1;
+	else if (value > (thd_1 - BUFFERING_V1) && current_state == 1)
+		return 1;
+	else if (current_state == 0)
+		return 0;
+	else
+		return 1;
+}
+
+void aicwf_netif_ctrl(struct aic_pci_dev *pcidev, int val)
+{
+	unsigned long flags;
+	struct rwnx_vif *rwnx_vif;
+
+	if (pcidev->net_stop)
+		return;
+
+	spin_lock_irqsave(&pcidev->tx_flow_lock, flags);
+	list_for_each_entry(rwnx_vif, &pcidev->rwnx_hw->vifs, list) {
+		if (!rwnx_vif || !rwnx_vif->ndev || !rwnx_vif->up)
+			continue;
+		netif_tx_stop_all_queues(rwnx_vif->ndev);//netif_stop_queue(rwnx_vif->ndev);
+	}
+	spin_unlock_irqrestore(&pcidev->tx_flow_lock, flags);
+	pcidev->net_stop = true;
+	mod_timer(&pcidev->netif_timer, jiffies + msecs_to_jiffies(val));
+
+	return;
+}
+
+void aicwf_temp_ctrl(struct aic_pci_dev *pcidev)
+{
+	if (pcidev->set_level) {
+		if (pcidev->set_level == 1) {
+			pcidev->get_level = 1;
+			aicwf_netif_ctrl(pcidev, pcidev->interval_t1/*TMR_INTERVAL_1*/);
+			//mdelay(1);
+		} else if (pcidev->set_level == 2) {
+			pcidev->get_level = 2;
+			aicwf_netif_ctrl(pcidev, pcidev->interval_t2/*TMR_INTERVAL_2*/);
+			//mdelay(2);
+		}
+		return;
+	} else {
+		if (pcidev->cur_temp > (pcidev->tp_thd_1 - 8)) {
+			//if ((sdiodev->cur_temp > TEMP_THD_1 && sdiodev->cur_temp <= TEMP_THD_2) || (sdiodev->cur_stat == 1)) {
+			if (update_state(pcidev->cur_temp, pcidev->cur_stat) == 1) {
+				pcidev->get_level = 1;
+				pcidev->cur_stat = 1;
+				aicwf_netif_ctrl(pcidev, pcidev->interval_t1/*TMR_INTERVAL_1*/);
+				//mdelay(1);
+				//break;
+			//} else if ((sdiodev->cur_temp > TEMP_THD_2) || (sdiodev->cur_stat == 2)) {
+			} else if (update_state(pcidev->cur_temp, pcidev->cur_stat) == 2) {
+				pcidev->get_level = 2;
+				pcidev->cur_stat = 2;
+				aicwf_netif_ctrl(pcidev, pcidev->interval_t2/*TMR_INTERVAL_2*/);
+				//mdelay(2);
+				//break;
+			}
+			return;
+		}
+
+		if (pcidev->cur_stat) {
+			AICWFDBG(LOGINFO, "reset cur_stat");
+			pcidev->cur_stat = 0;
+			pcidev->get_level = 0;
+		}
+
+		return;
+	}
+}
+
+void aicwf_netif_worker(struct work_struct *work)
+{
+	struct aic_pci_dev *pcidev = container_of(work, struct aic_pci_dev, netif_work);
+	unsigned long flags;
+	struct rwnx_vif *rwnx_vif;
+	spin_lock_irqsave(&pcidev->tx_flow_lock, flags);
+	list_for_each_entry(rwnx_vif, &pcidev->rwnx_hw->vifs, list) {
+		if (!rwnx_vif || !rwnx_vif->ndev || !rwnx_vif->up)
+			continue;
+		netif_tx_wake_all_queues(rwnx_vif->ndev);//netif_wake_queue(rwnx_vif->ndev);
+	}
+	spin_unlock_irqrestore(&pcidev->tx_flow_lock, flags);
+	pcidev->net_stop = false;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+static void aicwf_netif_timer(ulong data)
+#else
+static void aicwf_netif_timer(struct timer_list *t)
+#endif
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+		struct aic_pci_dev *pcidev = (struct aic_pci_dev *) data;
+#else
+		struct aic_pci_dev *pcidev = from_timer(pcidev, t, netif_timer);
+#endif
+
+	if (!work_pending(&pcidev->netif_work))
+		schedule_work(&pcidev->netif_work);
+
+	return;
+}
+
+void aicwf_temp_ctrl_worker(struct work_struct *work)
+{
+	struct rwnx_hw *rwnx_hw;
+	struct mm_set_vendor_swconfig_cfm cfm;
+	struct aic_pci_dev *pcidev = container_of(work, struct aic_pci_dev, tp_ctrl_work);
+	rwnx_hw = pcidev->rwnx_hw;
+	//AICWFDBG(LOGINFO, "%s\n", __func__);
+
+	if (pcidev->bus_if->state == BUS_DOWN_ST) {
+		AICWFDBG(LOGERROR, "%s bus down\n", __func__);
+		return;
+	}
+
+	spin_lock_bh(&pcidev->tm_lock);
+	if (!pcidev->tm_start) {
+		spin_unlock_bh(&pcidev->tm_lock);
+		AICWFDBG(LOGERROR, "tp_timer should stop_1\n");
+		return;
+	}
+	spin_unlock_bh(&pcidev->tm_lock);
+
+
+	rwnx_hw->started_jiffies = jiffies;
+
+	rwnx_send_get_temp_req(rwnx_hw, &cfm);
+	pcidev->cur_temp = cfm.temp_comp_get_cfm.degree;
+
+	spin_lock_bh(&pcidev->tm_lock);
+	if (pcidev->tm_start) {
+		mod_timer(&pcidev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+	} else
+		AICWFDBG(LOGERROR, "tp_timer should stop_2\n");
+	spin_unlock_bh(&pcidev->tm_lock);
+
+
+	return;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+static void aicwf_temp_ctrl_timer(ulong data)
+#else
+static void aicwf_temp_ctrl_timer(struct timer_list *t)
+#endif
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	struct aic_pci_dev *pcidev = (struct aic_pci_dev *) data;
+#else
+	struct aic_pci_dev *pcidev = from_timer(pcidev, t, tp_ctrl_timer);
+#endif
+
+	if (!work_pending(&pcidev->tp_ctrl_work))
+		schedule_work(&pcidev->tp_ctrl_work);
+
+	return;
 }
 #endif
 
@@ -151,13 +326,14 @@ static int aicwf_sw_resume(void)
 static int aicwf_resume_access(void)
 {
 	int ret = 0;
-	struct mm_add_if_cfm add_if_cfm;
-	struct mm_set_stack_start_cfm set_start_cfm;
-	struct aicbsp_feature_t feature;
+	//struct mm_add_if_cfm add_if_cfm;
+	//struct mm_set_stack_start_cfm set_start_cfm;
+	//struct aicbsp_feature_t feature;
 	struct rwnx_hw *rwnx_hw = g_rwnx_plat->pcidev->rwnx_hw;
 	struct rwnx_vif *rwnx_vif;
 	struct rwnx_vif *rwnx_vif_param = NULL;
-
+	struct rwnx_cmd *cur = NULL;
+	struct rwnx_cmd *nxt = NULL;
 #ifdef CONFIG_USB_BT
     struct aicbt_patch_table *head = NULL;
     struct aicbt_patch_info_t patch_info = {
@@ -214,7 +390,7 @@ static int aicwf_resume_access(void)
 
 	aicwf_sw_resume();
 
-	struct rwnx_cmd *cur, *nxt;
+//	struct rwnx_cmd *cur, *nxt;
 	spin_lock_bh(&rwnx_hw->cmd_mgr->lock);
 	list_for_each_entry_safe(cur, nxt, &rwnx_hw->cmd_mgr->cmds, list) {
 		printk("resume_cmd_id: %d\n", cur->id);
@@ -333,9 +509,11 @@ static int aicwf_disconnect_inform(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwn
 static int aicwf_pcie_init(struct aic_pci_dev *pciedev)
 {
 	struct pci_dev *pci_dev = pciedev->pci_dev;
+	struct aic_pci_dev *adev = pciedev;
 	u16 pci_cmd;
 	int ret = -ENODEV;
 	u8 linkctrl;
+	int i = 0;
 
 	printk("%s\n", __func__);
 	/* Hotplug fixups */
@@ -344,14 +522,14 @@ static int aicwf_pcie_init(struct aic_pci_dev *pciedev)
 	pci_write_config_word(pci_dev, PCI_COMMAND, pci_cmd);
 	pci_write_config_byte(pci_dev, PCI_CACHE_LINE_SIZE, L1_CACHE_BYTES>>2);
 
-	if(ret = pci_enable_device(pci_dev)) {
+	if((ret = pci_enable_device(pci_dev))) {
 		dev_err(&(pci_dev->dev), "pci_enable_device failed\n");
 		goto out;
 	}
 
 	pci_set_master(pci_dev);
 
-	if(ret = pci_request_regions(pci_dev, KBUILD_MODNAME)) {
+	if((ret = pci_request_regions(pci_dev, KBUILD_MODNAME))) {
 		dev_err(&(pci_dev->dev), "pci_request_regions failed\n");
 		goto out_request;
 	}
@@ -361,98 +539,210 @@ static int aicwf_pcie_init(struct aic_pci_dev *pciedev)
 		goto out_msi;
 	}
 
-	if( !(pciedev->pci_bar0_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 0))) {
-		dev_err(&(pci_dev->dev), "pci_ioremap_bar0 failed\n");
-		ret = -ENODEV;
-		goto out_bar0;
+	pciedev->bar_count = 0;
+	for (i = 0; i < 6; i++) {
+		if (pci_resource_start(pci_dev, i)) {
+			pciedev->bar_count++;
+		}
+	}
+	printk("bar_count:%d\n", adev->bar_count);
+
+	switch (pciedev->chip_id) {
+		case PRODUCT_ID_AIC8800D80:
+			if (pciedev->bar_count == 1) {
+				adev->pdev = pci_dev;
+				#if 0
+				adev->bar0 = pci_resource_start(adev->pdev, 0);
+				adev->len0 = pci_resource_len  (adev->pdev, 0);
+				adev->map0 = ioremap(adev->bar0, adev->len0);
+				#else
+				pci_read_config_dword (adev->pdev, 0x10, &(adev->bar0));
+				adev->len0 = pci_resource_len(adev->pdev, 0);
+				if(!(adev->map0 = (u8 *)pci_ioremap_bar(adev->pdev, 0))) {
+					dev_err(&(pci_dev->dev), "pci_ioremap_bar0 failed\n");
+					ret = -ENODEV;
+					goto out_bar0;
+				}
+				#endif
+
+				pciedev->pci_bar0_vaddr = adev->map0;
+				if(adev->map0 == NULL)
+				{
+					dev_err(&(pci_dev->dev), "pci_ioremap_bar0 failed\n");
+					ret = -ENODEV;
+					goto out_bar0;
+				}
+				LOG_INFO("bar0: %x, len = %x, map = %lx", adev->bar0, adev->len0, (unsigned long)adev->map0);
+				printk("start %llx end %llx flags %lx len %llx \n", pci_resource_start(adev->pdev, 0),
+																	pci_resource_end(adev->pdev, 0),
+																	pci_resource_flags(adev->pdev, 0),
+																	pci_resource_len(adev->pdev, 0));
+			} else {
+				if(!(pciedev->pci_bar0_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 0))) {
+					dev_err(&(pci_dev->dev), "pci_ioremap_bar0 failed\n");
+					ret = -ENODEV;
+					goto out_bar0;
+				}
+
+				if( !(pciedev->pci_bar1_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 1))) {
+					dev_err(&(pci_dev->dev), "pci_ioremap_bar1 failed\n");
+					ret = -ENODEV;
+					goto out_bar1;
+				}
+
+				if( !(pciedev->pci_bar2_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 2))) {
+					dev_err(&(pci_dev->dev), "pci_ioremap_bar2 failed\n");
+					ret = -ENODEV;
+					goto out_bar2;
+				}
+			}
+			break;
+		case PRODUCT_ID_AIC8800D80X2:
+			adev->pdev = pci_dev;
+			#if 0
+			adev->bar0 = pci_resource_start(adev->pdev, 0);
+			adev->len0 = pci_resource_len  (adev->pdev, 0);
+			adev->map0 = ioremap(adev->bar0, adev->len0);
+			#else
+			pci_read_config_dword (adev->pdev, 0x10, &(adev->bar0));
+			adev->len0 = pci_resource_len(adev->pdev, 0);
+			if(!(adev->map0 = (u8 *)pci_ioremap_bar(adev->pdev, 0))) {
+				dev_err(&(pci_dev->dev), "pci_ioremap_bar0 failed\n");
+				ret = -ENODEV;
+				goto out_bar0;
+			}
+			#endif
+
+			pciedev->pci_bar0_vaddr = adev->map0;
+			if(adev->map0 == NULL)
+			{
+				dev_err(&(pci_dev->dev), "pci_ioremap_bar0 failed\n");
+				ret = -ENODEV;
+				goto out_bar0;
+			}
+			LOG_INFO("bar0: %x, len = %x, map = %lx", adev->bar0, adev->len0, (unsigned long)adev->map0);
+			printk("start %llx end %llx flags %lx len %llx \n", pci_resource_start(adev->pdev, 0),
+																pci_resource_end(adev->pdev, 0),
+																pci_resource_flags(adev->pdev, 0),
+																pci_resource_len(adev->pdev, 0));
+			break;
+		default:
+			printk("chip id not correct\n");
+			break;
 	}
 
-	if( !(pciedev->pci_bar1_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 1))) {
-		dev_err(&(pci_dev->dev), "pci_ioremap_bar1 failed\n");
-		ret = -ENODEV;
-		goto out_bar1;
+	ret = request_irq(pci_dev->irq, aicwf_pcie_irq_hdlr,  IRQF_SHARED, "aicwf_pci", pciedev);
+	if(ret) {
+		printk("request irq fail:%d\n", ret);
+		goto out_irq;
 	}
 
-	if( !(pciedev->pci_bar2_vaddr = (u8 *)pci_ioremap_bar(pci_dev, 2))) {
-		dev_err(&(pci_dev->dev), "pci_ioremap_bar2 failed\n");
-		ret = -ENODEV;
-		goto out_bar2;
+	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		//# by G: msg waitlock at L1
+		pci_read_config_byte(pci_dev, pci_dev->pcie_cap + PCI_EXP_LNKCTL, &linkctrl);
+		if(linkctrl & 0x02){
+			linkctrl = linkctrl & ~0x02;
+			pci_write_config_byte(pci_dev, pci_dev->pcie_cap + PCI_EXP_LNKCTL, linkctrl);
+		}
 	}
 
-    ret = request_irq(pci_dev->irq, aicwf_pcie_irq_hdlr,  IRQF_SHARED, "aicwf_pci", pciedev);
-    if(ret) {
-        printk("request irq fail:%d\n", ret);
-        goto out_irq;
-    }
+	#if 0
+	unsigned long base = pci_resource_start(pci_dev, 0);
+	unsigned long len = pci_resource_len(pci_dev, 0);
+	unsigned long flags = pci_resource_flags(pci_dev, 0);
+	printk("bar0: base: 0x%lx, len=%ld, flags=0x%lx, vaddr=%p\n", base, len, flags, pciedev->pci_bar0_vaddr);
+	base = pci_resource_start(pci_dev, 2);
+	len = pci_resource_len(pci_dev, 2);
+	flags = pci_resource_flags(pci_dev, 2);
+	printk("bar2: base: 0x%lx, len=%ld, flags=0x%lx, vaddr=%p\n", base, len, flags, pciedev->pci_bar0_vaddr);
+	#endif
+	printk("%s success\n", __func__);
 
-	//# by G: msg waitlock at L1
-	pci_read_config_byte(pci_dev, pci_dev->pcie_cap + PCI_EXP_LNKCTL, &linkctrl);
-	if(linkctrl & 0x02){
-		linkctrl = linkctrl & ~0x02;
-		pci_write_config_byte(pci_dev, pci_dev->pcie_cap + PCI_EXP_LNKCTL, linkctrl);
-	}
-
-    #if 0
-    unsigned long base = pci_resource_start(pci_dev, 0);
-    unsigned long len = pci_resource_len(pci_dev, 0);
-    unsigned long flags = pci_resource_flags(pci_dev, 0);
-    printk("bar0: base: 0x%lx, len=%ld, flags=0x%lx, vaddr=%p\n", base, len, flags, pciedev->pci_bar0_vaddr);
-    base = pci_resource_start(pci_dev, 2);
-    len = pci_resource_len(pci_dev, 2);
-    flags = pci_resource_flags(pci_dev, 2);
-    printk("bar2: base: 0x%lx, len=%ld, flags=0x%lx, vaddr=%p\n", base, len, flags, pciedev->pci_bar0_vaddr);
-    #endif
-    printk("%s success\n", __func__);
-
-    goto out;
+	goto out;
 out_irq:
-    iounmap(pciedev->pci_bar2_vaddr);
+	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (pciedev->pci_bar2_vaddr) {
+			iounmap(pciedev->pci_bar2_vaddr);
+		}
+	}
 out_bar2:
-    iounmap(pciedev->pci_bar1_vaddr);
+	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (pciedev->pci_bar1_vaddr) {
+			iounmap(pciedev->pci_bar1_vaddr);
+		}
+	}
 out_bar1:
-    iounmap(pciedev->pci_bar0_vaddr);
+	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (pciedev->pci_bar0_vaddr) {
+			iounmap(pciedev->pci_bar0_vaddr);
+		}
+	}
 out_bar0:
-    pci_disable_msi(pci_dev);
+	pci_disable_msi(pci_dev);
 out_msi:
-    pci_release_regions(pci_dev);
+	pci_release_regions(pci_dev);
 out_request:
-    pci_disable_device(pci_dev);
+	pci_disable_device(pci_dev);
 
 out:
-    return ret;
+	return ret;
 }
 
 static void aicwf_pcie_txmsg_db(struct aic_pci_dev *pciedev)
 {
-	volatile unsigned int *dst_mail = (volatile unsigned int *)(pciedev->pci_bar2_vaddr + 0x800ec);
-	dst_mail[0] = 0x1;
+	if (pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (pciedev->bar_count == 1) {
+			writel(1, pciedev->emb_tpci + 0x0ec);
+		} else {
+			volatile unsigned int *dst_mail = (volatile unsigned int *)(pciedev->pci_bar2_vaddr + 0x800ec);
+			dst_mail[0] = 0x1;
+		}
+	} else {
+		writel(1, pciedev->emb_tpci + 0x0ec);
+	}
 }
 
 static void aicwf_pcie_txdata_db(struct aic_pci_dev *pciedev)
 {
-	volatile unsigned int *dst_mail = (volatile unsigned int *)(pciedev->pci_bar2_vaddr + 0x800ec);
-	dst_mail[0] = 0x2;
+	if (pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (pciedev->bar_count == 1) {
+			writel(2, pciedev->emb_tpci + 0x0ec);
+		} else {
+			volatile unsigned int *dst_mail = (volatile unsigned int *)(pciedev->pci_bar2_vaddr + 0x800ec);
+			dst_mail[0] = 0x2;
+		}
+	} else {
+		writel(2, pciedev->emb_tpci + 0x0ec);
+	}
 }
 
 static int aicwf_pcie_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {
 	int ret = -ENODEV;
+	struct aicwf_bus *bus_if = NULL;
+	struct aic_pci_dev *pciedev = NULL;
 
 	printk("%s\n", __func__);
 
-	struct aicwf_bus *bus_if = kzalloc(sizeof(struct aicwf_bus), GFP_KERNEL);
+	bus_if = kzalloc(sizeof(struct aicwf_bus), GFP_KERNEL);
 	if (!bus_if) {
 	 printk("alloc bus fail\n");
 	 return -ENOMEM;
 	}
 
-	struct aic_pci_dev *pciedev = kzalloc(sizeof(struct aic_pci_dev), GFP_KERNEL);
+	pciedev = kzalloc(sizeof(struct aic_pci_dev), GFP_KERNEL);
 	if (!pciedev) {
 	 printk("alloc pciedev fail\n");
 	 kfree(bus_if);
 	 return -ENOMEM;
 	}
 
+	printk("pci_dev vendor:%04x device:%04x subvendor:%04x subdevice:%04x\n", pci_dev->vendor, pci_dev->device, pci_dev->subsystem_vendor, pci_dev->subsystem_device);
+
+	if(pci_id->device == AIC8800D80_PCI_DEVICE_ID)
+		pciedev->chip_id = PRODUCT_ID_AIC8800D80;
+	if(pci_id->device == AIC8800D80X2_PCI_DEVICE_ID)
+		pciedev->chip_id = PRODUCT_ID_AIC8800D80X2;
 	pciedev->bus_if = bus_if;
 	bus_if->bus_priv.pci = pciedev;
 	dev_set_drvdata(&pci_dev->dev, bus_if);
@@ -463,10 +753,17 @@ static int aicwf_pcie_probe(struct pci_dev *pci_dev, const struct pci_device_id 
 #endif
 
 	ret = aicwf_pcie_init(pciedev);
-
 	if(ret) {
 		printk("%s: pci init fail\n", __func__);
 		return ret;
+	}
+
+	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80X2 || pciedev->bar_count == 1) {
+		ret = aicwf_pcie_setst(pciedev);
+		if(ret) {
+			printk("%s: pci set&tst fail\n", __func__);
+			return ret;
+		}
 	}
 
 	aicwf_pcie_bus_init(pciedev);
@@ -494,9 +791,17 @@ static void aicwf_pcie_remove(struct pci_dev *pci_dev)
 #endif
 	free_irq(pci_dev->irq, pci);
 	pci_disable_device(pci_dev);
-	iounmap(pci->pci_bar0_vaddr);
-	iounmap(pci->pci_bar1_vaddr);
-	iounmap(pci->pci_bar2_vaddr);
+	if (pci->pci_bar0_vaddr) {
+		iounmap(pci->pci_bar0_vaddr);
+	}
+	if(pci->chip_id == PRODUCT_ID_AIC8800D80) {
+		if (pci->pci_bar1_vaddr) {
+			iounmap(pci->pci_bar1_vaddr);
+		}
+		if (pci->pci_bar2_vaddr) {
+			iounmap(pci->pci_bar2_vaddr);
+		}
+	}
 	pci_release_regions(pci_dev);
 	pci_clear_master(pci_dev);
 	pci_disable_msi(pci_dev);
@@ -515,12 +820,12 @@ static void aicwf_pcie_remove(struct pci_dev *pci_dev)
 
 static int aicwf_pcie_suspend(struct pci_dev *pdev, pm_message_t state)
 {
-	printk("%s\n", __func__);
 	int ret = 0, i = 0;
 	//g_rwnx_plat->pcidev->rwnx_hw->pci_suspending = 1;
 	struct rwnx_hw *rwnx_hw = g_rwnx_plat->pcidev->rwnx_hw;
 	struct rwnx_vif *rwnx_vif;
 
+	printk("%s\n", __func__);
 	list_for_each_entry(rwnx_vif, &rwnx_hw->vifs, list) {
 		if (rwnx_vif->up) {
 			while ((int)atomic_read(&rwnx_vif->drv_conn_state) == (int)RWNX_DRV_STATUS_DISCONNECTING) {
@@ -535,11 +840,21 @@ static int aicwf_pcie_suspend(struct pci_dev *pdev, pm_message_t state)
 		}
 	}
 
+#ifdef CONFIG_TEMP_CONTROL
+		del_timer_sync(&rwnx_hw->pcidev->tp_ctrl_timer);
+		cancel_work_sync(&rwnx_hw->pcidev->tp_ctrl_work);
+	
+		mod_timer(&rwnx_hw->pcidev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+	
+		del_timer_sync(&rwnx_hw->pcidev->netif_timer);
+		cancel_work_sync(&rwnx_hw->pcidev->netif_work);
+#endif
+
 	g_rwnx_plat->pcidev->rwnx_hw->pci_suspending = 1;
 
 	spin_lock_bh(&rwnx_hw->cb_lock);
 	if (rwnx_hw->scan_request) {// && rwnx_hw->scan_request->wdev == &rwnx_vif->wdev) {
-		printk("suspend scan_done\n");
+//		printk("suspend scan_done\n");
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 		struct cfg80211_scan_info info =
 		{
@@ -549,6 +864,7 @@ static int aicwf_pcie_suspend(struct pci_dev *pdev, pm_message_t state)
 #else
 		cfg80211_scan_done (rwnx_hw->scan_request, true);
 #endif
+		printk("suspend scan_done\n");
 		rwnx_hw->scan_request = NULL;
 		scanning = 0;
 	}
@@ -598,7 +914,7 @@ static int aicwf_pcie_resume(struct pci_dev *pdev)
 	}
 #endif
 
-	fw_started = *(volatile u32 *) (g_rwnx_plat->pcidev->pci_bar0_vaddr + 0x120000) == 0x1a0000;
+	fw_started = *(volatile u32 *) (g_rwnx_plat->pcidev->pci_bar0_vaddr + 0x120000) == 0x1a2000;
 
 	if(!fw_started) {
 		ret = aicwf_resume_access();
@@ -610,6 +926,10 @@ static int aicwf_pcie_resume(struct pci_dev *pdev)
 		printk("resume skip reload\n");
 
 		g_rwnx_plat->pcidev->rwnx_hw->pci_suspending = 0;
+
+#ifdef CONFIG_TEMP_CONTROL
+		mod_timer(&g_rwnx_plat->pcidev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+#endif
 
 		return ret;
 	}
@@ -634,8 +954,25 @@ int aicwf_pcie_register_drv(void)
 
 void aicwf_pcie_unregister_drv(void)
 {
-	if (g_rwnx_plat && g_rwnx_plat->enabled)
-        rwnx_platform_deinit(g_rwnx_plat->pcidev->rwnx_hw);
+	if (g_rwnx_plat && g_rwnx_plat->enabled){
+#ifdef CONFIG_TEMP_CONTROL
+		spin_lock_bh(&g_rwnx_plat->pcidev->tm_lock);
+		g_rwnx_plat->pcidev->tm_start = 0;
+		if (timer_pending(&g_rwnx_plat->pcidev->tp_ctrl_timer)) {
+			AICWFDBG(LOGINFO, "%s del tp_ctrl_timer\n", __func__);
+			del_timer_sync(&g_rwnx_plat->pcidev->tp_ctrl_timer);
+		}
+		spin_unlock_bh(&g_rwnx_plat->pcidev->tm_lock);
+		cancel_work_sync(&g_rwnx_plat->pcidev->tp_ctrl_work);
+
+		if (timer_pending(&g_rwnx_plat->pcidev->netif_timer)) {
+			AICWFDBG(LOGINFO, "%s del netif_timer\n", __func__);
+			del_timer_sync(&g_rwnx_plat->pcidev->netif_timer);
+		}
+		cancel_work_sync(&g_rwnx_plat->pcidev->netif_work);
+#endif
+		rwnx_platform_deinit(g_rwnx_plat->pcidev->rwnx_hw);
+	}
 
 	pci_unregister_driver(&aicwf_pci_driver);
 }
@@ -749,12 +1086,12 @@ void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
 {
 	struct aicwf_bus *bus_if = pciedev->bus_if;
 	int ret;
-
+	struct aicwf_rx_priv* rx_priv = NULL;
     bus_if->dev = &pciedev->pci_dev->dev;
     bus_if->ops = &aicwf_pcie_bus_ops;
     bus_if->state = BUS_UP_ST;
 
-    struct aicwf_rx_priv* rx_priv;
+    //struct aicwf_rx_priv* rx_priv;
     rx_priv = aicwf_rx_init(pciedev);
     if(!rx_priv) {
         txrx_err("rx init failed\n");
@@ -762,7 +1099,36 @@ void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
         //goto out_free_bus;
     }
     pciedev->rx_priv = rx_priv;
-	
+
+#ifdef CONFIG_TEMP_CONTROL
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+	init_timer(&pciedev->tp_ctrl_timer);
+	pciedev->tp_ctrl_timer.data = (ulong) pciedev;
+	pciedev->tp_ctrl_timer.function = aicwf_temp_ctrl_timer;
+	init_timer(&pciedev->netif_timer);
+	pciedev->netif_timer.data = (ulong) pciedev;
+	pciedev->netif_timer.function = aicwf_netif_timer;
+#else
+	timer_setup(&pciedev->tp_ctrl_timer, aicwf_temp_ctrl_timer, 0);
+	timer_setup(&pciedev->netif_timer, aicwf_netif_timer, 0);
+#endif
+	INIT_WORK(&pciedev->tp_ctrl_work, aicwf_temp_ctrl_worker);
+	INIT_WORK(&pciedev->netif_work, aicwf_netif_worker);
+	mod_timer(&pciedev->tp_ctrl_timer, jiffies + msecs_to_jiffies(TEMP_GET_INTERVAL));
+	spin_lock_init(&pciedev->tm_lock);
+	pciedev->net_stop = false;;
+	pciedev->on_off = true;
+	pciedev->cur_temp = 0;
+	pciedev->get_level = 0;
+	pciedev->set_level = 0;
+	pciedev->interval_t1 = TMR_INTERVAL_1;
+	pciedev->interval_t2 = TMR_INTERVAL_2;
+	pciedev->cur_stat = 0;
+	pciedev->tp_thd_1 = TEMP_THD_1;
+	pciedev->tp_thd_2 = TEMP_THD_2;
+	pciedev->tm_start = 1;
+#endif
+
 	ret = aicwf_bus_init(0, &pciedev->pci_dev->dev);
 	if(ret)
 		printk("%s fail\n", __func__);

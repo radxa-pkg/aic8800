@@ -70,6 +70,11 @@
 #define POLL_DRIVER_DURATION_US (100000)
 #define POLL_DRIVER_MAX_TIME_MS (10000)
 #define EVENT_BUF_SIZE 2048
+/*
+ * Whether support virtual interface create/delete
+ * Only enable it after android10
+ */
+#define WIFI_VIRTUAL_INTERFACE_SUPPORT
 
 static void internal_event_handler(wifi_handle handle, int events);
 static int internal_no_seq_check(nl_msg *msg, void *arg);
@@ -82,11 +87,15 @@ static wifi_error wifi_start_rssi_monitoring(wifi_request_id id, wifi_interface_
 static wifi_error wifi_stop_rssi_monitoring(wifi_request_id id, wifi_interface_handle iface);
 static wifi_error wifi_set_packet_filter(wifi_interface_handle handle,
                             const u8 *program, u32 len);
+static wifi_error wifi_read_packet_filter(wifi_interface_handle handle, u32 src_offset,
+                            u8 *host_dst, u32 length);
 static wifi_error wifi_get_packet_filter_capabilities(wifi_interface_handle handle,
                 u32 *version, u32 *max_len);
 static wifi_error wifi_configure_nd_offload(wifi_interface_handle iface, u8 enable);
+#ifdef WIFI_VIRTUAL_INTERFACE_SUPPORT
 static wifi_error wifi_virtual_interface_create(wifi_handle handle, const char *ifname, wifi_interface_type iface_type);
 static wifi_error wifi_virtual_interface_delete(wifi_handle handle, const char* ifname);
+#endif
 static wifi_error wifi_get_usable_channels(wifi_handle handle, u32 band_mask, u32 iface_mode_mask,
                 u32 filter_mask, u32 max_size, u32* size, wifi_usable_channel* channels);
 
@@ -115,7 +124,8 @@ enum wifi_apf_attr {
 
 enum apf_request_type {
     GET_APF_CAPABILITIES,
-    SET_APF_PROGRAM
+    SET_APF_PROGRAM,
+    READ_APF_PROGRAM,
 };
 
 enum wifi_usable_channel_attributes {
@@ -230,8 +240,11 @@ wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn *fn)
     fn->wifi_get_packet_filter_capabilities = wifi_get_packet_filter_capabilities;
     fn->wifi_get_wake_reason_stats = wifi_get_wake_reason_stats;
     fn->wifi_set_packet_filter = wifi_set_packet_filter;
+	fn->wifi_read_packet_filter = wifi_read_packet_filter;
+#ifdef WIFI_VIRTUAL_INTERFACE_SUPPORT
     fn->wifi_virtual_interface_create = wifi_virtual_interface_create;
     fn->wifi_virtual_interface_delete = wifi_virtual_interface_delete;
+#endif
     fn->wifi_get_usable_channels = wifi_get_usable_channels;
     return WIFI_SUCCESS;
 }
@@ -392,7 +405,15 @@ static void internal_cleaned_up_handler(wifi_handle handle)
 
     (*cleaned_up_handler)(handle);
     pthread_mutex_destroy(&info->cb_lock);
-    free(info);
+
+    if (info->cmd)
+        free(info->cmd);
+    if (info->event_cb)
+        free(info->event_cb);
+    if (info->interfaces)
+        free(info->interfaces);
+    if (info)
+        free(info);
 
     ALOGI("Internal cleanup completed");
 }
@@ -912,6 +933,7 @@ public:
 class AndroidPktFilterCommand : public WifiCommand {
     private:
         const u8* mProgram;
+		u8* mReadProgram;
         u32 mProgramLen;
         u32* mVersion;
         u32* mMaxLen;
@@ -923,6 +945,9 @@ class AndroidPktFilterCommand : public WifiCommand {
                     mVersion(version), mMaxLen(max_len),
                     mReqType(GET_APF_CAPABILITIES)
         {
+			mProgram = NULL;
+            mProgramLen = 0;
+            mReadProgram = NULL;
         }
 
         AndroidPktFilterCommand(wifi_interface_handle handle,
@@ -931,6 +956,20 @@ class AndroidPktFilterCommand : public WifiCommand {
                     mProgram(program), mProgramLen(len),
                     mReqType(SET_APF_PROGRAM)
         {
+			mVersion = NULL;
+            mMaxLen = NULL;
+            mReadProgram = NULL;
+        }
+
+		AndroidPktFilterCommand(wifi_interface_handle handle,
+            u8* host_dst, u32 length)
+            : WifiCommand("AndroidPktFilterCommand", handle, 0),
+                mReadProgram(host_dst), mProgramLen(length),
+                mReqType(READ_APF_PROGRAM)
+        {
+            mProgram = NULL;
+            mVersion = NULL;
+            mMaxLen = NULL;
         }
 
     int createRequest(WifiRequest& request) {
@@ -940,7 +979,10 @@ class AndroidPktFilterCommand : public WifiCommand {
         } else if (mReqType == GET_APF_CAPABILITIES) {
             ALOGI("\n%s: APF get capabilities request\n", __FUNCTION__);
             return createGetPktFilterCapabilitesRequest(request);
-        } else {
+        } else if (mReqType == READ_APF_PROGRAM) {
+            ALOGI("%s: APF read packet filter request\n", __FUNCTION__);
+            return createReadPktFilterRequest(request);
+		} else {
             ALOGE("\n%s Unknown APF request\n", __FUNCTION__);
             return WIFI_ERROR_NOT_SUPPORTED;
         }
@@ -952,6 +994,7 @@ class AndroidPktFilterCommand : public WifiCommand {
         NULL_CHECK_RETURN(program, "memory allocation failure", WIFI_ERROR_OUT_OF_MEMORY);
         int result = request.create(GOOGLE_OUI, APF_SUBCMD_SET_FILTER);
         if (result < 0) {
+			ALOGE("Failed to create cmd: %d, err %d\n", APF_SUBCMD_SET_FILTER, result);
             delete[] program;
             return result;
         }
@@ -959,15 +1002,17 @@ class AndroidPktFilterCommand : public WifiCommand {
         nlattr *data = request.attr_start(NL80211_ATTR_VENDOR_DATA);
         result = request.put_u32(APF_ATTRIBUTE_PROGRAM_LEN, mProgramLen);
         if (result < 0) {
-            delete[] program;
-            return result;
+			ALOGE("Failed to put the program_len %d, err %d\n", mProgramLen, result);
+            goto exit;
         }
         memcpy(program, mProgram, mProgramLen);
         result = request.put(APF_ATTRIBUTE_PROGRAM, program, mProgramLen);
         if (result < 0) {
-            delete[] program;
-            return result;
+			ALOGE("Failed to copy program_ptr %d, err %d\n", mProgramLen, result);
+            goto exit;
         }
+
+exit:
         request.attr_end(data);
         delete[] program;
         return result;
@@ -984,10 +1029,21 @@ class AndroidPktFilterCommand : public WifiCommand {
         return result;
     }
 
+    int createReadPktFilterRequest(WifiRequest& request) {
+        int result = request.create(GOOGLE_OUI, APF_SUBCMD_READ_FILTER);
+            if (result < 0) {
+                return result;
+            }
+            nlattr *data = request.attr_start(NL80211_ATTR_VENDOR_DATA);
+            request.attr_end(data);
+            return result;
+    }
+
     int start() {
         WifiRequest request(familyId(), ifaceId());
         int result = createRequest(request);
         if (result < 0) {
+			ALOGI("CreateRequest failed for APF, result = %d", result);
             return result;
         }
         result = requestResponse(request);
@@ -1004,7 +1060,7 @@ class AndroidPktFilterCommand : public WifiCommand {
     }
 
     int handleResponse(WifiEvent& reply) {
-        ALOGD("In SetAPFCommand::handleResponse");
+        ALOGE("In SetAPFCommand::handleResponse mReqType %d\n", mReqType);
 
         if (reply.get_cmd() != NL80211_CMD_VENDOR) {
             ALOGD("Ignoring reply with cmd = %d", reply.get_cmd());
@@ -1017,17 +1073,17 @@ class AndroidPktFilterCommand : public WifiCommand {
         nlattr *vendor_data = reply.get_attribute(NL80211_ATTR_VENDOR_DATA);
         int len = reply.get_vendor_data_len();
 
-        ALOGD("Id = %0x, subcmd = %d, len = %d", id, subcmd, len);
+        ALOGI("Id = %0x, subcmd = %d, len = %d", id, subcmd, len);
         if (vendor_data == NULL || len == 0) {
             ALOGE("no vendor data in SetAPFCommand response; ignoring it");
             return NL_SKIP;
         }
         if( mReqType == SET_APF_PROGRAM) {
-            ALOGD("Response recieved for set packet filter command\n");
+            ALOGE("Response received for set packet filter command\n");
         } else if (mReqType == GET_APF_CAPABILITIES) {
             *mVersion = 0;
             *mMaxLen = 0;
-            ALOGD("Response recieved for get packet filter capabilities command\n");
+            ALOGD("Response received for get packet filter capabilities command\n");
             for (nl_iterator it(vendor_data); it.has_next(); it.next()) {
                 if (it.get_type() == APF_ATTRIBUTE_VERSION) {
                     *mVersion = it.get_u32();
@@ -1038,6 +1094,18 @@ class AndroidPktFilterCommand : public WifiCommand {
                 } else {
                     ALOGE("Ignoring invalid attribute type = %d, size = %d",
                             it.get_type(), it.get_len());
+                }
+            }
+        } else if (mReqType == READ_APF_PROGRAM) {
+            ALOGD("Read packet filter, mProgramLen = %d\n", mProgramLen);
+            for (nl_iterator it(vendor_data); it.has_next(); it.next()) {
+                if (it.get_type() == APF_ATTRIBUTE_PROGRAM) {
+                    u8 *buffer = NULL;
+                    buffer = (u8 *)it.get_data();
+                    memcpy(mReadProgram, buffer, mProgramLen);
+                } else if (it.get_type() == APF_ATTRIBUTE_PROGRAM_LEN) {
+                    int apf_length = it.get_u32();
+                    ALOGD("apf program length = %d\n", apf_length);
                 }
             }
         }
@@ -1186,6 +1254,7 @@ protected:
 
 };
 
+#ifdef WIFI_VIRTUAL_INTERFACE_SUPPORT
 class WiFiInterfaceCommand: public WifiCommand {
 private:
     const char *mIfaceName;
@@ -1262,6 +1331,7 @@ public:
         return WIFI_SUCCESS;
     }
 };
+#endif
 
 static int wifi_get_multicast_id(wifi_handle handle, const char *name, const char *group)
 {
@@ -1481,12 +1551,27 @@ static wifi_error wifi_set_packet_filter(wifi_interface_handle handle,
     return result;
 }
 
+static wifi_error wifi_read_packet_filter(wifi_interface_handle handle,
+    u32 src_offset, u8 *host_dst, u32 length)
+{
+    ALOGD("Read APF program, halHandle = %p, length = %d\n", handle, length);
+    AndroidPktFilterCommand *cmd = new AndroidPktFilterCommand(handle, host_dst, length);
+    NULL_CHECK_RETURN(cmd, "memory allocation failure", WIFI_ERROR_OUT_OF_MEMORY);
+    wifi_error result = (wifi_error)cmd->start();
+    if (result == WIFI_SUCCESS) {
+        ALOGI("Read APF program success\n");
+    }
+    cmd->releaseRef();
+    return result;
+}
+
 static wifi_error wifi_configure_nd_offload(wifi_interface_handle handle, u8 enable)
 {
     SetNdoffloadCommand command(handle, enable);
     return (wifi_error) command.requestResponse();
 }
 
+#ifdef WIFI_VIRTUAL_INTERFACE_SUPPORT
 wifi_error wifi_virtual_interface_create(wifi_handle handle,
                                          const char* ifname,
                                          wifi_interface_type iface_type)
@@ -1543,6 +1628,7 @@ wifi_error wifi_virtual_interface_delete(wifi_handle handle,
 
     return status;
 }
+#endif
 
 /////////////////////////////////////////////////////////////////////////////
 

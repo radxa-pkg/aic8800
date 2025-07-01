@@ -33,6 +33,7 @@
 #include "md5.h"
 #include "aicwf_compat_8800dc.h"
 #include "aicwf_compat_8800d80.h"
+#include "aicwf_compat_8800d80x2.h"
 #ifdef CONFIG_USE_FW_REQUEST
 #include <linux/firmware.h>
 #endif
@@ -60,10 +61,12 @@ typedef struct
     txpwr_lvl_conf_t txpwr_lvl;
     txpwr_lvl_conf_v2_t txpwr_lvl_v2;
     txpwr_lvl_conf_v3_t txpwr_lvl_v3;
+    txpwr_lvl_conf_v4_t txpwr_lvl_v4;
     txpwr_lvl_adj_conf_t txpwr_lvl_adj;
     txpwr_loss_conf_t txpwr_loss;
     txpwr_ofst_conf_t txpwr_ofst;
     txpwr_ofst2x_conf_t txpwr_ofst2x;
+    txpwr_ofst2x_conf_v2_t txpwr_ofst2x_v2;
     xtal_cap_conf_t xtal_cap;
 } userconfig_info_t;
 
@@ -113,9 +116,32 @@ userconfig_info_t userconfig_info = {
             //MCS0, MCS1, MCS2, MCS3, MCS4, MCS5, MCS6, MCS7, MCS8, MCS9, MCS10,MCS11
             { 20,   20,   20,   20,   18,   18,   16,   16,   16,   15,   14,   14},
     },
+    .txpwr_lvl_v4 = {
+        .enable             = 1,
+        .pwrlvl_11b_11ag_2g4 =
+            //1M,   2M,   5M5,  11M,  6M,   9M,   12M,  18M,  24M,  36M,  48M,  54M
+            { 20,   20,   20,   20,   20,   20,   20,   20,   18,   18,   16,   16},
+        .pwrlvl_11n_11ac_2g4 =
+            //MCS0, MCS1, MCS2, MCS3, MCS4, MCS5, MCS6, MCS7, MCS8, MCS9
+            { 20,   20,   20,   20,   18,   18,   16,   16,   16,   16},
+        .pwrlvl_11ax_2g4 =
+            //MCS0, MCS1, MCS2, MCS3, MCS4, MCS5, MCS6, MCS7, MCS8, MCS9, MCS10,MCS11
+            { 20,   20,   20,   20,   18,   18,   16,   16,   16,   16,   15,   15},
+        .pwrlvl_11a_5g =
+            //6M,   9M,   12M,  18M,  24M,  36M,  48M,  54M
+            { 20,   20,   20,   20,   18,   18,   16,   16},
+        .pwrlvl_11n_11ac_5g =
+            //MCS0, MCS1, MCS2, MCS3, MCS4, MCS5, MCS6, MCS7, MCS8, MCS9
+            { 20,   20,   20,   20,   18,   18,   16,   16,   16,   15},
+        .pwrlvl_11ax_5g =
+            //MCS0, MCS1, MCS2, MCS3, MCS4, MCS5, MCS6, MCS7, MCS8, MCS9, MCS10,MCS11
+            { 20,   20,   20,   20,   18,   18,   16,   16,   16,   15,   14,   14},
+    },
     .txpwr_loss = {
-        .loss_enable      = 1,
-        .loss_value       = 0,
+        .loss_enable_2g4  = 0,
+        .loss_value_2g4   = 0,
+        .loss_enable_5g   = 0,
+        .loss_value_5g    = 0,
     },
     .txpwr_ofst = {
         .enable       = 1,
@@ -141,6 +167,42 @@ userconfig_info_t userconfig_info = {
             {   0,    0,    0,    0,    0,    0   }, // ofdm_highrate
             {   0,    0,    0,    0,    0,    0   }, // ofdm_midrate
         },
+    },
+    .txpwr_ofst2x_v2 = {
+        .enable        = 0,
+        .pwrofst_flags = 0,
+        .pwrofst2x_tbl_2g4_ant0 =
+        { // 11b, ofdm_highrate, ofdm_lowrate
+            {   0,    0,    0   }, // ch1-4
+            {   0,    0,    0   }, // ch5-9
+            {   0,    0,    0   }, // ch10-13
+        },
+        .pwrofst2x_tbl_2g4_ant1 =
+        { // 11b, ofdm_highrate, ofdm_lowrate
+            {   0,    0,    0   }, // ch1-4
+            {   0,    0,    0   }, // ch5-9
+            {   0,    0,    0   }, // ch10-13
+        },
+        .pwrofst2x_tbl_5g_ant0 =
+        { // ofdm_highrate, ofdm_lowrate, ofdm_midrate
+            {   0,    0,    0   }, // ch42
+            {   0,    0,    0   }, // ch58
+            {   0,    0,    0   }, // ch106
+            {   0,    0,    0   }, // ch122
+            {   0,    0,    0   }, // ch138
+            {   0,    0,    0   }, // ch155
+        },
+        .pwrofst2x_tbl_5g_ant1 =
+        { // ofdm_highrate, ofdm_lowrate, ofdm_midrate
+            {   0,    0,    0   }, // ch42
+            {   0,    0,    0   }, // ch58
+            {   0,    0,    0   }, // ch106
+            {   0,    0,    0   }, // ch122
+            {   0,    0,    0   }, // ch138
+            {   0,    0,    0   }, // ch155
+        },
+        .pwrofst2x_tbl_6g_ant0 = {   0,   }, // ofdm_highrate: 6e_ch7 ~ 6e_ch229
+        .pwrofst2x_tbl_6g_ant1 = {   0,   }, // ofdm_highrate: 6e_ch7 ~ 6e_ch229
     },
     .xtal_cap = {
         .enable        = 0,
@@ -1358,6 +1420,15 @@ static int rwnx_plat_patch_load(struct rwnx_hw *rwnx_hw)
                 }
                 #endif
                 else
+                #elif defined(CONFIG_LOFT_CALIB)
+                if (1) {
+                    AICWFDBG(LOGINFO, "loft calib\n");
+                    ret = aicwf_loft_calib_8800dc(rwnx_hw, &loft_res_local);
+                    if (ret) {
+                        AICWFDBG(LOGINFO, "loft calib fail: %d\n", ret);
+                        return ret;
+                    }
+                } else
                 #endif
                 {
                     ret = aicwf_misc_ram_init_8800dc(rwnx_hw);
@@ -1384,8 +1455,23 @@ static int rwnx_plat_patch_load(struct rwnx_hw *rwnx_hw)
                         return ret;
                     }
                 }
-                #endif
-                #endif
+                #endif/*CONFIG_FORCE_DPD_CALIB*/
+                #elif defined(CONFIG_LOFT_CALIB)
+                {
+                    AICWFDBG(LOGINFO, "patch load\n");
+                    ret = aicwf_plat_patch_load_8800dc(rwnx_hw);
+                    if (ret) {
+                        AICWFDBG(LOGINFO, "load patch bin fail: %d\n", ret);
+                        return ret;
+                    }
+                    AICWFDBG(LOGINFO, "loft calib\n");
+                    ret = aicwf_loft_calib_8800dc(rwnx_hw, &loft_res_local);
+                    if (ret) {
+                        AICWFDBG(LOGINFO, "loft calib fail: %d\n", ret);
+                        return ret;
+                    }
+                }
+                #endif/*CONFIG_DPD*/
                 AICWFDBG(LOGINFO, "%s load rftest bin\n", __func__);
                 ret = aicwf_plat_rftest_load_8800dc(rwnx_hw);
                 if (ret) {
@@ -1652,6 +1738,33 @@ static int rwnx_check_fw_compatibility(struct rwnx_hw *rwnx_hw)
 #endif
 #endif /* !CONFIG_RWNX_FHOST */
 
+int rwnx_atoi2(char *value, int c_len)
+{
+    int len = 0;
+    int i = 0;
+    int result = 0;
+    int flag = 1;
+
+    if (value[0] == '-') {
+        flag = -1;
+        value++;
+    }
+    len = c_len;
+
+    for (i = 0;i < len ;i++) {
+        result = result * 10;
+        if (value[i] >= 48 && value[i] <= 57) {
+            result += value[i] - 48;
+        } else {
+            result = 0;
+            break;
+        }
+    }
+
+    return result * flag;
+}
+
+
 int rwnx_atoi(char *value)
 {
     int len = 0;
@@ -1820,6 +1933,78 @@ void get_userconfig_txpwr_lvl_v3_in_fdrv(txpwr_lvl_conf_v3_t *txpwr_lvl_v3)
     AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs11_5g:%d\r\n",    __func__, txpwr_lvl_v3->pwrlvl_11ax_5g[11]);
 }
 
+void get_userconfig_txpwr_lvl_v4_in_fdrv(txpwr_lvl_conf_v4_t *txpwr_lvl_v4)
+{
+    *txpwr_lvl_v4 = userconfig_info.txpwr_lvl_v4;
+
+    AICWFDBG(LOGINFO, "%s:enable:%d\r\n",               __func__, txpwr_lvl_v4->enable);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_1m_2g4:%d\r\n",  __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_2m_2g4:%d\r\n",  __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_5m5_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_11m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_6m_2g4:%d\r\n",  __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_9m_2g4:%d\r\n",  __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[5]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_12m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[6]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_18m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[7]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_24m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[8]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_36m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[9]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_48m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[10]);
+    AICWFDBG(LOGINFO, "%s:lvl_11b_11ag_54m_2g4:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11b_11ag_2g4[11]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs0_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs1_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs2_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs3_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs4_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs5_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[5]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs6_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[6]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs7_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[7]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs8_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[8]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs9_2g4:%d\r\n",__func__, txpwr_lvl_v4->pwrlvl_11n_11ac_2g4[9]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs0_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs1_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs2_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs3_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs4_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs5_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[5]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs6_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[6]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs7_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[7]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs8_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[8]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs9_2g4:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[9]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs10_2g4:%d\r\n",   __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[10]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs11_2g4:%d\r\n",   __func__, txpwr_lvl_v4->pwrlvl_11ax_2g4[11]);
+
+    AICWFDBG(LOGINFO, "%s:lvl_11a_6m_5g:%d\r\n",        __func__, txpwr_lvl_v4->pwrlvl_11a_5g[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_9m_5g:%d\r\n",        __func__, txpwr_lvl_v4->pwrlvl_11a_5g[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_12m_5g:%d\r\n",       __func__, txpwr_lvl_v4->pwrlvl_11a_5g[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_18m_5g:%d\r\n",       __func__, txpwr_lvl_v4->pwrlvl_11a_5g[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_24m_5g:%d\r\n",       __func__, txpwr_lvl_v4->pwrlvl_11a_5g[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_36m_5g:%d\r\n",       __func__, txpwr_lvl_v4->pwrlvl_11a_5g[5]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_48m_5g:%d\r\n",       __func__, txpwr_lvl_v4->pwrlvl_11a_5g[6]);
+    AICWFDBG(LOGINFO, "%s:lvl_11a_54m_5g:%d\r\n",       __func__, txpwr_lvl_v4->pwrlvl_11a_5g[7]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs0_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs1_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs2_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs3_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs4_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs5_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[5]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs6_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[6]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs7_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[7]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs8_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[8]);
+    AICWFDBG(LOGINFO, "%s:lvl_11n_11ac_mcs9_5g:%d\r\n", __func__, txpwr_lvl_v4->pwrlvl_11n_11ac_5g[9]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs0_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[0]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs1_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[1]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs2_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[2]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs3_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[3]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs4_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[4]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs5_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[5]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs6_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[6]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs7_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[7]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs8_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[8]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs9_5g:%d\r\n",     __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[9]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs10_5g:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[10]);
+    AICWFDBG(LOGINFO, "%s:lvl_11ax_mcs11_5g:%d\r\n",    __func__, txpwr_lvl_v4->pwrlvl_11ax_5g[11]);
+}
+
 void get_userconfig_txpwr_lvl_adj_in_fdrv(txpwr_lvl_adj_conf_t *txpwr_lvl_adj)
 {
     *txpwr_lvl_adj = userconfig_info.txpwr_lvl_adj;
@@ -1883,13 +2068,39 @@ void get_userconfig_txpwr_ofst2x_in_fdrv(txpwr_ofst2x_conf_t *txpwr_ofst2x)
     AICWFDBG(LOGINFO, "\n");
 }
 
+void get_userconfig_txpwr_ofst2x_v2_in_fdrv(txpwr_ofst2x_conf_v2_t *txpwr_ofst2x_v2)
+{
+    int type, ch_grp;
+    *txpwr_ofst2x_v2 = userconfig_info.txpwr_ofst2x_v2;
+    AICWFDBG(LOGINFO, "%s:enable      :%d\r\n", __func__, txpwr_ofst2x_v2->enable);
+    AICWFDBG(LOGINFO, "pwrofst2x 2.4g(ant0/ant1): [0]:11b, [1]:ofdm_highrate\n"
+        "  chan=" "\t1-4" "\t5-9" "\t10-13");
+    for (type = 0; type < 2; type++) {
+        AICWFDBG(LOGINFO, "\n  [%d] =", type);
+        for (ch_grp = 0; ch_grp < 3; ch_grp++) {
+            AICWFDBG(LOGINFO, "\t%d/%d", txpwr_ofst2x_v2->pwrofst2x_tbl_2g4_ant0[ch_grp][type], txpwr_ofst2x_v2->pwrofst2x_tbl_2g4_ant1[ch_grp][type]);
+        }
+    }
+    AICWFDBG(LOGINFO, "\npwrofst2x 5g: [0]:ofdm_highrate\n"
+        "  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
+    for (type = 0; type < 1; type++) {
+        AICWFDBG(LOGINFO, "\n  [%d] =", type);
+        for (ch_grp = 0; ch_grp < 6; ch_grp++) {
+            AICWFDBG(LOGINFO, "\t%d/%d", txpwr_ofst2x_v2->pwrofst2x_tbl_5g_ant0[ch_grp][type], txpwr_ofst2x_v2->pwrofst2x_tbl_5g_ant1[ch_grp][type]);
+        }
+    }
+    AICWFDBG(LOGINFO, "\n");
+}
 void get_userconfig_txpwr_loss(txpwr_loss_conf_t *txpwr_loss)
 {
-    txpwr_loss->loss_enable      = userconfig_info.txpwr_loss.loss_enable;
-    txpwr_loss->loss_value       = userconfig_info.txpwr_loss.loss_value;
+	txpwr_loss->loss_enable_2g4  = userconfig_info.txpwr_loss.loss_enable_2g4;
+	txpwr_loss->loss_value_2g4   = userconfig_info.txpwr_loss.loss_value_2g4;
+	txpwr_loss->loss_enable_5g  = userconfig_info.txpwr_loss.loss_enable_5g;
+	txpwr_loss->loss_value_5g   = userconfig_info.txpwr_loss.loss_value_5g;
 
-    AICWFDBG(LOGINFO, "%s:loss_enable:%d\r\n",     __func__, txpwr_loss->loss_enable);
-    AICWFDBG(LOGINFO, "%s:loss_value:%d\r\n",      __func__, txpwr_loss->loss_value);
+	AICWFDBG(LOGDEBUG, "%s:loss_enable_2g4: %d, val_2g4: %d, loss_enable_5g: %d, val_5g: %d\r\n", __func__,
+				txpwr_loss->loss_enable_2g4, txpwr_loss->loss_value_2g4,
+				txpwr_loss->loss_enable_5g, txpwr_loss->loss_value_5g);
 }
 
 void get_userconfig_xtal_cap(xtal_cap_conf_t *xtal_cap)
@@ -2105,22 +2316,26 @@ void rwnx_plat_nvram_set_value(char *command, char *value)
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[1] = rwnx_atoi(value);
     } else if (!strcmp(command, "lvl_adj_2g4_chan_10_13")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[2] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_42")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_42")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[0] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_58")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_58")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[1] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_106")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_106")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[2] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_122")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_122")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[3] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_138")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_138")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[4] = rwnx_atoi(value);
-    } else if (!strcmp(command, "ofst_5g_ofdm_highrate_chan_155")) {
+    } else if (!strcmp(command, "lvl_adj_5g_chan_155")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[5] = rwnx_atoi(value);
-    } else if (!strcmp(command, "loss_enable")) {
-        userconfig_info.txpwr_loss.loss_enable = rwnx_atoi(value);
-    } else if (!strcmp(command, "loss_value")) {
-        userconfig_info.txpwr_loss.loss_value = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_enable_2g4")) {
+        userconfig_info.txpwr_loss.loss_enable_2g4 = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_value_2g4")) {
+        userconfig_info.txpwr_loss.loss_value_2g4 = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_enable_5g")) {
+        userconfig_info.txpwr_loss.loss_enable_5g = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_value_5g")) {
+        userconfig_info.txpwr_loss.loss_value_5g = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_enable")) {
         userconfig_info.txpwr_ofst.enable = rwnx_atoi(value);
         userconfig_info.txpwr_ofst2x.enable = rwnx_atoi(value);
@@ -2155,7 +2370,7 @@ void rwnx_plat_nvram_set_value(char *command, char *value)
     } else if (!strcmp(command, "ofst_2g4_ofdm_lowrate_chan_5_9")) {
         userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_2g4[2][1] = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_2g4_ofdm_lowrate_chan_10_13")) {
-        userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_2g4[2][0] = rwnx_atoi(value);
+        userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_2g4[2][2] = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_5g_ofdm_lowrate_chan_42")) {
         userconfig_info.txpwr_ofst2x.pwrofst2x_tbl_5g[0][0] = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_5g_ofdm_lowrate_chan_58")) {
@@ -2202,6 +2417,293 @@ void rwnx_plat_nvram_set_value(char *command, char *value)
         AICWFDBG(LOGERROR, "invalid cmd: %s\n", command);
     }
 
+}
+void rwnx_plat_nvram_set_value_8800d80x2(char *command, char *value)
+{
+    //TODO send command
+    AICWFDBG(LOGINFO, "%s:command=%s value=%s\n", __func__, command, value);
+    if (!strcmp(command, "enable")) {
+        userconfig_info.txpwr_lvl_v4.enable = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_1m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[0] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_2m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[1] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_5m5_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[2] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_11m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[3] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_6m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[4] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_9m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[5] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_12m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[6] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_18m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[7] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_24m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[8] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_36m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[9] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_48m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[10] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11b_11ag_54m_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[11] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs0_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[0] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs1_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[1] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs2_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[2] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs3_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[3] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs4_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[4] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs5_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[5] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs6_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[6] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs7_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[7] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs8_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[8] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs9_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[9] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs0_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[0] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs1_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[1] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs2_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[2] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs3_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[3] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs4_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[4] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs5_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[5] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs6_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[6] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs7_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[7] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs8_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[8] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs9_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[9] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs10_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[10] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs11_2g4")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[11] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_6m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[0] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_9m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[1] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_12m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[2] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_18m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[3] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_24m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[4] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_36m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[5] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_48m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[6] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11a_54m_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[7] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs0_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[0] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs1_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[1] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs2_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[2] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs3_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[3] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs4_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[4] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs5_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[5] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs6_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[6] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs7_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[7] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs8_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[8] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11n_11ac_mcs9_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[9] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs0_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[0] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs1_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[1] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs2_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[2] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs3_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[3] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs4_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[4] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs5_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[5] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs6_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[6] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs7_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[7] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs8_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[8] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs9_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[9] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs10_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[10] = rwnx_atoi(value);
+    } else if (!strcmp(command,     "lvl_11ax_mcs11_5g")) {
+        userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[11] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_enable")) {
+        userconfig_info.txpwr_lvl_adj.enable = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_1_4")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_5_9")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_2g4_chan_10_13")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_2g4[2] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_5g_chan_42")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_5g_chan_58")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_5g_chan_106")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[2] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_5g_chan_122")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[3] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_5g_chan_138")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[4] = rwnx_atoi(value);
+    } else if (!strcmp(command, "lvl_adj_5g_chan_155")) {
+        userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[5] = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_enable_2g4")) {
+        userconfig_info.txpwr_loss.loss_enable_2g4 = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_value_2g4")) {
+        userconfig_info.txpwr_loss.loss_value_2g4 = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_enable_5g")) {
+        userconfig_info.txpwr_loss.loss_enable_5g = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_value_5g")) {
+        userconfig_info.txpwr_loss.loss_value_5g = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_enable")) {
+        userconfig_info.txpwr_ofst2x_v2.enable = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant0_11b_chan_1_4")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant0[0][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant0_11b_chan_5_9")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant0[1][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant0_11b_chan_10_13")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant0[2][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant0_ofdm_highrate_chan_1_4")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant0[0][1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant0_ofdm_highrate_chan_5_9")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant0[1][1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant0_ofdm_highrate_chan_10_13")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant0[2][1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant1_11b_chan_1_4")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant1[0][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant1_11b_chan_5_9")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant1[1][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant1_11b_chan_10_13")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant1[2][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant1_ofdm_highrate_chan_1_4")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant1[0][1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant1_ofdm_highrate_chan_5_9")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant1[1][1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_2g4_ant1_ofdm_highrate_chan_10_13")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_2g4_ant1[2][1] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant0_ofdm_highrate_chan_42")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant0[0][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant0_ofdm_highrate_chan_58")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant0[1][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant0_ofdm_highrate_chan_106")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant0[2][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant0_ofdm_highrate_chan_122")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant0[3][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant0_ofdm_highrate_chan_138")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant0[4][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant0_ofdm_highrate_chan_155")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant0[5][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant1_ofdm_highrate_chan_42")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant1[0][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant1_ofdm_highrate_chan_58")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant1[1][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant1_ofdm_highrate_chan_106")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant1[2][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant1_ofdm_highrate_chan_122")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant1[3][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant1_ofdm_highrate_chan_138")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant1[4][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "ofst_5g_ant1_ofdm_highrate_chan_155")) {
+        userconfig_info.txpwr_ofst2x_v2.pwrofst2x_tbl_5g_ant1[5][0] = rwnx_atoi(value);
+    } else if (!strcmp(command, "xtal_enable")) {
+        userconfig_info.xtal_cap.enable = rwnx_atoi(value);
+    } else if (!strcmp(command, "xtal_cap")) {
+        userconfig_info.xtal_cap.xtal_cap = rwnx_atoi(value);
+    } else if (!strcmp(command, "xtal_cap_fine")) {
+        userconfig_info.xtal_cap.xtal_cap_fine = rwnx_atoi(value);
+    } else {
+        AICWFDBG(LOGERROR, "invalid cmd: %s\n", command);
+    }
+}
+
+void rwnx_plat_userconfig_parsing_8800d80x2(char *buffer, int size)
+{
+    int i = 0;
+    int parse_state = 0;
+    char command[64];
+    char value[100];
+    int char_counter = 0;
+
+    memset(command, 0, 64);
+    memset(value, 0, 100);
+
+    for (i = 0; i < size; i++) {
+        //Send command or print nvram log when char is \r or \n
+        if (buffer[i] == 0x0a || buffer[i] == 0x0d) {
+            if (command[0] != 0 && value[0] != 0) {
+                if (parse_state == PRINT) {
+                    AICWFDBG(LOGINFO, "%s:%s\r\n", __func__, value);
+                } else if (parse_state == GET_VALUE) {
+                    rwnx_plat_nvram_set_value_8800d80x2(command, value);
+                }
+            }
+            //Reset command value and char_counter
+            memset(command, 0, 64);
+            memset(value, 0, 100);
+            char_counter = 0;
+            parse_state = INIT;
+            continue;
+        }
+
+        //Switch parser state
+        if (parse_state == INIT) {
+            if (buffer[i] == '#') {
+                parse_state = PRINT;
+                continue;
+            } else if (buffer[i] == 0x0a || buffer[i] == 0x0d) {
+                parse_state = INIT;
+                continue;
+            } else {
+                parse_state = CMD;
+            }
+        }
+
+        //Fill data to command and value
+        if (parse_state == PRINT) {
+            command[0] = 0x01;
+            value[char_counter] = buffer[i];
+            char_counter++;
+        } else if (parse_state == CMD) {
+            if (command[0] != 0 && buffer[i] == '=') {
+                parse_state = GET_VALUE;
+                char_counter = 0;
+                continue;
+            }
+            command[char_counter] = buffer[i];
+            char_counter++;
+        } else if (parse_state == GET_VALUE) {
+            if(buffer[i] != 0x2D && (buffer[i] < 0x30 || buffer[i] > 0x39)) {
+                continue;
+            }
+            value[char_counter] = buffer[i];
+            char_counter++;
+        }
+    }
 }
 
 void rwnx_plat_userconfig_parsing(char *buffer, int size)
@@ -2357,6 +2859,7 @@ void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
     char *szLine, *ptmp;
     char band[10], colNumBuf[10];
     uint8_t colNum = 0, colNum_cc = 255, band_cc = 0;
+    bool sp_cc = false;
     // clear powerlimit info at first
     memset((void *)&powerlimit_info, 0, sizeof(powerlimit_info_t));
     ptmp = buffer;
@@ -2455,8 +2958,15 @@ void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
                     AICWFDBG(LOGINFO, "CC matched: %s, col=%d\n", cc, forCnt);
                     colNum_cc = forCnt;
                     powerlimit_info.flags |= POWER_LIMIT_CC_MATCHED_BIT;
+                    sp_cc = true;
                     break;
                 }
+            }
+
+            if (!sp_cc) {
+                colNum_cc = colNum - 1;
+                AICWFDBG(LOGDEBUG, "use 00: %s, colNum_cc=%d\n", cc, colNum_cc);
+                powerlimit_info.flags |= POWER_LIMIT_CC_MATCHED_BIT;
             }
 
             loadingStage = LD_STAGE_CH_ROW;
@@ -2678,6 +3188,9 @@ static int rwnx_plat_userconfig_load(struct rwnx_hw *rwnx_hw) {
         #endif
     }else if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800D81){
         rwnx_plat_userconfig_load_8800d80(rwnx_hw);
+    }else if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800D81X2 ||
+        rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800D89X2){
+        rwnx_plat_userconfig_load_8800d80x2(rwnx_hw);
     }
 
 	return 0;

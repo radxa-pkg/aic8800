@@ -365,6 +365,40 @@ static inline int rwnx_rx_pktloss_notify_ind(struct rwnx_hw *rwnx_hw,
 	return 0;
 }
 
+static inline int rwnx_radar_detect_ind(struct rwnx_hw *rwnx_hw,
+                                                struct rwnx_cmd *cmd,
+                                                struct ipc_e2a_msg *msg)
+{
+    struct radar_pulse_array_desc *pulses = (struct radar_pulse_array_desc *)msg->param;
+	int i;
+
+    //RWNX_DBG(RWNX_FN_ENTRY_STR);
+    //printk("%s\n", __func__);
+
+    if(pulses->cnt == 0) {
+		printk("cnt error\n");
+		return -1;
+    }
+
+	if(rwnx_radar_detection_is_enable(&rwnx_hw->radar, pulses->idx)) {
+		for(i=0; i<pulses->cnt; i++) {
+			struct rwnx_radar_pulses *p = &rwnx_hw->radar.pulses[pulses->idx];
+
+			p->buffer[p->index] = pulses->pulse[i];
+			p->index = (p->index + 1)%RWNX_RADAR_PULSE_MAX;
+			if(p->count < RWNX_RADAR_PULSE_MAX)
+				p->count++;
+			//printk("pulse=%x\n", pulses->pulse[i]);
+		}
+
+		if(!work_pending(&rwnx_hw->radar.detection_work))
+			schedule_work(&rwnx_hw->radar.detection_work);
+    } else
+		printk("not enable\n");
+
+    return 0;
+}
+
 static inline int rwnx_apm_staloss_ind(struct rwnx_hw *rwnx_hw,
                                                 struct rwnx_cmd *cmd,
                                                 struct ipc_e2a_msg *msg)
@@ -759,6 +793,13 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
 			rwnx_vif->tdls_chsw_prohibited = extcap->ext_capab[4] & WLAN_EXT_CAPA5_TDLS_CH_SW_PROHIBITED;
 		}
 
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+		if (chan->flags & IEEE80211_CHAN_RADAR)
+			rwnx_radar_detection_enable(&rwnx_hw->radar,
+											RWNX_RADAR_DETECT_REPORT,
+											RWNX_RADAR_RIU);
+#endif
+
 		if (rwnx_vif->wep_enabled)
 			rwnx_vif->wep_auth_err = false;
 
@@ -864,8 +905,10 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
             }
 	}
 
-	netif_tx_start_all_queues(dev);
-	netif_carrier_on(dev);
+	if (ind->status_code == 0) {
+		netif_tx_start_all_queues(dev);
+		netif_carrier_on(dev);
+	}
 
 	return 0;
 }
@@ -890,6 +933,10 @@ static inline int rwnx_rx_sm_disconnect_ind(struct rwnx_hw *rwnx_hw,
 	if(!rwnx_vif)
 		return 0;
 	dev = rwnx_vif->ndev;
+
+#ifdef CONFIG_DEBUG_FS
+	rwnx_dbgfs_unregister_rc_stat(rwnx_hw, rwnx_vif->sta.ap);
+#endif
 
 	#ifdef CONFIG_BR_SUPPORT
 		struct rwnx_vif *vif = netdev_priv(dev);
@@ -1289,6 +1336,7 @@ static msg_cb_fct mm_hdlrs[MSG_I(MM_MAX)] = {
 	[MSG_I(MM_RSSI_STATUS_IND)]        = rwnx_rx_rssi_status_ind,
 	[MSG_I(MM_PKTLOSS_IND)]            = rwnx_rx_pktloss_notify_ind,
     [MSG_I(MM_APM_STALOSS_IND)]        = rwnx_apm_staloss_ind,
+    [MSG_I(MM_RADAR_DETECT_IND)] 	   = rwnx_radar_detect_ind,
 };
 
 static msg_cb_fct scan_hdlrs[MSG_I(SCANU_MAX)] = {

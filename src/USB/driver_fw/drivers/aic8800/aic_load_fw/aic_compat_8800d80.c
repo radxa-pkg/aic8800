@@ -16,8 +16,8 @@ void rwnx_plat_userconfig_parsing(char *buffer, int size);
 void rwnx_release_firmware_common(u32** buffer);
 
 extern int testmode;
-extern u32 chip_id;
-u8 chip_mcu_id = 0;
+extern u8 chip_id;
+extern u8 chip_mcu_id;
 
 typedef u32 (*array2_tbl_t)[2];
 
@@ -39,13 +39,15 @@ typedef struct {
 #define AIC_PATCH_OFST(mem) ((size_t) &((aic_patch_t *)0)->mem)
 #define AIC_PATCH_ADDR(mem) ((u32) (aic_patch_str_base + AIC_PATCH_OFST(mem)))
 
+#define USER_PWROFST_COVER_CALIB_FLAG	0x01U
 #define USER_CHAN_MAX_TXPWR_EN_FLAG     (0x01U << 1)
 #define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
 
-#define CFG_USER_CHAN_MAX_TXPWR_EN  0
+#define CFG_PWROFST_COVER_CALIB     1
+#define CFG_USER_CHAN_MAX_TXPWR_EN  1
 #define CFG_USER_TX_USE_ANA_F       0
 
-#define CFG_USER_EXT_FLAGS_EN   (CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
+#define CFG_USER_EXT_FLAGS_EN   (CFG_PWROFST_COVER_CALIB || CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
 
 u32 patch_tbl_d80[][2] =
 {
@@ -55,13 +57,16 @@ u32 patch_tbl_d80[][2] =
     {0x00b4, 0xf3010000},
     #endif
 #ifdef CONFIG_PLATFORM_HI
-    {0x0170, 0x00000001},//rx aggr counter
+    {0x0170, 0x00010001},//rx aggr counter
 #else
-    {0x0170, 0x0000000A},//rx aggr counter
+    {0x0170, 0x0001000A},//rx aggr counter
 #endif
 
     #if CFG_USER_EXT_FLAGS_EN
-    {0x0188, 0x00000001
+    {0x0188, 0x00000000
+	#if CFG_PWROFST_COVER_CALIB
+	| USER_PWROFST_COVER_CALIB_FLAG
+	#endif
         #if CFG_USER_CHAN_MAX_TXPWR_EN
         | USER_CHAN_MAX_TXPWR_EN_FLAG
         #endif
@@ -289,7 +294,7 @@ int system_config_8800d80(struct aic_usb_dev *usb_dev){
         if (((rd_mem_addr_cfm.memdata >> 25) & 0x01UL) == 0x00UL) {
             chip_mcu_id = 1;
         }
-		chip_id = rd_mem_addr_cfm.memdata >> 16;
+		chip_id = (u8)(rd_mem_addr_cfm.memdata >> 16);
 		printk("chip_id=%x, chip_mcu_id = %d\n", chip_id, chip_mcu_id);
     #if 1
 		syscfg_num = sizeof(syscfg_tbl_8800d80) / sizeof(u32) / 2;
@@ -311,6 +316,38 @@ int system_config_8800d80(struct aic_usb_dev *usb_dev){
 		}
     #endif
     return 0;
+}
+
+
+static int aicbt_ext_patch_data_load(struct aic_usb_dev *usb_dev, struct aicbt_patch_info_t *patch_info)
+{
+    int ret = 0;
+    uint32_t ext_patch_nb = patch_info->ext_patch_nb;
+    char ext_patch_file_name[50];
+    int index = 0;
+    uint32_t id = 0;
+    uint32_t addr = 0;
+
+    
+    if (ext_patch_nb > 0){
+        
+        for (index = 0; index < patch_info->ext_patch_nb; index++){
+            id = *(patch_info->ext_patch_param + (index * 2));
+            addr = *(patch_info->ext_patch_param + (index * 2) + 1); 
+            memset(ext_patch_file_name, 0, sizeof(ext_patch_file_name));
+            sprintf(ext_patch_file_name,"%s%d.bin",
+                FW_PATCH_BASE_NAME_8800D80_U02_EXT,
+                id);
+            AICWFDBG(LOGDEBUG, "%s ext_patch_file_name:%s ext_patch_id:%x ext_patch_addr:%x \r\n",
+                __func__,ext_patch_file_name, id, addr);
+            
+            if (rwnx_plat_bin_fw_upload_android(usb_dev, addr, ext_patch_file_name)) {
+                ret = -1;
+                break;
+            }
+        }
+    }
+    return ret;
 }
 
 
@@ -368,17 +405,21 @@ int aicfw_download_fw_8800d80(struct aic_usb_dev *usb_dev)
             if(rwnx_plat_bin_fw_upload_android(usb_dev, patch_info.addr_patch, FW_PATCH_BASE_NAME_8800D80_U02)) {
                 return -1;
             }
-            #if 0
-            if (rwnx_plat_bin_fw_patch_table_upload_android(usb_dev, FW_PATCH_TABLE_NAME_8800D80_U02)) {
+
+            if (aicbt_ext_patch_data_load(usb_dev, &patch_info)) {
                 return -1;
             }
-            #else
+
             if (aicbt_patch_table_load(usb_dev, head)) {
                 return -1;
             }
-            #endif
-            if(rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FMAC_FW_ADDR_8800D80_U02, FW_BASE_NAME_8800D80_U02)) {
-                return -1;
+
+            if (IS_CHIP_ID_H()){
+                if(rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FMAC_FW_ADDR_8800D80_U02, FW_BASE_NAME_8800D80_H_U02))
+                    return -1;
+            } else {
+                if(rwnx_plat_bin_fw_upload_android(usb_dev, RAM_FMAC_FW_ADDR_8800D80_U02, FW_BASE_NAME_8800D80_U02))
+                    return -1;
             }
             #if 0
             if(rwnx_plat_bin_fw_upload_android(usb_dev, FW_RAM_CALIBMODE_ADDR_8800D80_U02, FW_CALIBMODE_NAME_8800D80_U02)) {
@@ -426,15 +467,15 @@ int aicfw_download_fw_8800d80(struct aic_usb_dev *usb_dev)
             if(rwnx_plat_bin_fw_upload_android(usb_dev, patch_info.addr_patch, FW_PATCH_BASE_NAME_8800D80_U02)) {
                 return -1;
             }
-#if 0
-            if (rwnx_plat_bin_fw_patch_table_upload_android(usb_dev, FW_PATCH_TABLE_NAME_8800D80_U02)) {
+
+            if (aicbt_ext_patch_data_load(usb_dev, &patch_info)) {
                 return -1;
             }
-#else
+
             if (aicbt_patch_table_load(usb_dev, head)) {
                 return -1;
             }
-#endif
+
 
             if (chip_mcu_id) {
                 int ret = 0;

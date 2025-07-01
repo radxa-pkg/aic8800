@@ -285,7 +285,7 @@ static void rwnx_downgrade_ac(struct rwnx_sta *sta, struct sk_buff *skb)
 		skb->priority = rwnx_down_hwq2tid[ac];
 	}
 }
-
+#if 0
 static void rwnx_tx_statistic(struct rwnx_vif *vif, struct rwnx_txq *txq,
                               union rwnx_hw_txstatus status, unsigned int data_len)
 {
@@ -304,7 +304,7 @@ static void rwnx_tx_statistic(struct rwnx_vif *vif, struct rwnx_txq *txq,
     sta->stats.tx_bytes += data_len;
     sta->stats.last_act = jiffies;
 }
-
+#endif
 u16 rwnx_select_txq(struct rwnx_vif *rwnx_vif, struct sk_buff *skb)
 {
 	struct rwnx_hw *rwnx_hw = rwnx_vif->rwnx_hw;
@@ -558,6 +558,7 @@ static int rwnx_prep_dma_tx(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_tx
                             void *frame_start)
 {
     struct txdesc_api *desc = &sw_txhdr->desc.api;
+    struct rwnx_ipc_buf *ipc_hostdesc_buf = NULL;
 
 	#ifdef AICWF_PCIE_SUPPORT
     if (rwnx_ipc_buf_a2e_init(rwnx_hw, &sw_txhdr->ipc_data, frame_start,
@@ -576,7 +577,7 @@ static int rwnx_prep_dma_tx(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_tx
 
 
 #if 1
-	struct rwnx_ipc_buf *ipc_hostdesc_buf = &sw_txhdr->ipc_hostdesc;
+	ipc_hostdesc_buf = &sw_txhdr->ipc_hostdesc;
 	ipc_hostdesc_buf->size = sizeof(struct txdesc_host);
 	ipc_hostdesc_buf->dma_addr = dma_map_single(rwnx_hw->dev, &sw_txhdr->desc, sizeof(struct txdesc_host), DMA_TO_DEVICE);
 	ipc_hostdesc_buf->addr = (void *)&sw_txhdr->desc;
@@ -685,7 +686,10 @@ void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags)
 		sw_txhdr->need_cfm = 1;
 		sw_txhdr->desc.api.host.hostid = ((1<<31) | rwnx_hw->ipc_env->txdesc_free_idx[0]);
 		aicwf_pcie_host_txdesc_push(rwnx_hw->ipc_env, 0, (long)skb);
-		printk("need cfm ethertype:%8x,user_idx=%d, %x, skb=%p , headroom = %d \n", sw_txhdr->desc.api.host.ethertype, rwnx_hw->ipc_env->txdesc_free_idx[0], *(skb->data+sw_txhdr->headroom), skb,sw_txhdr->headroom);
+		if((sw_txhdr->desc.api.host.flags & TXU_CNTRL_MGMT))
+			printk("need cfm mgmt:%x,user_idx=%d, skb=%p , headroom = %d \n", *(skb->data+sw_txhdr->headroom), rwnx_hw->ipc_env->txdesc_free_idx[0], skb,sw_txhdr->headroom);
+		else
+			printk("need cfm ethertype:%8x,user_idx=%d, %x, skb=%p , headroom = %d \n", sw_txhdr->desc.api.host.ethertype, rwnx_hw->ipc_env->txdesc_free_idx[0], *(skb->data+sw_txhdr->headroom), skb,sw_txhdr->headroom);
 		printk("skb-> data[0] = %x , data[1] = %x \n",skb->data[0],skb->data[1]);
 	} else {
 		sw_txhdr->need_cfm = 0;
@@ -1506,18 +1510,6 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if(skb->priority < 3)
 		skb->priority = 0;
 
-#ifdef CONFIG_FILTER_TCP_ACK
-	msgbuf=intf_tcp_alloc_msg(msgbuf);
-	msgbuf->rwnx_vif=rwnx_vif;
-	msgbuf->skb=skb;
-	if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
-		return NETDEV_TX_OK;
-	}else{
-		move_tcpack_msg(rwnx_hw,msgbuf);
-		kfree(msgbuf);
-	}
-#endif
-
 	/* Get the STA id and TID information */
 	sta = rwnx_get_tx_info(rwnx_vif, skb, &tid);
 	if (!sta)
@@ -1526,6 +1518,28 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	txq = rwnx_txq_sta_get(sta, tid, rwnx_hw);
 	if (txq->idx == TXQ_INACTIVE)
 		goto free;
+
+#ifdef CONFIG_FILTER_TCP_ACK
+	if(cpu_to_le16(skb->len) <= MAX_TCP_ACK){
+	msgbuf=intf_tcp_alloc_msg(msgbuf);
+	msgbuf->rwnx_vif=rwnx_vif;
+	msgbuf->skb=skb;
+	if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
+		spin_lock_bh(&rwnx_hw->tx_lock);
+		if ((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) >= 150 && rwnx_hw->fc==0) {
+			netif_tx_stop_all_queues(txq->ndev);
+			rwnx_hw->fc = 1;
+			AICWFDBG(LOGINFO,"fc\n");
+		}
+		spin_unlock_bh(&rwnx_hw->tx_lock);
+		return NETDEV_TX_OK;
+	}else{
+		move_tcpack_msg(rwnx_hw,msgbuf);
+		kfree(msgbuf);
+	}
+	}
+#endif
+
 
 #ifdef CONFIG_RWNX_AMSDUS_TX
 	if (rwnx_amsdu_add_subframe(rwnx_hw, skb, sta, txq))
@@ -1616,7 +1630,7 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 
     /* store Tx info in skb headroom */
-    txhdr = skb_push(skb, RWNX_TX_HEADROOM);
+    txhdr = (struct rwnx_txhdr *)skb_push(skb, RWNX_TX_HEADROOM);
     txhdr->sw_hdr = sw_txhdr;
 	sw_txhdr->headroom = RWNX_TX_HEADROOM;
 
@@ -1677,7 +1691,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 	struct rwnx_txq *txq;
 	bool robust;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 	AICWFDBG(LOGDEBUG,"mgmt xmit %x %x ",params->buf[0],params->buf[1]);
+#else
+	AICWFDBG(LOGDEBUG,"mgmt xmit %x %x ",buf[0],buf[1]);
+#endif
 
     /*if((g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8801) ||
         (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80) ||
@@ -1687,8 +1705,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 	}*/
 
 	nx_off_chan_txq_idx = NX_OFF_CHAN_TXQ_IDX_FOR_OLD_IC;
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 	frame_len = params->len;
+#else
+	frame_len = len;	
+#endif
 
 	if(atomic_read(&rwnx_hw->txdata_cnt) >= 177){
 		printk("%s txq flow ctrl \n",__func__);
@@ -1742,7 +1763,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 	 */
 	data = skb_put(skb, frame_len);
 	/* Copy the provided data */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 	memcpy(data, params->buf, frame_len);
+#else
+	memcpy(data, buf, frame_len);	
+#endif
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
 		robust = ieee80211_is_robust_mgmt_frame(skb);
@@ -1803,7 +1828,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 	if (robust)
 		desc->host.flags |= TXU_CNTRL_MGMT_ROBUST;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
 	if (params->no_cck) {
+#else
+	if (no_cck) {	
+#endif
 		desc->host.flags |= TXU_CNTRL_MGMT_NO_CCK;
 	}
 
@@ -1817,7 +1846,7 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 #endif
 #endif
 	/* store Tx info in skb headroom */
-    txhdr = skb_push(skb, RWNX_TX_HEADROOM);
+    txhdr = (struct rwnx_txhdr *)skb_push(skb, RWNX_TX_HEADROOM);
     txhdr->sw_hdr = sw_txhdr;
     sw_txhdr->headroom = RWNX_TX_HEADROOM;
 
@@ -1925,7 +1954,7 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 								GFP_ATOMIC);
 	} else if ((txq->idx != TXQ_INACTIVE) &&
 			   (rwnx_txst.retry_required || rwnx_txst.sw_retry_required)) {
-		bool sw_retry = (rwnx_txst.sw_retry_required) ? true : false;
+		//bool sw_retry = (rwnx_txst.sw_retry_required) ? true : false;
 
 		/* Reset the status */
 		txhdr->hw_hdr.cfm.status.value = 0;

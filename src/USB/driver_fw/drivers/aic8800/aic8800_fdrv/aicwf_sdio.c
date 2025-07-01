@@ -23,7 +23,6 @@
 #ifdef CONFIG_INGENIC_T20
 #include "mach/jzmmc.h"
 #endif /* CONFIG_INGENIC_T20 */
-extern uint8_t scanning;
 
 #ifdef CONFIG_PLATFORM_ALLWINNER
 void platform_wifi_power_off(void);
@@ -433,8 +432,8 @@ int aicwf_sdio_sleep_allow(struct aic_sdio_dev *sdiodev)
         }
     }
 
-    sdio_info("sleep: %d, %d\n", sdiodev->state, scanning);
-    if (sdiodev->state == SDIO_ACTIVE_ST  && !scanning && !rwnx_hw->is_p2p_alive \
+    sdio_info("sleep: %d, %d\n", sdiodev->state, rwnx_hw->scanning);
+    if (sdiodev->state == SDIO_ACTIVE_ST  && !rwnx_hw->scanning && !rwnx_hw->is_p2p_alive \
                 && !rwnx_hw->is_p2p_connected && dhcped) {
         down(&sdiodev->pwrctl_wakeup_sema);
         if (rwnx_hw->vif_started) {

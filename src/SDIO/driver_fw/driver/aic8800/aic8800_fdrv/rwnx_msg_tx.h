@@ -80,7 +80,7 @@ int rwnx_send_me_rc_set_rate(struct rwnx_hw *rwnx_hw,
 							 u8 sta_idx,
 							 u16 rate_idx);
 int rwnx_send_me_set_ps_mode(struct rwnx_hw *rwnx_hw, u8 ps_mode);
-int rwnx_send_me_set_lp_level(struct rwnx_hw *rwnx_hw, u8 lp_level);
+int rwnx_send_me_set_lp_level(struct rwnx_hw *rwnx_hw, u8 lp_level, u8 disable_filter);
 int rwnx_send_sm_connect_req(struct rwnx_hw *rwnx_hw,
 							 struct rwnx_vif *rwnx_vif,
 							 struct cfg80211_connect_params *sme,
@@ -167,6 +167,7 @@ int rwnx_send_get_sta_info_req(struct rwnx_hw *rwnx_hw, u8_l sta_idx, struct mm_
 int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,
 					u8_l fwtrace_redir_en, struct mm_set_stack_start_cfm *cfm);
 int rwnx_send_txop_req(struct rwnx_hw *rwnx_hw, uint16_t *txop, u8_l long_nav_en, u8_l cfe_en);
+int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
 int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
 int rwnx_send_vendor_hwconfig_req(struct rwnx_hw *rwnx_hw, uint32_t hwconfig_id, int32_t *param, int32_t *param_out);
 int rwnx_send_vendor_swconfig_req(struct rwnx_hw *rwnx_hw, uint32_t swconfig_id, int32_t *param_in, int32_t *param_out);
@@ -175,9 +176,15 @@ int rwnx_send_get_fw_version_req(struct rwnx_hw *rwnx_hw, struct mm_get_fw_versi
 int rwnx_send_txpwr_idx_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_ofst_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_ofst2x_req(struct rwnx_hw *rwnx_hw);
+int rwnx_send_txpwr_ofst2x_v2_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_v3_req(struct rwnx_hw *rwnx_hw);
+int rwnx_send_txpwr_lvl_v4_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_adj_req(struct rwnx_hw *rwnx_hw);
+#ifdef CONFIG_APF
+int rwnx_send_set_apf_prog_req(struct rwnx_hw *rwnx_hw, u8_l *program, u32_l program_len);
+int rwnx_send_get_apf_prog_req(struct rwnx_hw *rwnx_hw, u8_l *program, u32_l program_len);
+#endif
 
 #ifdef CONFIG_SDIO_BT
 int rwnx_sdio_bt_send_req(struct rwnx_hw *rwnx_hw,uint32_t len, struct sk_buff *skb);

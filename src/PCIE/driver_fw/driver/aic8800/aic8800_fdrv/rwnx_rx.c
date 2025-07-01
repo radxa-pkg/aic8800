@@ -48,44 +48,23 @@ u16 tx_legrates_lut_rate[] = {
 	540
 };
 
-
-u16 legrates_lut_rate[] = {
-	10,
-	20,
-	55,
-	110,
-	0,
-	0,
-	0,
-	0,
-	480,
-	240,
-	120,
-	60,
-	540,
-	360,
-	180,
-	90
-};
-
-
-const u8 legrates_lut[] = {
-	0,                          /* 0 */
-	1,                          /* 1 */
-	2,                          /* 2 */
-	3,                          /* 3 */
-	-1,                         /* 4 */
-	-1,                         /* 5 */
-	-1,                         /* 6 */
-	-1,                         /* 7 */
-	10,                         /* 8 */
-	8,                          /* 9 */
-	6,                          /* 10 */
-	4,                          /* 11 */
-	11,                         /* 12 */
-	9,                          /* 13 */
-	7,                          /* 14 */
-	5                           /* 15 */
+struct rwnx_legrate legrates_lut[] = {
+	[0] = { .idx = 0, .rate = 10},
+	[1] = { .idx = 1, .rate = 20},
+	[2] = { .idx = 2, .rate = 55},
+	[3] = { .idx = 3, .rate = 110},
+	[4] = { .idx = -1, .rate = 0},
+	[5] = { .idx = -1, .rate = 0},
+	[6] = { .idx = -1, .rate = 0},
+	[7] = { .idx = -1, .rate = 0},
+	[8] = { .idx = 10, .rate = 480},
+	[9] = { .idx = 8, .rate = 240},
+	[10] = { .idx = 6, .rate = 120},
+	[11] = { .idx = 4, .rate = 60},
+	[12] = { .idx = 11, .rate = 540},
+	[13] = { .idx = 9, .rate = 360},
+	[14] = { .idx = 7, .rate = 180},
+	[15] = { .idx = 5, .rate = 90},
 };
 
 struct vendor_radiotap_hdr {
@@ -278,7 +257,7 @@ static void rwnx_rx_statistic(struct rwnx_hw *rwnx_hw, struct hw_rxhdr *hw_rxhdr
 			break;
 		}
 	} else {
-		int idx = legrates_lut[rxvect->leg_rate];
+		int idx = legrates_lut[rxvect->leg_rate].idx;
 		if (idx < 4) {
 			rate_idx = idx * 2 + rxvect->pre_type;
 		} else {
@@ -992,7 +971,7 @@ static void rwnx_rx_add_rtap_hdr(struct rwnx_hw *rwnx_hw,
 		struct ieee80211_supported_band *band =
 				rwnx_hw->wiphy->bands[phy_info->phy_band];
 		rtap->it_present |= cpu_to_le32(1 << IEEE80211_RADIOTAP_RATE);
-		BUG_ON((rate_idx = legrates_lut[rxvect->leg_rate]) == -1);
+		BUG_ON((rate_idx = legrates_lut[rxvect->leg_rate].idx) == -1);
 		if (phy_info->phy_band == NL80211_BAND_5GHZ)
 			rate_idx -= 4;  /* rwnx_ratetable_5ghz[0].hw_value == 4 */
 		*pos = DIV_ROUND_UP(band->bitrates[rate_idx].bitrate, 5);
@@ -1357,7 +1336,7 @@ u8 rwnx_rxdataind(void *pthis, void *arg)
     struct rwnx_vif *rwnx_vif;
     struct sk_buff *skb;
     int msdu_offset = sizeof(struct hw_rxhdr) + 2;
-    int peek_len    = msdu_offset + sizeof(struct ethhdr);
+    //int peek_len    = msdu_offset + sizeof(struct ethhdr);
     u16_l status;
 
     REG_SW_SET_PROFILING(rwnx_hw, SW_PROF_RWNXDATAIND);

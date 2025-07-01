@@ -1,0 +1,224 @@
+# /dev/ devices
+
+
+# Amlogic AV streaming devices
+/dev/amvideo              0666   media        system
+/dev/ionvideo             0666   media        system
+/dev/video_composer*      0660   media        system
+/dev/ppmgr                0660   media        system
+/dev/amstream_*           0666   media        system
+/dev/audiodsp0            0660   media        system
+/dev/uio0                 0666   system       mediadrm
+/dev/video0               0660   system       camera
+/dev/video1               0660   system       camera
+/dev/video2               0660   system       camera
+/dev/video10              0660   system       mediadrm
+/dev/video11              0660   media        system
+/dev/video13              0666   system       mediadrm
+/dev/video14              0666   system       mediadrm
+/dev/video15              0666   system       mediadrm
+/dev/video16              0666   system       mediadrm
+/dev/video16              0660   system       mediadrm
+/dev/video17              0660   system       mediadrm
+/dev/video18              0660   system       mediadrm
+/dev/video19              0660   system       mediadrm
+/dev/video20              0660   system       mediadrm
+/dev/video21              0660   system       mediadrm
+/dev/video23              0660   system     mediadrm
+/dev/video26              0660   system     mediadrm
+/dev/video30              0660   system     mediadrm
+/dev/video31              0660   system     mediadrm
+/dev/video32              0660   system     mediadrm
+/dev/video33              0660   system     mediadrm
+/dev/video34              0660   system     mediadrm
+/dev/video35              0660   system     mediadrm
+/dev/video36              0660   system     mediadrm
+/dev/video37              0660   system     mediadrm
+/dev/video38              0660   system     mediadrm
+/dev/video50              0660   system     camera
+/dev/video60              0660   system     camera
+/dev/video61              0660   system     camera
+/dev/video62              0660   system     camera
+/dev/video63              0660   system     camera
+/dev/video64              0660   system     camera
+/dev/video65              0660   system     camera
+/dev/video66              0660   system     camera
+/dev/video67              0660   system     camera
+/dev/video68              0660   system     camera
+/dev/video69              0660   system     camera
+/dev/video70              0660   system     camera
+/dev/video71              0660   system     camera
+/dev/video72              0660   system     camera
+/dev/video73              0660   system     camera
+/dev/video74              0660   system     camera
+/dev/video75              0660   system     camera
+/dev/video76              0660   system     camera
+/dev/video77              0660   system     camera
+/dev/v4l-subdev0          0660   system     camera
+/dev/v4l-subdev1          0660   system     camera
+/dev/v4l-subdev2          0660   system     camera
+/dev/v4l-subdev3          0660   system     camera
+/dev/v4l-subdev4          0660   system     camera
+/dev/v4l-subdev5          0660   system     camera
+/dev/v4l-subdev6          0660   system     camera
+/dev/v4l-subdev7          0660   system     camera
+/dev/v4l-subdev8          0660   system     camera
+/dev/v4l-subdev9          0660   system     camera
+/dev/amaudio_utils        0660   media        system
+/dev/amaudio_ctl          0660   media        system
+/dev/amvenc_avc           0660   mediacodec   system
+/dev/amvecm               0660   system       system
+/dev/HevcEnc              0660   mediacodec   system
+/dev/amvenc_multi         0660   mediacodec   system
+/dev/amsubtitle           0660   media        system
+/dev/jpegenc              0660   media        system
+/dev/videosync            0666   media     system
+/dev/media*               0666   media     system
+/dev/tsync                0666   media     system
+/dev/ac_sbuf0             0660   system    camera
+/dev/ac_isp4uf            0660   system    camera
+/dev/secmem               0660   system     mediadrm
+/dev/amresource_mgr       0666   media     system
+/dev/adla0                0666   system       system
+/dev/amlgdc               0660   system     camera
+
+#audio data
+/dev/audio_data_debug     0660   mediacodec   audio
+/dev/amjpegdec            0666   system       system
+/dev/ge2d                 0660   system       system
+/dev/vdin0                0660   system       system
+/dev/vdin1                0660   system     system
+/dev/virtmem              0666   system       system
+/dev/ptsserver            0666   mediacodec   system
+/dev/hdmirx0              0660   system       system
+/dev/ptsserver            0666   system       mediadrm
+
+# Mali
+/dev/ump                  0666   system       graphics
+/dev/mali                 0666   system       graphics
+/dev/mali0                0666   system       graphics
+/dev/ion                  0666   system       graphics
+/dev/dma_heap/heap-fb     0666   system       graphics
+/dev/dma_heap/heap-gfx    0666   system       graphics
+/dev/dma_heap/heap-secure 0666   system       graphics
+/dev/dma_heap/system      0666   system       graphics
+/dev/dma_heap/system-uncached      0666   system       graphics
+/dev/dma_heap/heap-codecmm      0666   system       graphics
+/dev/dma_heap/heap-cached-codecmm       0666   system       graphics
+/dev/dma_heap/heap-secure-codecmm       0666   system       graphics
+
+# uvm
+/dev/uvm                  0666   system       graphics
+
+# video tunnel
+/dev/videotunnel          0666   system       graphics
+
+# sw_sync
+/dev/sw_sync              0666   system       graphics
+
+#possible serial
+/dev/ttyS1                0660   bluetooth    bluetooth
+/dev/ttyS2                0660   bluetooth    bluetooth
+/dev/ttyS3                0666   system       system
+/dev/ttya0                0660   system       system
+/dev/ttya1                0660   system       system
+/dev/ptya0                0660   system       system
+/dev/ptya1                0660   system       system
+/dev/ttyHS2               0666   bluetooth    bluetooth
+/dev/ttyS20               0664   system       system
+
+/dev/mpu                  0666   system       system
+/dev/mpuirq               0666   system       system
+/dev/accelirq             0666   system       system
+/dev/timerirq             0666   system       system
+
+#amlbt
+/dev/aml_btusb            0660   bluetooth    bluetooth
+/dev/stpbt                0664   bluetooth    bluetooth
+
+/dev/rtk_btusb            0660   bluetooth    bluetooth
+#mtkbt
+/dev/rtkbt_dev            0660   bluetooth    bluetooth
+/dev/hidraw*              0660   system       audio
+/dev/btusb0               0660   bluetooth    bluetooth
+#unisoc
+/dev/ttyBT0               0660   bluetooth     bluetooth
+/dev/ttyBT1               0660   bluetooth     bluetooth
+
+/dev/display              0660   root         graphics
+/dev/display2             0660   root         graphics
+/dev/display3             0660   root         graphics
+
+# For USB Joysticks
+/dev/input/js*            0664   system       system
+
+/dev/wifi_power           0660   wifi         bluetooth
+/dev/wifi_mac             0660   wifi         bluetooth
+
+/dev/otz_client           0666   drm          drm
+
+/dev/cec                  0666   system       system
+/dev/v4l2_frontend        0666   system       system
+/dev/dvb0.frontend0       0666   system       system
+/dev/opteearmtz00         0666   system       system
+/dev/tee0                 0666   system       system
+
+/dev/block/by-name/frp    0660   system       system
+/dev/block/by-name/env    0660   system       system
+
+#dma buf
+/dev/dma_heap/system-secure-*	0444	system system
+
+# /sys/ sysfs
+#
+
+#bluetooth
+/sys/devices/platform/bt-dev/rfkill/rfkill0   state   0666    bluetooth   bluetooth
+/sys/devices/platform/bt-dev/rfkill/rfkill0   type    0660    bluetooth   bluetooth
+/sys/devices/platform/aml_bt/rfkill/rfkill0   state   0666    bluetooth   bluetooth
+/sys/devices/platform/aml_bt/rfkill/rfkill0   type    0660    bluetooth   bluetooth
+/sys/devices/bt-dev.*/rfkill/rfkill0          state   0660    bluetooth   bluetooth
+/sys/devices/bt-dev.*/rfkill/rfkill0          type    0660    bluetooth   bluetooth
+/sys/devices/platform/mtty.0/rfkill/rfkill1    state   0660    bluetooth   bluetooth
+/sys/devices/platform/mtty.0/rfkill/rfkill1    type    0660    bluetooth   bluetooth
+
+#hdmi cec
+/sys/class/amhdmitx/amhdmitx0       hpd_state               0664      system      system
+/sys/class/amhdmitx/amhdmitx0       disp_mode               0664      system      system
+/sys/class/amhdmitx/amhdmitx0       config                  0664      system      system
+/sys/class/amhdmitx/amhdmitx0       avmute                  0664      system      system
+/sys/class/amhdmitx/amhdmitx0       aud_ch                  0664      system      mediadrm
+/sys/class/amhdmitx/amhdmitx0       frac_rate_policy        0664      system      system
+
+/sys/class/amhdmitx/amhdmitx0       allm_cap                0664      system      system
+/sys/class/amhdmitx/amhdmitx0       allm_mode               0664      system      system
+/sys/class/amhdmitx/amhdmitx0       contenttype_cap         0664      system      system
+/sys/class/amhdmitx/amhdmitx0       contenttype_mode        0664      system      system
+
+#graphic
+/sys/class/graphics/fb*             blank                   0664      media       system
+/sys/class/graphics/fb*             order                   0664      media       system
+/sys/class/graphics/fb*             scale                   0664      media       system
+/sys/class/graphics/fb*             scale_axis              0664      system      system
+/sys/class/graphics/fb*             free_scale              0664      system      system
+/sys/class/graphics/fb*             scale_width             0664      system      system
+/sys/class/graphics/fb*             scale_height            0664      system      system
+
+/sys/class/graphics/fb0             free_scale_switch       0664      system      graphics
+/sys/class/graphics/fb0             enable_key              0664      media       system
+/sys/class/graphics/fb0             enable_key_onhold       0664      media       system
+/sys/class/graphics/fb0             free_scale_axis         0664      system      system
+/sys/class/graphics/fb0             freescale_mode          0664      system      system
+/sys/class/graphics/fb0             free_scale_axis         0664      system      system
+/sys/class/graphics/fb0             window_axis             0664      system      system
+
+#cpu
+/sys/devices/system/cpu/cpu1        online                          0664      system      system
+/sys/devices/system/cpu/cpu0        cpufreq/scaling_governor        0664      system      system
+/sys/devices/system/cpu/cpu0        cpufreq/hmp_boost               0664      system      system
+
+#led
+/sys/devices/platform/gpioleds/leds/yellow_led    trigger   0666  root root
+/sys/devices/platform/gpioleds/leds/sys_led       brightness   0666  root root
+
+parallel_restorecon enabled

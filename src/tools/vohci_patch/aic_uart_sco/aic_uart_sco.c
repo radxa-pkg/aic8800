@@ -120,8 +120,8 @@ static int snd_copy_send_sco_data( AIC_sco_card_t *pSCOSnd,u8 *buffer)
 
     count = frames_to_bytes(runtime, period_size)/sco_packet_bytes;
 #if AIC_SCO_PRINT
-    printk("%s, buffer_pos:%d sco_packet_bytes:%d count:%d", __FUNCTION__, (int)pSCOSnd->playback.buffer_pos,
-    sco_packet_bytes, count);
+    printk("%s, buffer_pos:%d sco_packet_bytes:%d count:%d,period_size:%d,runtime->buffer_size:%d", __FUNCTION__, (int)pSCOSnd->playback.buffer_pos,
+    sco_packet_bytes, count,(int)period_size,(int)runtime->buffer_size);
 #endif
     source = runtime->dma_area + pSCOSnd->playback.buffer_pos * frame_bytes;
 
@@ -769,13 +769,14 @@ static ssize_t ioctl_read(struct file *file_p,
 		buffer = (u8 *)vmalloc((3*period_size)+1);
         sco_count = snd_copy_send_sco_data(data->pSCOSnd,&buffer[1]);
 #if AIC_SCO_PRINT
-		printk("%s sco_count %d,sco_packet_bytes %d\r\n", __func__,sco_count,sco_packet_bytes);
+		printk("%s sco_count %d,sco_packet_bytes %d, 1 %d, 2 %d\r\n", __func__,sco_count,sco_packet_bytes,\
+		data->pSCOSnd->capture.sco_packet_bytes,snd_cap_timer.snd_sco_length);
 #endif
-		if (data->pSCOSnd->capture.sco_packet_bytes != snd_cap_timer.snd_sco_length) {
-			if (data->pSCOSnd->capture.sco_packet_bytes > snd_cap_timer.snd_sco_length) {
-				buffer[0] = sco_count * (data->pSCOSnd->capture.sco_packet_bytes/snd_cap_timer.snd_sco_length);
+		if (sco_packet_bytes != snd_cap_timer.snd_sco_length) {
+			if (sco_packet_bytes > snd_cap_timer.snd_sco_length) {
+				buffer[0] = sco_count * (sco_packet_bytes/snd_cap_timer.snd_sco_length);
 			} else {
-				buffer[0] = sco_count / (snd_cap_timer.snd_sco_length/data->pSCOSnd->capture.sco_packet_bytes);
+				buffer[0] = sco_count / (snd_cap_timer.snd_sco_length/sco_packet_bytes);
 			}
 		}else{
 			buffer[0] = (u8)sco_count;
@@ -798,13 +799,19 @@ static ssize_t ioctl_read(struct file *file_p,
                 }
                 break;
             default:
+                {
+                    vfree(buffer);
+                    return ret;
+                }
                 break;
         }
 #if AIC_SCO_PRINT
 		printk("%s,len:%d\n", __func__, len);
 #endif
-		if (copy_to_user(ptr, buffer, len))
+		if (copy_to_user(ptr, buffer, len)){
+            vfree(buffer);
 			return -EFAULT;
+        }
 		ret = len;
 		vfree(buffer);
     }
@@ -881,6 +888,7 @@ static ssize_t ioctl_write(struct file *file_p,
                 }
                 break;
             default:
+		snd_cap_timer.snd_sco_length = count;
                 break;
         }
 	}

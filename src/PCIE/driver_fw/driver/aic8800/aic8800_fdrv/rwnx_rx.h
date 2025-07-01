@@ -41,8 +41,11 @@ enum rx_status_bits {
 /* Maximum number of rx buffer the fw may use at the same time
    (must be at least IPC_RXBUF_CNT) */
 
-#define RWNX_RXBUFF_MAX 255//128//((64 * NX_REMOTE_STA_MAX) < IPC_RXBUF_CNT ?     \
-                         IPC_RXBUF_CNT : (64 * NX_REMOTE_STA_MAX))
+#define RWNX_RXBUFF_MAX 255
+#if 0
+128
+((64 * NX_REMOTE_STA_MAX) < IPC_RXBUF_CNT ? IPC_RXBUF_CNT : (64 * NX_REMOTE_STA_MAX))
+#endif
 
 /**
  * struct rwnx_skb_cb - Control Buffer structure for RX buffer
@@ -349,8 +352,12 @@ struct hw_rxhdr {
 	u32    pattern;
 };
 
-extern const u8 legrates_lut[];
-extern u16 legrates_lut_rate[];
+struct rwnx_legrate {
+	int idx;
+	int rate;
+};
+
+extern struct rwnx_legrate legrates_lut[];
 extern u16 tx_legrates_lut_rate[];
 
 struct DHCPInfo {

@@ -1344,9 +1344,10 @@ static void rwnx_radar_process_pulse(struct work_struct *ws)
 #ifdef CREATE_TRACE_POINTS
 			trace_radar_pulse(chain, p);
 #endif
-			if (dfs_pattern_detector_add_pulse(radar->dpd[chain], chain,
-											   (s16)freq + (2 * p->freq),
-											   p->rep, (p->len * 2), now)) {
+		if (dfs_pattern_detector_add_pulse(radar->dpd[chain], chain,
+								(s16)freq + p->freq, //(2 * p->freq),
+								p->rep, p->len/*(p->len * 2)*/, now)) {
+
 				u16 idx = radar->detected[chain].index;
 
 				if (chain == RWNX_RADAR_RIU) {

@@ -949,10 +949,10 @@ int rwnx_txq_queue_skb(struct sk_buff *skb, struct rwnx_txq *txq,
 	atomic_inc(&rwnx_hw->txdata_cnt);
 	atomic_inc(&rwnx_hw->txdata_cnt_push);
 	//printk("a%d\n",atomic_read(&rwnx_hw->txdata_cnt));
-    if (atomic_read(&rwnx_hw->txdata_cnt) >= 150 && rwnx_hw->fc==0) {
+    if ((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) >= 150 && rwnx_hw->fc==0) {
 	    netif_tx_stop_all_queues(txq->ndev);
 	    rwnx_hw->fc = 1;
-	    AICWFDBG(LOGINFO,"fc\n");
+	    AICWFDBG(LOGINFO,"fc:%d\n",rwnx_hw->txdata_reserved);
     }
 #else /* ! CONFIG_RWNX_FULLMAC */
 
@@ -1360,7 +1360,7 @@ void rwnx_hwq_process(struct rwnx_hw *rwnx_hw, struct rwnx_hwq *hwq)
 
 		if (txq_empty) {
 			if(atomic_read(&rwnx_hw->txdata_cnt_push)!=0){
-				printk("t%d\n",atomic_read(&rwnx_hw->txdata_cnt_push));
+				AICWFDBG(LOGDEBUG,"t%d\n",atomic_read(&rwnx_hw->txdata_cnt_push));
 			}
 			rwnx_txq_del_from_hw_list(txq);
 			txq->pkt_sent = 0;
@@ -1378,6 +1378,11 @@ void rwnx_hwq_process(struct rwnx_hw *rwnx_hw, struct rwnx_hwq *hwq)
 				list_rotate_left(&hwq->list);
 			}
 		}
+
+#ifdef CONFIG_TEMP_CONTROL
+		if (rwnx_hw->pcidev->on_off && atomic_read(&rwnx_hw->txdata_cnt) >= 120)
+			aicwf_temp_ctrl(rwnx_hw->pcidev);
+#endif
 
 #ifdef CONFIG_RWNX_FULLMAC
 		/* Unable to complete PS traffic request because of hwq credit */

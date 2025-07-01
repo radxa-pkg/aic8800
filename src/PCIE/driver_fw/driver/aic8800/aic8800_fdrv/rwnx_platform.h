@@ -45,6 +45,9 @@
 #define FW_ADID_BASE_NAME_8800D80_U02       "fw_adid_8800d80_u02.bin"
 #define FW_PATCH_TABLE_NAME_8800D80_U02     "fw_patch_table_8800d80_u02.bin"
 
+#define RWNX_8800D80X2_PCIE_FW_NAME                   "fmacfw_8800D80X2_pcie.bin"
+#define RWNX_8800D80X2_PCIE_FW_BT_NAME                "fmacfwbt_8800D80X2_pcie.bin"
+#define RWNX_8800D80X2_PCIE_RF_FW_NAME                "lmacfw_rf_8800D80X2_pcie.bin"
 
 /**
  * Type of memory to access (cf rwnx_plat.get_address)

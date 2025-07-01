@@ -1,3 +1,11 @@
+EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
+EXTRA_CFLAGS += -Wno-implicit-fallthrough
+EXTRA_CFLAGS += -Wno-int-to-pointer-cast
+EXTRA_CFLAGS += -Wno-pointer-to-int-cast
+#EXTRA_CFLAGS += -Wno-unused-function
+#EXTRA_CFLAGS += -Wno-maybe-uninitialized
+#EXTRA_CFLAGS += -Wno-unused-variable
+
 RWNX_VERS_NUM := 6.4.3.0
 
 CONFIG_COUNTRY_CODE = "00"
@@ -90,9 +98,13 @@ CONFIG_USE_FW_REQUEST = n
 CONFIG_USE_P2P0=n
 CONFIG_BR_SUPPORT =n
 BR_NAME = br0
-CONFIG_FILTER_TCP_ACK =n
+CONFIG_FILTER_TCP_ACK =y
 CONFIG_ONE_TXQ = y
 CONFIG_RFKILL_POLL = n
+CONFIG_KLYIN = n
+CONFIG_VENDOR_LED_SUPPORT = n
+CONFIG_TEMP_COMP = n
+CONFIG_TEMP_CONTROL = n
 
 # Support of MU-MIMO transmission (need FW support)
 ifeq ($(CONFIG_RWNX_BFMER), y)
@@ -141,8 +153,9 @@ $(MODULE_NAME)-y := \
 	md5.o                  \
 	aicwf_compat_8800dc.o  \
 	aicwf_compat_8800d80.o \
-	regdb.o				   \
-	aicwf_rx_prealloc.o
+	regdb.o			\
+	aicwf_rx_prealloc.o	\
+	aic_priv_cmd.o
 
 $(MODULE_NAME)-$(CONFIG_BR_SUPPORT)       += aic_br_ext.o
 $(MODULE_NAME)-$(CONFIG_RWNX_RADAR)       += rwnx_radar.o
@@ -163,6 +176,7 @@ $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_usb.o
 $(MODULE_NAME)-$(CONFIG_PCIE_SUPPORT)     += aicwf_pcie.o
 $(MODULE_NAME)-$(CONFIG_PCIE_SUPPORT)     += aicwf_txrxif.o
 $(MODULE_NAME)-$(CONFIG_PCIE_SUPPORT)     += pcie_host.o
+$(MODULE_NAME)-$(CONFIG_PCIE_SUPPORT)     += aicwf_pcie_api.o
 
 ccflags-$(CONFIG_DEBUG_FS) += -DCONFIG_RWNX_DEBUGFS
 ccflags-$(CONFIG_DEBUG_FS) += -DCONFIG_RWNX_UM_HELPER_DFLT=\"$(CONFIG_RWNX_UM_HELPER_DFLT)\"
@@ -232,6 +246,10 @@ ccflags-$(CONFIG_USE_P2P0) += -DCONFIG_USE_P2P0
 ccflags-$(CONFIG_FILTER_TCP_ACK) += -DCONFIG_FILTER_TCP_ACK
 ccflags-$(CONFIG_ONE_TXQ)  += -DCONFIG_ONE_TXQ
 ccflags-$(CONFIG_RFKILL_POLL)  += -DCONFIG_RFKILL_POLL
+ccflags-$(CONFIG_KLYIN)  += -DCONFIG_KLYIN
+ccflags-$(CONFIG_VENDOR_LED_SUPPORT)  += -DCONFIG_VENDOR_LED_SUPPORT
+ccflags-$(CONFIG_TEMP_COMP) += -DCONFIG_TEMP_COMP
+ccflags-$(CONFIG_TEMP_CONTROL) += -DCONFIG_TEMP_CONTROL
 
 ifeq ($(CONFIG_SDIO_SUPPORT), y)
 ccflags-y += -DAICWF_SDIO_SUPPORT
@@ -270,7 +288,7 @@ endif
 
 ccflags-$(CONFIG_RX_REORDER) += -DAICWF_RX_REORDER
 ccflags-$(CONFIG_ARP_OFFLOAD) += -DAICWF_ARP_OFFLOAD
-ccflags-$(CONFIG_RADAR_DETECT) += -DRADAR_OR_IR_DETECT
+ccflags-$(CONFIG_RADAR_OR_IR_DETECT) += -DCONFIG_RADAR_OR_IR_DETECT
 ccflags-$(CONFIG_DOWNLOAD_FW)  += -DCONFIG_DOWNLOAD_FW
 ccflags-$(CONFIG_RX_NETIF_RECV_SKB) += -DCONFIG_RX_NETIF_RECV_SKB
 ccflags-$(CONFIG_USB_BT) += -DCONFIG_USB_BT
@@ -283,6 +301,8 @@ CONFIG_PLATFORM_AMLOGIC ?= n
 CONFIG_PLATFORM_UBUNTU ?= y
 
 ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
+
+MAKEFLAGS +=-j$(shell nproc)
 
 ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
 #KDIR ?= /home/yaya/E/Rockchip/3229/Android7/RK3229_ANDROID7.1_v1.01_20170914/rk3229_Android7.1_v1.01_xml0914/kernel
@@ -336,7 +356,8 @@ KDIR  ?= /lib/modules/$(shell uname -r)/build
 PWD   ?= $(shell pwd)
 KVER ?= $(shell uname -r)
 MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800D80/
-ARCH ?= x86_64
+SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
+ARCH ?= $(SUBARCH)
 CROSS_COMPILE ?=
 endif
 

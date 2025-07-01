@@ -38,8 +38,10 @@ lvl_11ax_mcs10_2g4=15
 lvl_11ax_mcs11_2g4=15
 
 # txpwr_loss
-loss_enable=0
-loss_value=2
+loss_enable_2g4=0
+loss_value_2g4=2
+loss_enable_5g=0
+loss_value_5g=5
 
 # txpwr_ofst
 ofst_enable=0
