@@ -1,0 +1,32 @@
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
+index 138bacd..3d29307 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
+@@ -130,6 +130,11 @@ KVER ?= $(shell uname -r)
+ MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
+ ARCH ?= x86_64
+ CROSS_COMPILE ?=
++
++ifeq ($(CONFIG_AW_BSP), y)
++ccflags-y += -DCONFIG_PLATFORM_ALLWINNER
++endif
++
+ endif
+ ###########################################
+ 
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+index 2b24142..c244197 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+@@ -389,6 +389,11 @@ KVER ?= $(shell uname -r)
+ MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/
+ ARCH ?= x86_64
+ CROSS_COMPILE ?=
++
++ifeq ($(CONFIG_AW_BSP), y)
++ccflags-y += -DCONFIG_PLATFORM_ALLWINNER
++endif
++
+ endif
+ ###########################################
+ 
