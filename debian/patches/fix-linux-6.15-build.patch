@@ -155,17 +155,17 @@ index d740f14..f665692 100644
  
  	return 0;
 @@ -1460,7 +1464,11 @@ void reord_deinit_sta(struct aicwf_rx_priv *rx_priv, struct reord_ctrl_info *reo
- 		}
- 		spin_unlock_irqrestore(&preorder_ctrl->reord_list_lock, flags);
- 		if (timer_pending(&preorder_ctrl->reord_timer)) {
+ 		if(preorder_ctrl->enable){
+ 			preorder_ctrl->enable = false;
+ 			if (timer_pending(&preorder_ctrl->reord_timer)) {
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
-+			ret = timer_delete_sync(&preorder_ctrl->reord_timer);
++ 				ret = timer_delete_sync(&preorder_ctrl->reord_timer);
 +#else
- 			ret = del_timer_sync(&preorder_ctrl->reord_timer);
+ 				ret = del_timer_sync(&preorder_ctrl->reord_timer);
 +#endif
+ 			}
+ 			cancel_work_sync(&preorder_ctrl->reord_timer_work);
  		}
- 		cancel_work_sync(&preorder_ctrl->reord_timer_work);
- 	}
 @@ -1809,7 +1817,11 @@ int reord_process_unit(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u16 s
  		}
  	} else {

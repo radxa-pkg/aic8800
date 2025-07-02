@@ -1,4 +1,21 @@
+# Devenv
+/.devenv*
+/devenv.local.nix
+
+# direnv
+/.direnv
+
+# pre-commit
+/.pre-commit-config.yaml
+
+# Local VS Code configuration
 /.vscode*
-/SOURCE
-/VERSION
+
+# Kernel build artifacts
+/*.deb
+/*.buildinfo
+/*.changes
 /.pc
+
+# Output folder
+/out

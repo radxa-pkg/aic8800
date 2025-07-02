@@ -2,12 +2,14 @@ diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PC
 index a787214..b739e18 100644
 --- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -515,7 +515,7 @@ int testmode = 0;
- int adap_test = 0;
+@@ -515,8 +515,8 @@ int testmode = 0;
  module_param(testmode, int, 0660);
  module_param(adap_test, int, 0660);
+ module_param(wifi_fail, int, 0660);
 -char aic_fw_path[200]="/lib/firmware/aic8800D80";
+-char aic_fw_path_8800d80x2[200]="/lib/firmware/aic8800D80X2";
 +char aic_fw_path[200]="/lib/firmware/aic8800_fw/PCIE/aic8800D80";
++char aic_fw_path_8800d80x2[200]="/lib/firmware/aic8800_fw/PCIE/aic8800D80X2";
  u8 chip_sub_id = 0;
  u8 chip_mcu_id = 0;
  u8 chip_id = 0;

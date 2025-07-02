@@ -1,0 +1,15 @@
+export DEB_CFLAGS_MAINT_APPEND = -pthread
+
+override_dh_install:
+	DEB_VERSION=$(DEB_VERSION) dh_install \
+		--exclude=*.ko \
+		--exclude=*.a \
+		--exclude=*.swp \
+		--exclude=*.o \
+		--exclude=.gitignore
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l/lib/aarch64-linux-gnu/
+
+override_dh_dkms:
+	dh_dkms -V $(DEB_VERSION)

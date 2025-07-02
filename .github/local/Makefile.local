@@ -1,0 +1,17 @@
+SRC-AICRF-TEST	:=	src/tools/aicrf_test/
+BIN-AICRF-TEST	:=	bt_test wifi_test
+BINS-AICRF-TEST	:=	$(addprefix $(SRC-AICRF-TEST),$(BIN-AICRF-TEST))
+
+post_build:
+	rm -f src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/aicrf_test/wifi_test
+
+.PHONY: build-aicrf-test
+build-aicrf-test: $(BINS-AICRF-TEST)
+	$(MAKE) CROSS_COMPILE=aarch64-linux-gnu- -C $(SRC-AICRF-TEST)
+
+.PHONY: clean-aicrf-test
+clean-aicrf-test:
+	$(MAKE) -C $(SRC-AICRF-TEST) -j$(shell nproc) clean || true
+
+main_build: build-aicrf-test
+clean: clean-aicrf-test

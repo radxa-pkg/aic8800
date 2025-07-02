@@ -7,7 +7,9 @@ Build-Depends: debhelper (>=12~),
                devscripts,
                dh-exec,
                dh-sequence-dkms,
-               lintian
+               lintian,
+               crossbuild-essential-arm64 [!arm64],
+               libc6:arm64 [!arm64],
 
 Package: aic8800-sdio-dkms
 Architecture: all
