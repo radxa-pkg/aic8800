@@ -206,6 +206,18 @@ index 2c337d8..171b171 100644
  		}
  		if (rwnx_vif->up) {
  			rwnx_send_remove_if(rwnx_hw, rwnx_vif->vif_index, true);
+@@ -8485,7 +8485,11 @@ void rwnx_cfg80211_deinit(struct rwnx_hw *rwnx_hw)
+         list_for_each_entry(defrag_ctrl, &rwnx_hw->defrag_list, list) {
+             list_del_init(&defrag_ctrl->list);
+             if (timer_pending(&defrag_ctrl->defrag_timer))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++                timer_delete_sync(&defrag_ctrl->defrag_timer);
++#else
+                 del_timer_sync(&defrag_ctrl->defrag_timer);
++#endif
+             dev_kfree_skb(defrag_ctrl->skb);
+             kfree(defrag_ctrl);
+         }
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
 index bbf21c9..79b5fc2 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
@@ -246,3 +258,171 @@ index bbf21c9..79b5fc2 100644
  		}
      }
  
+@@ -2386,7 +2386,11 @@ check_len_update:
+ 							skb_tmp = defrag_info->skb;
+ 							list_del_init(&defrag_info->list);
+ 							if (timer_pending(&defrag_info->defrag_timer)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++								ret = timer_delete(&defrag_info->defrag_timer);
++#else
+ 								ret = del_timer(&defrag_info->defrag_timer);
++#endif
+ 							}
+ 							kfree(defrag_info);
+ 							spin_unlock_bh(&rwnx_hw->defrag_lock);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+index ca47b26..d74bd8d 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+@@ -106,7 +106,11 @@ void tcp_ack_deinit(struct rwnx_hw *priv)
+ 		drop_msg = NULL;
+ 
+ 		write_seqlock_bh(&ack_m->ack_info[i].seqlock);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++		timer_delete(&ack_m->ack_info[i].timer);
++#else
+ 		del_timer(&ack_m->ack_info[i].timer);
++#endif
+ 		drop_msg = ack_m->ack_info[i].msgbuf;
+ 		ack_m->ack_info[i].msgbuf = NULL;
+ 		write_sequnlock_bh(&ack_m->ack_info[i].seqlock);
+@@ -375,7 +379,11 @@ int tcp_ack_handle(struct msg_buf *new_msgbuf,
+ 				//printk("%lx \n",ack_info->msgbuf);
+ 				drop_msg = ack_info->msgbuf;
+ 				ack_info->msgbuf = NULL;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++				timer_delete(&ack_info->timer);
++#else
+ 				del_timer(&ack_info->timer);
++#endif
+ 			}else{
+ 				//printk("msgbuf is NULL \n");
+ 			}
+@@ -409,7 +417,11 @@ int tcp_ack_handle(struct msg_buf *new_msgbuf,
+ 				   atomic_read(&ack_m->max_drop_cnt)))) {
+ 			ack_info->drop_cnt = 0;
+ 			ack_info->in_send_msg = new_msgbuf;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete(&ack_info->timer);
++#else
+ 			del_timer(&ack_info->timer);
++#endif
+ 		} else {
+ 			ret = 1;
+ 			ack_info->msgbuf = new_msgbuf;
+@@ -472,7 +484,11 @@ int tcp_ack_handle_new(struct msg_buf *new_msgbuf,
+ 			ack_info->drop_cnt = 0;
+ 			//send_msg = new_msgbuf;
+ 			ack_info->in_send_msg = new_msgbuf;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete(&ack_info->timer);
++#else
+ 			del_timer(&ack_info->timer);
++#endif
+ 		}else{
+ 			ret = 1;
+ 			ack_info->msgbuf = new_msgbuf;
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+index 4ee7e64..cfec217 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+@@ -115,7 +115,11 @@ void tcp_ack_deinit(struct rwnx_hw *priv)
+ 		drop_msg = NULL;
+ 
+ 		write_seqlock_bh(&ack_m->ack_info[i].seqlock);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++		timer_delete(&ack_m->ack_info[i].timer);
++#else
+ 		del_timer(&ack_m->ack_info[i].timer);
++#endif
+ 		drop_msg = ack_m->ack_info[i].msgbuf;
+ 		ack_m->ack_info[i].msgbuf = NULL;
+ 		write_sequnlock_bh(&ack_m->ack_info[i].seqlock);
+@@ -388,7 +392,11 @@ int tcp_ack_handle(struct msg_buf *new_msgbuf,
+ 				//printk("%lx \n",ack_info->msgbuf);
+ 				drop_msg = ack_info->msgbuf;
+ 				ack_info->msgbuf = NULL;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++				timer_delete(&ack_info->timer);
++#else
+ 				del_timer(&ack_info->timer);
++#endif
+ 			}else{
+ 				//printk("msgbuf is NULL \n");
+ 			}
+@@ -422,7 +430,11 @@ int tcp_ack_handle(struct msg_buf *new_msgbuf,
+ 				   atomic_read(&ack_m->max_drop_cnt)))) {
+ 			ack_info->drop_cnt = 0;
+ 			ack_info->in_send_msg = new_msgbuf;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete(&ack_info->timer);
++#else
+ 			del_timer(&ack_info->timer);
++#endif
+ 		} else {
+ 			ret = 1;
+ 			ack_info->msgbuf = new_msgbuf;
+@@ -486,7 +498,11 @@ int tcp_ack_handle_new(struct msg_buf *new_msgbuf,
+ 			ack_info->drop_cnt = 0;
+ 			//send_msg = new_msgbuf;
+ 			ack_info->in_send_msg = new_msgbuf;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete(&ack_info->timer);
++#else
+ 			del_timer(&ack_info->timer);
++#endif
+ 			if(drop_msg) {
+ 			write_seqlock_bh(&rwnx_hw->txdata_reserved_seqlock);
+ 			rwnx_hw->txdata_reserved--;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+index 480fd07..47f0598 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_tcp_ack.c
+@@ -106,7 +106,11 @@ void tcp_ack_deinit(struct rwnx_hw *priv)
+ 		drop_msg = NULL;
+ 
+ 		write_seqlock_bh(&ack_m->ack_info[i].seqlock);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++		timer_delete(&ack_m->ack_info[i].timer);
++#else
+ 		del_timer(&ack_m->ack_info[i].timer);
++#endif
+ 		drop_msg = ack_m->ack_info[i].msgbuf;
+ 		ack_m->ack_info[i].msgbuf = NULL;
+ 		write_sequnlock_bh(&ack_m->ack_info[i].seqlock);
+@@ -375,7 +379,11 @@ int tcp_ack_handle(struct msg_buf *new_msgbuf,
+ 				//printk("%lx \n",ack_info->msgbuf);
+ 				drop_msg = ack_info->msgbuf;
+ 				ack_info->msgbuf = NULL;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++				timer_delete(&ack_info->timer);
++#else
+ 				del_timer(&ack_info->timer);
++#endif
+ 			}else{
+ 				//printk("msgbuf is NULL \n");
+ 			}
+@@ -409,7 +417,11 @@ int tcp_ack_handle(struct msg_buf *new_msgbuf,
+ 				   atomic_read(&ack_m->max_drop_cnt)))) {
+ 			ack_info->drop_cnt = 0;
+ 			ack_info->in_send_msg = new_msgbuf;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete(&ack_info->timer);
++#else
+ 			del_timer(&ack_info->timer);
++#endif
+ 		} else {
+ 			ret = 1;
+ 			ack_info->msgbuf = new_msgbuf;
+@@ -472,7 +484,11 @@ int tcp_ack_handle_new(struct msg_buf *new_msgbuf,
+ 			ack_info->drop_cnt = 0;
+ 			//send_msg = new_msgbuf;
+ 			ack_info->in_send_msg = new_msgbuf;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
++			timer_delete(&ack_info->timer);
++#else
+ 			del_timer(&ack_info->timer);
++#endif
+ 		}else{
+ 			ret = 1;
+ 			ack_info->msgbuf = new_msgbuf;

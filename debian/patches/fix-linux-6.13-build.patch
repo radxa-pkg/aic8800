@@ -20,7 +20,7 @@ diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PC
 index fc58409..08d41ad 100644
 --- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -5042,6 +5042,9 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
+@@ -3326,6 +3326,9 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
   * configured at firmware level.
   */
  static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
@@ -30,6 +30,18 @@ index fc58409..08d41ad 100644
  											 struct cfg80211_chan_def *chandef)
  {
  	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -3380,7 +3380,11 @@ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
+ 
+ int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
+                                              struct cfg80211_chan_def *chandef){
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++    return rwnx_cfg80211_set_monitor_channel(wiphy, NULL, chandef);
++#else
+     return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
++#endif
+ }
+ 
+ /**
 @@ -5484,7 +5487,11 @@ static int rwnx_cfg80211_get_channel(struct wiphy *wiphy,
  
  	if (rwnx_vif->vif_index == rwnx_hw->monitor_vif) {
@@ -63,7 +75,7 @@ diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SD
 index 86567f9..a4c760d 100644
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -4833,6 +4833,9 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
+@@ -3326,6 +3326,9 @@ static int rwnx_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev)
   * configured at firmware level.
   */
  static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
@@ -73,6 +85,18 @@ index 86567f9..a4c760d 100644
  											 struct cfg80211_chan_def *chandef)
  {
  	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -3481,7 +3481,11 @@ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
+ 
+ int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
+                                              struct cfg80211_chan_def *chandef){
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++    return rwnx_cfg80211_set_monitor_channel(wiphy, NULL, chandef);
++#else
+     return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
++#endif
+ }
+ 
+ 
 @@ -5281,7 +5284,11 @@ static int rwnx_cfg80211_get_channel(struct wiphy *wiphy,
  
  	if (rwnx_vif->vif_index == rwnx_hw->monitor_vif) {
@@ -119,7 +143,7 @@ diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/US
 index 2c337d8..1266da0 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -5186,6 +5186,9 @@ cfg80211_chandef_identical(const struct cfg80211_chan_def *chandef1,
+@@ -3326,6 +3326,9 @@ cfg80211_chandef_identical(const struct cfg80211_chan_def *chandef1,
  #endif
  
  static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
@@ -129,6 +153,18 @@ index 2c337d8..1266da0 100644
                                               struct cfg80211_chan_def *chandef)
  {
      struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+@@ -3899,7 +3899,11 @@ static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
+ 
+ int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
+                                              struct cfg80211_chan_def *chandef){
++#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++    return rwnx_cfg80211_set_monitor_channel(wiphy, NULL, chandef);
++#else
+     return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
++#endif
+ }
+ 
+ 
 @@ -5711,7 +5714,11 @@ static int rwnx_cfg80211_get_channel(struct wiphy *wiphy,
      if (rwnx_vif->vif_index == rwnx_hw->monitor_vif)
      {
