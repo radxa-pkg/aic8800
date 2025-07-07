@@ -1,3 +1,20 @@
+aic8800 (4.0+git20241119.06da8476-1) noble; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * feat: update to aic8800d_linux_sdk_V4.0_2024_1119_06da8476
+  * chore: adapt patches to the latest AIC release
+  * fix: auto detect Allwinner kernel
+  * chore: clean up old build infra
+
+  [ amazingfate ]
+  * workflow: trigger check_linked_issue when pr is edited
+  * fix build for linux 6.16
+
+  [ Jiali Chen ]
+  * fix: add fix-usb-build.patch
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Mon, 07 Jul 2025 07:07:30 +0000
+
 aic8800 (3.0+git20240327.3561b08f-7) noble; urgency=medium
 
   [ admin ]
