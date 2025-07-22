@@ -218,6 +218,11 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg)
 	tx_priv->head = tx_priv->aggr_buf->data;
 	tx_priv->tail = tx_priv->aggr_buf->data;
 
+#ifdef CONFIG_SDIO_ADMA
+	tx_priv->aggr_segcnt = 0;
+	tx_priv->len = 0;
+#endif
+
 	return tx_priv;
 }
 
@@ -231,6 +236,9 @@ void aicwf_tx_deinit(struct aicwf_tx_priv *tx_priv)
 #endif
 		kfree(tx_priv);
 	}
+#ifdef CONFIG_SDIO_ADMA
+	aicwf_sdio_aggrbuf_reset(tx_priv);
+#endif
 }
 
 #ifdef AICWF_SDIO_SUPPORT

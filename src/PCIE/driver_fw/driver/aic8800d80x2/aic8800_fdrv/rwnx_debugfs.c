@@ -22,6 +22,7 @@
 #include "rwnx_msg_tx.h"
 #include "rwnx_radar.h"
 #include "rwnx_tx.h"
+#include "rwnx_version_gen.h"
 
 #ifdef CONFIG_DEBUG_FS
 #ifdef CONFIG_RWNX_FULLMAC
@@ -424,6 +425,19 @@ static int rwnx_dbgfs_txq_vif(char *buf, size_t size, struct rwnx_vif *rwnx_vif,
 }
 
 extern u8 debug_print;
+
+static ssize_t rwnx_dbgfs_debug_read(struct file *file,
+                                    char __user *user_buf,
+                                    size_t count, loff_t *ppos)
+{
+	struct rwnx_hw *rwnx_hw = file->private_data;
+
+	printk("Driver RELEASE_DATE : %s \n",RELEASE_DATE);
+	printk("Firmware Version: %s\r\n", rwnx_hw->fw_version);
+
+    return 0;
+}
+
 static ssize_t rwnx_dbgfs_debug_write(struct file *file,
                                     const char __user *user_buf,
                                     size_t count, loff_t *ppos)
@@ -448,7 +462,7 @@ static ssize_t rwnx_dbgfs_debug_write(struct file *file,
     return count;
 }
 
-DEBUGFS_WRITE_FILE_OPS(debug);
+DEBUGFS_READ_WRITE_FILE_OPS(debug);
 
 static ssize_t rwnx_dbgfs_txq_read(struct file *file,
 								   char __user *user_buf,
@@ -1295,7 +1309,7 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 {
 	struct rwnx_hw *priv = file->private_data;
 	char buf[64];
-	int32_t addr[13];
+	int32_t addr[14];
     int32_t addr_out[12];
 	u32_l hwconfig_id;
 	size_t len = min_t(size_t,count,sizeof(buf)-1);
@@ -1309,10 +1323,10 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 	}
 
 	buf[len] = '\0';
-	ret = sscanf(buf, "%x %x %x %x %x %x %x %x %x %x %x %x %x %x",
-                            &hwconfig_id, &addr[0], &addr[1], &addr[2], &addr[3], &addr[4], &addr[5], &addr[6], &addr[7], &addr[8], &addr[9], &addr[10], &addr[11], &addr[12]);
-	if(ret > 14) {
-		printk("param error > 14\n");
+	ret = sscanf(buf, "%x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
+                            &hwconfig_id, &addr[0], &addr[1], &addr[2], &addr[3], &addr[4], &addr[5], &addr[6], &addr[7], &addr[8], &addr[9], &addr[10], &addr[11], &addr[12], &addr[13]);
+	if(ret > 15) {
+		printk("param error > 15\n");
 	} else {
 		switch(hwconfig_id)
 		    {
@@ -1324,12 +1338,12 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 			printk("ACS_TXOP_REQ bk:0x%x be:0x%x vi:0x%x vo:0x%x\n",addr[0],  addr[1], addr[2], addr[3]);
 			break;
 		    case 1:
-			if(ret != 14) {
-			    printk("param error  != 14\n");
+			if(ret != 15) {
+			    printk("param error  != 15\n");
 			    break;}
 			ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, NULL);
-			printk("CHANNEL_ACCESS_REQ edca:%x,%x,%x,%x, vif:%x, retry_cnt:%x, rts:%x, long_nav:%x, cfe:%x, rc_retry_cnt:%x:%x:%x ccademod_th %x\n",
-                                addr[0],  addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11], addr[12]);
+			printk("CHANNEL_ACCESS_REQ edca:%x,%x,%x,%x, vif:%x, retry_cnt:%x, rts:%x, long_nav:%x, cfe:%x, rc_retry_cnt:%x:%x:%x ccademod_th %x remove_1m2m %x\n",
+                                addr[0],  addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7], addr[8], addr[9], addr[10], addr[11], addr[12], addr[13]);
 			break;
 		    case 2:
 			if(ret != 7) {
@@ -1367,8 +1381,27 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
                     printk("CHIP_TEMP_GET_REQ degree=%d\n", addr_out[0]);
                 }
             break;
+            case 6: // STBC_MCS_SET_REQ
+                if (ret != 3) {
+                    printk("param error != 3\n");
+                } else {
+                    printk("ret=%d, id=%d, param=%x, %x\n", ret, hwconfig_id, addr[0], addr[1]);
+                    ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, addr_out);
+                }
+            break;
+            case 7:
+                    printk("ret=%d, id=%d, param=%x, %x\n", ret, hwconfig_id, addr[0], addr[1]);
+                    ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, addr_out);
+            break;
+            case 8:
+            case 9:
+            case 10:
+            case 11:
+            case 12:
+                ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, addr_out);
+                break;
 		    default:
-			printk("param error\n");
+			printk("param error:%d\n", hwconfig_id);
 			break;
 		}
 		if(ret) {
@@ -1461,7 +1494,10 @@ static ssize_t rwnx_dbgfs_vendor_swconfig_write(struct file *file,
                         addr[0], addr[1], addr_out[0]);
                 }
             break;
-
+            case 6: // TWO_ANT_RSSI_GET_REQ
+                ret = rwnx_send_vendor_swconfig_req(priv, swconfig_id, addr, addr_out);
+                printk("2 ant rssi=%x\n", addr_out[0]);
+            break;
             default:
                 printk("param error\n");
                 break;
@@ -1759,7 +1795,7 @@ static void idx_to_rate_cfg(int idx, union rwnx_rate_ctrl_info *r_cfg, int *ru_s
 
 static void idx_to_rate_cfg1(unsigned int formatmod,
 	unsigned int mcs,unsigned int nss,
-	unsigned int bwTx,unsigned int gi,
+	unsigned int bwTx,unsigned int gi, unsigned int dcm,
 	 union rwnx_rate_ctrl_info *r_cfg, int *ru_size)
 {
     r_cfg->value = 0;
@@ -1800,6 +1836,8 @@ static void idx_to_rate_cfg1(unsigned int formatmod,
             r->vht.mcs = mcs;
             r_cfg->bwTx = bwTx;
             r_cfg->giAndPreTypeTx = gi;
+            if(dcm)
+                r_cfg->value |= (0x1<<14);
             break;
         }
         case FORMATMOD_HE_MU:
@@ -1811,6 +1849,7 @@ static void idx_to_rate_cfg1(unsigned int formatmod,
             r->he.mcs = mcs;
             r_cfg->bwTx = 0;
             r_cfg->giAndPreTypeTx = gi;
+
             break;
         }
         default:
@@ -1969,7 +2008,7 @@ static ssize_t rwnx_dbgfs_rc_fixed_rate_idx_write(struct file *file,
     u8 mac[6];
     char buf[20];
     int fixed_rate_idx = 1;
-	unsigned int formatmod, mcs, nss, bwTx, gi;
+	unsigned int formatmod, mcs, nss, bwTx, gi, dcm;
     union rwnx_rate_ctrl_info rate_config;
 	union rwnx_rate_ctrl_info *r_cfg=&rate_config;
     int error = 0;
@@ -1980,7 +2019,7 @@ static ssize_t rwnx_dbgfs_rc_fixed_rate_idx_write(struct file *file,
     /* Get the station index from MAC address */
     sscanf(file->f_path.dentry->d_parent->d_iname, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
             &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
-    if (mac == NULL)
+    if (is_zero_ether_addr(mac))
         return 0;
     sta = rwnx_get_sta(priv, mac);
     if (sta == NULL)
@@ -1991,11 +2030,14 @@ static ssize_t rwnx_dbgfs_rc_fixed_rate_idx_write(struct file *file,
         return -EFAULT;
     buf[len] = '\0';
     //sscanf(buf, "%i\n", &fixed_rate_idx);
-	sscanf(buf, "%u %u %u %u %u",&formatmod, &mcs, &nss, &bwTx, &gi);
-	printk("%u %u %u %u %u\n",formatmod, mcs, nss, bwTx, gi);
+	sscanf(buf, "%u %u %u %u %u %u",&formatmod, &mcs, &nss, &bwTx, &gi, &dcm);
+	printk("%u %u %u %u %u %u\n",formatmod, mcs, nss, bwTx, gi, dcm);
 
-    if((formatmod > 6) || (mcs > 11) || (nss > 8) || (bwTx > 6) || (gi > 3)){
+    if((formatmod > 7) || (mcs > 11) || (nss > 8) || (bwTx > 6) || (gi > 3)){
         printk("error parameter");
+        return len;
+    }else if ((dcm==1 && mcs==2) || (dcm==1 && mcs > 4) || (dcm==1 && formatmod < 5)) {
+        printk("dcm err param\n");
         return len;
     }
 
@@ -2008,10 +2050,10 @@ static ssize_t rwnx_dbgfs_rc_fixed_rate_idx_write(struct file *file,
     else
     {
         //idx_to_rate_cfg(fixed_rate_idx, &rate_config, NULL);
-        idx_to_rate_cfg1(formatmod, mcs, nss, bwTx, gi, &rate_config, NULL);
+        idx_to_rate_cfg1(formatmod, mcs, nss, bwTx, gi, dcm, &rate_config, NULL);
     }
 
-	printk("formatModTx=%u mcsIndexTx=%u bwTx=%u giAndPreTypeTx=%u\n",r_cfg->formatModTx,r_cfg->mcsIndexTx,r_cfg->bwTx,r_cfg->giAndPreTypeTx);
+	printk("formatModTx=%u mcsIndexTx=%u bwTx=%u giAndPreTypeTx=%u, dcm=%d\n",r_cfg->formatModTx,r_cfg->mcsIndexTx,r_cfg->bwTx,r_cfg->giAndPreTypeTx,dcm);
 	// Forward the request to the LMAC
     if ((error = rwnx_send_me_rc_set_rate(priv, sta->sta_idx,
                                           (u16)rate_config.value)) != 0)
@@ -2394,7 +2436,7 @@ int rwnx_dbgfs_register(struct rwnx_hw *rwnx_hw, const char *name)
 	DEBUGFS_ADD_FILE(sys_stats, dir_drv,  S_IRUSR);
 	DEBUGFS_ADD_FILE(txq, dir_drv, S_IRUSR);
 	DEBUGFS_ADD_FILE(acsinfo, dir_drv, S_IRUSR);
-	DEBUGFS_ADD_FILE(debug, dir_drv, S_IWUSR);
+	DEBUGFS_ADD_FILE(debug, dir_drv, S_IWUSR |S_IRUSR);
 #ifdef CONFIG_RWNX_MUMIMO_TX
 	DEBUGFS_ADD_FILE(mu_group, dir_drv, S_IRUSR);
 #endif

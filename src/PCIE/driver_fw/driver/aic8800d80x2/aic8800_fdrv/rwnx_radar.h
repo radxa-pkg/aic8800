@@ -111,6 +111,8 @@ int  rwnx_radar_dump_pattern_detector(char *buf, size_t len,
 									  struct rwnx_radar *radar, u8 chain);
 int  rwnx_radar_dump_radar_detected(char *buf, size_t len,
 									struct rwnx_radar *radar, u8 chain);
+struct pri_detector *pri_detector_init(struct dfs_pattern_detector *dpd,
+									   u16 radar_type, u16 freq);
 
 #else
 

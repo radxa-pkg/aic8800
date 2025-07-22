@@ -405,6 +405,9 @@ enum mm_msg_tag {
 	MM_GET_APF_PROG_REQ,
 	MM_GET_APF_PROG_CFM,
 
+	MM_SET_TXPWR_PER_STA_REQ,
+	MM_SET_TXPWR_PER_STA_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -1232,6 +1235,12 @@ struct mm_get_sta_info_cfm {
 	u32_l rate_info;
 	u32_l txfailed;
 	u8    rssi;
+    u8    reserved[3];
+    u32_l chan_time;
+    u32_l chan_busy_time;
+    u32_l ack_fail_stat;
+    u32_l ack_succ_stat;
+    u32_l chan_tx_busy_time;
 };
 
 typedef struct
@@ -1290,8 +1299,10 @@ typedef struct
 
 typedef struct
 {
-    u8_l loss_enable;
-    s8_l loss_value;
+	u8_l loss_enable_2g4;
+	s8_l loss_value_2g4;
+	u8_l loss_enable_5g;
+	s8_l loss_value_5g;
 } txpwr_loss_conf_t;
 
 struct mm_set_txpwr_lvl_req
@@ -1925,6 +1936,13 @@ enum vendor_hwconfig_tag{
 	CCA_THRESHOLD_REQ,
 	BWMODE_REQ,
 	CHIP_TEMP_GET_REQ,
+	STBC_MCS_SET_REQ,
+	MAX_AGG_TX_CNT_REQ,
+	MAX_BW_MCS_THRESH_SET_REQ,
+	DCM_FORCE_EN_REQ,
+	AUTO_CCA_EN_REQ,
+	NSS_1T2R_REQ,
+	ON_AIR_DUTY_CYCLE_REQ,
 };
 
 enum {
@@ -1953,6 +1971,7 @@ struct mm_set_channel_access_req
 	u8_l  cfe_en;
 	u8_l  rc_retry_cnt[3];
 	s8_l ccademod_th;
+	u8_l  remove_1m2m;
 };
 
 struct mm_set_mac_timescale_req
@@ -1994,6 +2013,57 @@ struct mm_get_chip_temp_cfm
     s8_l degree;
 };
 
+struct mm_get_stbc_msc_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+    u8_l mcs_thresh;
+};
+
+struct mm_set_max_tx_agg_cnt_req
+{
+    u32_l hwconfig_id;
+    u8_l enale;
+    u8_l mcs_thresh;
+    u8_l max_agg_cnt[AC_MAX];
+};
+
+struct mm_set_max_bw_mcs_thresh_req
+{
+    u32_l hwconfig_id;
+    u8_l enale;
+    u8_l max_bw_mcs_thresh;
+};
+
+struct mm_set_dcm_force_en_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+};
+
+
+struct mm_set_auto_cca_en_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+    int8_t max_cca_thresh;
+    u8_l default_cca_set;
+    int8_t default_cca_thresh;
+};
+
+struct mm_set_nss_1t2r_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+};
+
+struct mm_set_on_air_duty_cycle_req
+{
+    u32_l hwconfig_id;
+    u8_l enable;
+    u8_l percent;//10 means 10%, 1-99
+};
+
 struct mm_set_vendor_hwconfig_cfm
 {
     u32_l hwconfig_id;
@@ -2026,6 +2096,7 @@ enum vendor_swconfig_tag
     EXT_FLAGS_SET_REQ,
     EXT_FLAGS_GET_REQ,
     EXT_FLAGS_MASK_SET_REQ,
+    TWO_ANT_RSSI_GET_REQ,
 };
 
 struct mm_set_bcn_cfg_req
@@ -2110,6 +2181,12 @@ struct mm_set_vendor_swconfig_cfm
         struct mm_get_ext_flags_cfm ext_flags_get_cfm;
         struct mm_mask_set_ext_flags_cfm ext_flags_mask_set_cfm;
     };
+};
+
+struct mm_set_txpwr_lvl_per_sta_req
+{
+	u8_l sta_idx;
+	s8_l tx_pwr_offset;
 };
 
 /// Structure containing the parameters of the @ref ME_RC_STATS_REQ message.
@@ -2916,7 +2993,7 @@ struct dbg_rftest_cmd_req {
 };
 
 struct dbg_rftest_cmd_cfm {
-	u64_l rftest_result[16];
+	u32_l rftest_result[32];
 };
 
 struct dbg_gpio_write_req {
@@ -2993,6 +3070,21 @@ struct dbg_mem_block_write_req {
 /// Structure containing the parameters of the @ref DBG_MEM_BLOCK_WRITE_CFM message.
 struct dbg_mem_block_write_cfm {
 	u32_l wstatus;
+};
+
+/// Structure containing the parameters of the @ref DBG_MEM_BLOCK_READ_REQ message.
+struct dbg_mem_block_read_req
+{
+    u32_l memaddr;
+    u32_l memsize;
+};
+
+/// Structure containing the parameters of the @ref DBG_MEM_BLOCK_READ_CFM message.
+struct dbg_mem_block_read_cfm
+{
+    u32_l memaddr;
+    u32_l memsize;
+    u32_l memdata[1024 / sizeof(u32_l)];
 };
 
 /// Structure containing the parameters of the @ref DBG_START_APP_REQ message.

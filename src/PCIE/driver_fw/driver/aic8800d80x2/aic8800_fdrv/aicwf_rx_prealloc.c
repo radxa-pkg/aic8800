@@ -20,7 +20,7 @@ struct rx_buff *aicwf_prealloc_rxbuff_alloc(spinlock_t *lock)
     spin_lock_irqsave(lock, flags);
     if (list_empty(&aic_rx_buff_list.rxbuff_list)) {
         spin_unlock_irqrestore(lock, flags);
-        printk("%s %d, rxbuff list is empty\n", __func__, __LINE__);
+        AICWFDBG(LOGERROR, "%s %d, rxbuff list is empty\n", __func__, __LINE__);
         return NULL;
     } else {
 		rxbuff = list_first_entry(&aic_rx_buff_list.rxbuff_list,
@@ -54,7 +54,7 @@ int aicwf_prealloc_init()
     struct rx_buff *rxbuff;
     int i = 0;
 
-    printk("%s enter\n", __func__);
+    AICWFDBG(LOGTRACE, "%s enter\n", __func__);
     INIT_LIST_HEAD(&aic_rx_buff_list.rxbuff_list);
     
 	for (i = 0 ; i < aic_rxbuff_num_max ; i++) {
@@ -62,7 +62,7 @@ int aicwf_prealloc_init()
         if (rxbuff) {
             rxbuff->data = kzalloc(aic_rxbuff_size, GFP_KERNEL);
             if (rxbuff->data == NULL) {
-                printk("failed to alloc rxbuff data\n");
+                AICWFDBG(LOGERROR, "failed to alloc rxbuff data\n");
                 kfree(rxbuff);
                 continue;
             }
@@ -75,7 +75,7 @@ int aicwf_prealloc_init()
         }
     }
 
-	printk("pre alloc rxbuff list len: %d\n", (int)atomic_read(&aic_rx_buff_list.rxbuff_list_len));
+	AICWFDBG(LOGINFO, "pre alloc rxbuff list len: %d\n", (int)atomic_read(&aic_rx_buff_list.rxbuff_list_len));
     return 0;
 }
 
@@ -84,9 +84,9 @@ void aicwf_prealloc_exit()
     struct rx_buff *rxbuff;
     struct rx_buff *pos;
     
-    printk("%s enter\n", __func__);
+    AICWFDBG(LOGTRACE, "%s enter\n", __func__);
 
-	printk("free pre alloc rxbuff list %d\n", (int)atomic_read(&aic_rx_buff_list.rxbuff_list_len));
+	AICWFDBG(LOGINFO, "free pre alloc rxbuff list %d\n", (int)atomic_read(&aic_rx_buff_list.rxbuff_list_len));
     list_for_each_entry_safe(rxbuff, pos, &aic_rx_buff_list.rxbuff_list, queue) {
         list_del_init(&rxbuff->queue);
         kfree(rxbuff->data);

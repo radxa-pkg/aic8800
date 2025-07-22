@@ -19,7 +19,7 @@
 
 
 #ifdef CONFIG_PLATFORM_UBUNTU
-#define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
+#define CONFIG_BLUEDROID        0 /* bleuz 0, bluedroid 1 */
 #else
 #define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
 #endif
@@ -49,6 +49,7 @@
 #define GET_DRV_DATA(x)        x->driver_data
 #endif
 
+#if CONFIG_BLUEDROID
 struct btusb_data {
     struct hci_dev       *hdev;
     //struct usb_device    *udev;
@@ -544,6 +545,10 @@ void hdev_exit(void);
 
 struct hci_dev *hci_dev_get(int index);
 int hci_recv_fragment(struct hci_dev *hdev, int type, void *data, int count);
-
+#else
+int btsdio_init(void);
+void btsdio_remove(void);
+int bt_sdio_recv(u8 *data,u32 data_len);
+#endif
 #endif//_AICWF_SDIO_BT_H_
 

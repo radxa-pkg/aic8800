@@ -18,9 +18,14 @@
 
 extern void rwnx_data_dump(char* tag, void* data, unsigned long len);
 extern void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg);
+extern void aicwf_pcie_dump(struct rwnx_hw *rwnx_hw);
 
 u8 data_cnt = 0;
 u8 debug_print = 1;
+int mpdu_cnt=0;
+int mpdu_len=0;
+int offset=0;
+struct sk_buff *skb_new;
 
 /**
  * rwnx_irq_hdlr - IRQ handler
@@ -53,6 +58,7 @@ void rwnx_task(unsigned long data)
     uint32_t rxdata_successive_cnt = 0;
     bool txdata_pause = false;
     uint32_t txdata_successive_cnt = 0;
+	int copy_len = 0;
 
     if(rwnx_hw->pci_suspending) {
         printk("%s pci_suspending return\n", __func__);
@@ -191,29 +197,72 @@ void rwnx_task(unsigned long data)
                 rxbuf->pattern = 0;
                 wmb();
 
-                dma_sync_single_for_cpu(&rwnx_hw->pcidev->pci_dev->dev, ipc_buf->dma_addr, 64+1554, DMA_FROM_DEVICE);
-                skb = (struct sk_buff *)ipc_buf->addr;
+                //dma_sync_single_for_cpu(&rwnx_hw->pcidev->pci_dev->dev, ipc_buf->dma_addr, 64+1554, DMA_FROM_DEVICE);
+				dma_sync_single_for_cpu(&rwnx_hw->pcidev->pci_dev->dev, ipc_buf->dma_addr, 2048, DMA_FROM_DEVICE);
+				skb = (struct sk_buff *)ipc_buf->addr;
 
                 //printk("rx data:cnt=%d, skb=%p, dma=%lx, data0,1=%x, %x, idx=%d\n", data_cnt, ipc_buf->addr, ipc_buf->dma_addr, skb->data[0], skb->data[1], hostid-1 );
                 //rwnx_data_dump("rx data", skb->data + 60, 64);
                 //if(debug_print)
                     //printk("rx %d\n",data_cnt);
 
-                skb_put(skb, ((skb->data[1]<<8) |skb->data[0] )+ 60);
 
                 if (ipc_buf->addr) {
                     dma_unmap_single(rwnx_hw->dev, ipc_buf->dma_addr, ipc_buf->size, DMA_FROM_DEVICE);
                     ipc_buf->addr = NULL;
                 }
 
-                #ifdef AICWF_RX_REORDER
+                #if 0
                 hw_rxhdr = (struct hw_rxhdr *)skb->data;
                 if(hw_rxhdr->is_monitor_vif) {
                     printk("rx data:cnt=%d, skb=%p, dma=%lx, len=%x, %x\n", data_cnt, ipc_buf->addr, (long unsigned int)ipc_buf->dma_addr, skb->data[1], skb->data[0] );
                     rwnx_data_dump("data:", skb->data - 128, 128 + 64);
                 }
                 #endif
-                rwnx_rxdataind_aicwf(rwnx_hw, skb, (void *)rwnx_hw->pcidev->rx_priv);
+
+				if(mpdu_cnt == 0)
+					mpdu_len = ((skb->data[1]<<8) |skb->data[0]) + 60;
+
+				if(mpdu_len > 2048 && mpdu_cnt == 0){
+					hw_rxhdr = (struct hw_rxhdr *)skb->data;
+
+					printk("rx len > 2048: %d,%d\n", mpdu_len, hw_rxhdr->hwvect.reserved);
+					offset = 0;
+					mpdu_cnt = hw_rxhdr->hwvect.reserved;
+					if(mpdu_cnt > 1) {
+						skb_new = dev_alloc_skb(mpdu_len);
+						if(skb_new)
+							skb_put(skb_new, mpdu_len);
+
+						copy_len = mpdu_len > 2048? 2048 : mpdu_len;
+						if(skb_new)
+							memcpy(skb_new->data + offset, skb->data, copy_len);
+						mpdu_len -= copy_len;
+						mpdu_cnt--;
+						offset += copy_len;
+						dev_kfree_skb(skb);
+					}else {
+						printk("2048mpdu \n");
+						skb_put(skb, 2048);
+						rwnx_rxdataind_aicwf(rwnx_hw, skb, (void *)rwnx_hw->pcidev->rx_priv);
+					}
+				}else if(mpdu_cnt > 0){
+					copy_len = mpdu_len > 2048? 2048 : mpdu_len;
+					if(skb_new)
+						memcpy(skb_new->data + offset, skb->data, copy_len);
+					mpdu_len -= copy_len;
+					mpdu_cnt--;
+					offset += copy_len;
+					dev_kfree_skb(skb);
+					printk("mpdu_len %d mpdu_cnt %d \n",mpdu_len,mpdu_cnt);
+					if(mpdu_cnt == 0){
+						rwnx_rxdataind_aicwf(rwnx_hw, skb_new, (void *)rwnx_hw->pcidev->rx_priv);
+					}
+				}else{
+					skb_put(skb, mpdu_len);
+					rwnx_rxdataind_aicwf(rwnx_hw, skb, (void *)rwnx_hw->pcidev->rx_priv);
+				}
+
                 rwnx_hw->stats.last_rx = jiffies;
                 rxdata_successive_cnt++;
 
@@ -307,6 +356,11 @@ void rwnx_task(unsigned long data)
                     break;
                 }
             }
+        }
+
+        if (status & PCIE_FW_ERR_BIT) {
+            printk("PCIE_FW_ERR_BIT\n");
+            aicwf_pcie_dump(rwnx_hw);
         }
 
         if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {

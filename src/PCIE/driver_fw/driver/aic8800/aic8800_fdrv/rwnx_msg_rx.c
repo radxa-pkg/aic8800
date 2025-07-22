@@ -910,6 +910,10 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
 		netif_carrier_on(dev);
 	}
 
+#ifdef CONFIG_DYNAMIC_PWR
+	rwnx_hw->sta_rssi_idx = ind->ap_idx;
+#endif
+
 	return 0;
 }
 
@@ -1020,6 +1024,8 @@ static inline int rwnx_rx_sm_external_auth_required_ind(struct rwnx_hw *rwnx_hw,
 	struct cfg80211_external_auth_params params;
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+	memset((void*)&params, 0, sizeof(struct cfg80211_external_auth_params));
 
 	params.action = NL80211_EXTERNAL_AUTH_START;
 	memcpy(params.bssid, ind->bssid.array, ETH_ALEN);

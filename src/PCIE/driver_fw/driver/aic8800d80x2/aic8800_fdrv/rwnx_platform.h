@@ -35,6 +35,7 @@
 #define RWNX_FCU_FW_NAME                "fcuram.bin"
 
 #define RAM_FMAC_FW_ADDR                   0x00120000
+#define RAM_LMAC_RF_FW_ADDR                0x00140000
 #define FW_RAM_ADID_BASE_ADDR_8800D80_U02  0x00201940
 #define FW_RAM_PATCH_BASE_ADDR_8800D80_U02 0x0020B43c
 
@@ -42,15 +43,28 @@
 #define RWNX_PCIE_FW_BT_NAME                "fmacfwbt_8800D80_pcie.bin"
 #define RWNX_PCIE_RF_FW_NAME                "lmacfw_rf_pcie.bin"
 #define FW_PATCH_BASE_NAME_8800D80_U02      "fw_patch_8800d80_u02.bin"
+#define FW_EXT_PATCH_BASE_NAME_8800D80_U02  "fw_patch_8800d80_u02_ext"
 #define FW_ADID_BASE_NAME_8800D80_U02       "fw_adid_8800d80_u02.bin"
 #define FW_PATCH_TABLE_NAME_8800D80_U02     "fw_patch_table_8800d80_u02.bin"
 
+#define RWNX_8800D80X2_PCIE_FLASH_FW_NAME                   "fw_flsupg_m80x2p.bin"
+
+#define RWNX_8800D80X2_PCIE_FLASHGEN2_FW_NAME                   "fw_flsgen2_m80x2p.bin"
+
+#ifdef CONFIG_FOR_IPCAM
+#define RWNX_8800D80X2_PCIE_FW_NAME                   "fmacfw_8800D80X2_pcie_ipc.bin"
+#define RWNX_8800D80X2_PCIE_FW_BT_NAME                "fmacfwbt_8800D80X2_pcie_ipc.bin"
+#else
 #define RWNX_8800D80X2_PCIE_FW_NAME                   "fmacfw_8800D80X2_pcie.bin"
 #define RWNX_8800D80X2_PCIE_FW_BT_NAME                "fmacfwbt_8800D80X2_pcie.bin"
+#endif
 #define RWNX_8800D80X2_PCIE_RF_FW_NAME                "lmacfw_rf_8800D80X2_pcie.bin"
-#define FW_PATCH_BASE_NAME_8800D80X2_U03              "fw_patch_8800d80x2_u03.bin"
-#define FW_ADID_BASE_NAME_8800D80X2_U03               "fw_adid_8800d80x2_u03.bin"
-#define FW_PATCH_TABLE_NAME_8800D80X2_U03             "fw_patch_table_8800d80x2_u03.bin"
+#define FW_PATCH_BASE_NAME_8800D80X2_U05              "fw_patch_8800d80x2_u05.bin"
+#define FW_EXT_PATCH_BASE_NAME_8800D80X2_U05          "fw_patch_8800d80x2_u05_ext"
+#define FW_ADID_BASE_NAME_8800D80X2_U05               "fw_adid_8800d80x2_u05.bin"
+#define FW_PATCH_TABLE_NAME_8800D80X2_U05             "fw_patch_table_8800d80x2_u05.bin"
+
+#define POWER_LEVEL_INVALID_VAL     (127)
 
 /**
  * Type of memory to access (cf rwnx_plat.get_address)
@@ -65,6 +79,29 @@ enum rwnx_platform_addr {
 	RWNX_ADDR_SYSTEM,
 	RWNX_ADDR_MAX,
 };
+
+typedef struct
+{
+    txpwr_lvl_conf_t txpwr_lvl;
+    txpwr_lvl_conf_v2_t txpwr_lvl_v2;
+    txpwr_lvl_conf_v3_t txpwr_lvl_v3;
+	txpwr_lvl_conf_v4_t txpwr_lvl_v4;
+    txpwr_lvl_adj_conf_t txpwr_lvl_adj;
+	txpwr_loss_conf_t txpwr_loss;
+    txpwr_ofst_conf_t txpwr_ofst;
+	txpwr_ofst2x_conf_t txpwr_ofst2x;
+    txpwr_ofst2x_conf_v2_t txpwr_ofst2x_v2;
+    xtal_cap_conf_t xtal_cap;
+} userconfig_info_t;
+extern userconfig_info_t userconfig_info;
+
+typedef enum {
+	REGIONS_SRRC,
+	REGIONS_FCC,
+	REGIONS_ETSI,
+	REGIONS_JP,
+	REGIONS_DEFAULT,
+} Regions_code;
 
 struct rwnx_hw;
 
@@ -149,6 +186,16 @@ void get_userconfig_txpwr_ofst_in_fdrv(txpwr_ofst_conf_t *txpwr_ofst);
 void get_userconfig_txpwr_ofst2x_in_fdrv(txpwr_ofst2x_conf_t *txpwr_ofst2x);
 void get_userconfig_txpwr_ofst2x_v2_in_fdrv(txpwr_ofst2x_conf_v2_t *txpwr_ofst2x_v2);
 
+uint8_t get_ccode_region(char * ccode);
+u8 get_region_index(char * name);
+
+#ifdef CONFIG_POWER_LIMIT
+int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name);
+void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
+int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx);
+int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw);
+#endif
+
 extern struct device *rwnx_platform_get_dev(struct rwnx_plat *rwnx_plat);
 
 static inline unsigned int rwnx_platform_get_irq(struct rwnx_plat *rwnx_plat)
@@ -175,15 +222,19 @@ struct aicbt_info_t {
 };
 
 struct aicbt_patch_info_t {
-       uint32_t info_len;
-       uint32_t adid_addrinf;
+	uint32_t info_len;
+	uint32_t adid_addrinf;
 	uint32_t addr_adid;
-       uint32_t patch_addrinf;
+	uint32_t patch_addrinf;
 	uint32_t addr_patch;
 	uint32_t reset_addr;
 	uint32_t reset_val;
 	uint32_t adid_flag_addr;
 	uint32_t adid_flag;
+	//ext patch nb
+	uint32_t ext_patch_nb_addr;
+	uint32_t ext_patch_nb;
+	uint32_t *ext_patch_param;
 };
 
 struct aicbsp_info_t {
@@ -270,13 +321,14 @@ enum aicbsp_cpmode_type {
 #define AICBT_UART_BAUD_DEFAULT     AICBT_UART_BAUD_1_5M
 #define AICBT_UART_FC_DEFAULT       AICBT_UART_FLOWCTRL_ENABLE
 #define AICBT_LPM_ENABLE_DEFAULT    0
-#define AICBT_TXPWR_LVL_DEFAULT     AICBT_TXPWR_LVL
+#define AICBT_TXPWR_LVL_DEFAULT     AICBT_TXPWR_LVL_D80
 
 
 struct bt_patch_file_name{
 	const char *fw_adid;
 	const char *fw_patch;
 	const char *fw_patch_table;
+	const char *bt_ext_patch;
 };
 
 int aicbt_patch_table_free(struct aicbt_patch_table *head);
@@ -286,7 +338,21 @@ int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_
 int rwnx_plat_bin_fw_patch_table_upload_android(struct rwnx_hw *rwnx_hw, char *filename);
 int patch_config(struct rwnx_hw *rwnx_hw);
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr);
-
+int patch_config_d80x2(struct rwnx_hw *rwnx_hw);
+int rwnx_plat_userconfig_upload_android(struct rwnx_hw *rwnx_hw, char *fw_path, char *filename);
+void rwnx_plat_userconfig_parsing(struct rwnx_hw *rwnx_hw, char *buffer, int size);
+void rwnx_plat_userconfig_parsing3(char *buffer, int size);
+void rwnx_plat_userconfig_parsing2(char *buffer, int size);
+void rwnx_plat_userconfig_parsing_8800d80x2(char *buffer, int size);
+void rwnx_plat_nvram_set_value_8800d80x2(char *command, char *value);
+void rwnx_plat_nvram_set_value_v3(char *command, char *value);
+void rwnx_plat_nvram_set_value(char *command, char *value);
+void rwnx_release_firmware_common(u32** buffer);
+int rwnx_request_firmware_common(struct rwnx_hw *rwnx_hw, u32** buffer, const char *filename);
+int rwnx_atoi(char *value);
+#ifdef CONFIG_LOAD_BT_CONF
+void aicbt_parse_config(struct rwnx_hw *rwnx_hw);
 #endif
+#endif /*CONFIG_USE_BT*/
 
 #endif /* _RWNX_PLATFORM_H_ */

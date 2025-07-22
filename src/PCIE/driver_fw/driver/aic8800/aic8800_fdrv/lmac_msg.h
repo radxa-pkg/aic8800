@@ -1232,6 +1232,11 @@ struct mm_get_sta_info_cfm {
 	u32_l rate_info;
 	u32_l txfailed;
 	u8    rssi;
+	u8    reserved[3];
+    	u32_l chan_time;
+    	u32_l chan_busy_time;
+    	u32_l ack_fail_stat;
+    	u32_l ack_succ_stat;
 };
 
 typedef struct
@@ -1276,8 +1281,10 @@ typedef struct
 
 typedef struct
 {
-    u8_l loss_enable;
-    s8_l loss_value;
+	u8_l loss_enable_2g4;
+	s8_l loss_value_2g4;
+	u8_l loss_enable_5g;
+	s8_l loss_value_5g;
 } txpwr_loss_conf_t;
 
 struct mm_set_txpwr_lvl_req
@@ -1896,6 +1903,7 @@ struct mm_set_channel_access_req
 	u8_l  cfe_en;
 	u8_l  rc_retry_cnt[3];
 	s8_l ccademod_th;
+	u8_l  remove_1m2m;
 };
 
 struct mm_set_mac_timescale_req
@@ -2936,6 +2944,21 @@ struct dbg_mem_block_write_req {
 /// Structure containing the parameters of the @ref DBG_MEM_BLOCK_WRITE_CFM message.
 struct dbg_mem_block_write_cfm {
 	u32_l wstatus;
+};
+
+/// Structure containing the parameters of the @ref DBG_MEM_BLOCK_READ_REQ message.
+struct dbg_mem_block_read_req
+{
+    u32_l memaddr;
+    u32_l memsize;
+};
+
+/// Structure containing the parameters of the @ref DBG_MEM_BLOCK_READ_CFM message.
+struct dbg_mem_block_read_cfm
+{
+    u32_l memaddr;
+    u32_l memsize;
+    u32_l memdata[1024 / sizeof(u32_l)];
 };
 
 /// Structure containing the parameters of the @ref DBG_START_APP_REQ message.

@@ -687,25 +687,27 @@ static const struct ieee80211_regdomain regdom_CZ = {
 };
 
 static const struct ieee80211_regdomain regdom_DE = {
-	.alpha2 = "DE",
-	.dfs_region = NL80211_DFS_ETSI,
-	.reg_rules = {
-		REG_RULE_EXT(2400, 2483, 40, 0, 20, 0, 0),
-		REG_RULE_EXT(5150, 5250, 80, 0, 20, 0, 
-			NL80211_RRF_NO_OUTDOOR | 
-			NL80211_RRF_AUTO_BW | 0),
-		REG_RULE_EXT(5250, 5350, 80, 0, 20, 0, 
-			NL80211_RRF_NO_OUTDOOR | 
-			NL80211_RRF_DFS | 
-			NL80211_RRF_AUTO_BW | 0),
-		REG_RULE_EXT(5470, 5695, 160, 0, 27, 0, 
-			NL80211_RRF_DFS | 0),
-		/*REG_RULE_EXT(5470, 5725, 160, 0, 27, 0, 
-			NL80211_RRF_DFS | 0),*/
-		REG_RULE_EXT(57000, 66000, 2160, 0, 40, 0, 0),
-	},
-	.n_reg_rules = 5
-};
+    .alpha2 = "DE", 
+    .dfs_region = NL80211_DFS_ETSI, 
+    .reg_rules = {
+        REG_RULE_EXT(2400, 2483, 40, 0, 20, 0, 0),
+        REG_RULE_EXT(5150, 5250, 80, 0, 20, 0, NL80211_RRF_AUTO_BW|
+          NL80211_RRF_NO_OUTDOOR|
+          0),
+        REG_RULE_EXT(5250, 5350, 80, 0, 20, 0, NL80211_RRF_AUTO_BW|
+          NL80211_RRF_DFS|
+          NL80211_RRF_NO_OUTDOOR|
+          0),
+        REG_RULE_EXT(5470, 5725, 160, 0, 20, 0, NL80211_RRF_DFS|
+          0),
+        REG_RULE_EXT(5725, 5875, 80, 0, 20, 0, 0),
+        REG_RULE_EXT(5945, 6425, 160, 0, 20, 0, NL80211_RRF_NO_OUTDOOR|
+          0),
+        REG_RULE_EXT(57000, 66000, 2160, 0, 20, 0, 0),
+    }, 
+    .n_reg_rules = 7
+}; 
+
 
 static const struct ieee80211_regdomain regdom_DK = {
 	.alpha2 = "DK",
@@ -1825,6 +1827,18 @@ static const struct ieee80211_regdomain regdom_MY = {
 	.n_reg_rules = 4
 };
 
+static const struct ieee80211_regdomain regdom_NG = {
+    .alpha2 = "NG",
+    .dfs_region = NL80211_DFS_ETSI,
+    .reg_rules = {
+        REG_RULE_EXT(2402, 2482, 40, 0, 20, 0, 0),
+        REG_RULE_EXT(5250, 5330, 80, 0, 20, 0, NL80211_RRF_DFS|
+          0),
+        REG_RULE_EXT(5735, 5835, 80, 0, 20, 0, 0),
+    },
+    .n_reg_rules = 3
+};
+
 static const struct ieee80211_regdomain regdom_NI = {
 	.alpha2 = "NI",
 	.dfs_region = NL80211_DFS_FCC,
@@ -2835,6 +2849,7 @@ const struct ieee80211_regdomain *reg_regdb[] = {
 	&regdom_MW,
 	&regdom_MX,
 	&regdom_MY,
+	&regdom_NG,
 	&regdom_NI,
 	&regdom_NL,
 	&regdom_NO,

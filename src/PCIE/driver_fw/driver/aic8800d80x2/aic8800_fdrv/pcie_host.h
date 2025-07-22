@@ -11,6 +11,7 @@
 #define PCIE_RX_MSG_BIT      CO_BIT(0)
 #define PCIE_RX_DATA_BIT     CO_BIT(1)
 #define PCIE_TXC_DATA_BIT    CO_BIT(2)
+#define PCIE_FW_ERR_BIT      CO_BIT(3)
 
 #define AIC8800D80_PCIE_IRQ_STATUS_OFFSET  0x3521c
 #define AIC8800D80_PCIE_IRQ_ACK_OFFSET     0x35208
@@ -41,6 +42,6 @@ extern void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_t
                           struct sk_buff *skb, int hw_queue);
 extern void aicwf_pcie_host_txdesc_push(struct ipc_host_env_tag *env, const int queue_idx, const uint64_t host_id);
 extern void aicwf_pcie_host_tx_cfm_handler(struct ipc_host_env_tag *env, u32 *data, u8 free);
-
+void aicwf_pcie_host_init(struct ipc_host_env_tag *env, void *cb,  struct ipc_shared_env_tag *shared_env_ptr, void *pthis);
 
 #endif

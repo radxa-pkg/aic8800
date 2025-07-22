@@ -72,7 +72,7 @@ int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_sw
 
 #ifdef CONFIG_RWNX_FULLMAC
 int rwnx_send_me_config_req(struct rwnx_hw *rwnx_hw);
-int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw);
+int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw, char *ccode);
 int rwnx_send_me_set_control_port_req(struct rwnx_hw *rwnx_hw, bool opened,
 									  u8 sta_idx);
 int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *params,
@@ -162,6 +162,8 @@ int rwnx_send_dbg_get_sys_stat_req(struct rwnx_hw *rwnx_hw,
 								   struct dbg_get_sys_stat_cfm *cfm);
 int rwnx_send_dbg_mem_block_write_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
 									  u32 mem_size, u32 *mem_data);
+int rwnx_send_dbg_mem_block_read_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
+									u32 mem_size, struct dbg_mem_block_read_cfm *cfm);
 int rwnx_send_dbg_start_app_req(struct rwnx_hw *rwnx_hw, u32 boot_addr,
 								u32 boot_type);
 int rwnx_send_pwm_init_req(struct rwnx_hw *rwnx_hw, u8 pwm_gpidx, u8 mode, u8 run, u32 tmr_cnt,

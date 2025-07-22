@@ -1500,6 +1500,10 @@ int rwnx_sdio_bt_send_req(struct rwnx_hw *rwnx_hw,uint32_t len, struct sk_buff *
 	struct mm_bt_send_cfm cfm;
 	int error;
 
+	if(testmode) {
+		AICWFDBG(LOGERROR, "%s testmode can not send\n", __func__);
+		return 0;
+	}
 	cfm.status = 0;
     req = rwnx_msg_zalloc(TDLS_SDIO_BT_SEND_REQ, TASK_TDLS, DRV_TASK_ID, sizeof(struct mm_bt_send_req));
 
@@ -2211,6 +2215,73 @@ int rwnx_send_get_apf_prog_req(struct rwnx_hw *rwnx_hw, u8_l *program, u32_l pro
 }
 #endif
 
+int rwnx_send_set_filter(struct rwnx_hw *rwnx_hw, uint32_t filter)
+{
+    struct mm_set_filter_req *set_filter_req_param;
+    uint32_t rx_filter = 0;
+
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+    /* Build the MM_SET_FILTER_REQ message */
+    set_filter_req_param =
+        rwnx_msg_zalloc(MM_SET_FILTER_REQ, TASK_MM, DRV_TASK_ID,
+                        sizeof(struct mm_set_filter_req));
+    if (!set_filter_req_param)
+        return -ENOMEM;
+
+    /* Set parameters for the MM_SET_FILTER_REQ message */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 2, 0)
+    if (filter & FIF_PROMISC_IN_BSS)
+        rx_filter |= NXMAC_ACCEPT_UNICAST_BIT;
+#endif
+    if (filter & FIF_ALLMULTI)
+        rx_filter |= NXMAC_ACCEPT_MULTICAST_BIT;
+
+    if (filter & (FIF_FCSFAIL | FIF_PLCPFAIL))
+        rx_filter |= NXMAC_ACCEPT_ERROR_FRAMES_BIT;
+
+    if (filter & FIF_BCN_PRBRESP_PROMISC)
+        rx_filter |= NXMAC_ACCEPT_OTHER_BSSID_BIT;
+
+    if (filter & FIF_CONTROL)
+        rx_filter |= NXMAC_ACCEPT_OTHER_CNTRL_FRAMES_BIT |
+                     NXMAC_ACCEPT_CF_END_BIT |
+                     NXMAC_ACCEPT_ACK_BIT |
+                     NXMAC_ACCEPT_CTS_BIT |
+                     NXMAC_ACCEPT_RTS_BIT |
+                     NXMAC_ACCEPT_BA_BIT | NXMAC_ACCEPT_BAR_BIT;
+
+    if (filter & FIF_OTHER_BSS)
+        rx_filter |= NXMAC_ACCEPT_OTHER_BSSID_BIT;
+
+    if (filter & FIF_PSPOLL) {
+        /* TODO: check if the MAC filters apply to our BSSID or is general */
+        rx_filter |= NXMAC_ACCEPT_PS_POLL_BIT;
+    }
+
+    if (filter & FIF_PROBE_REQ) {
+        rx_filter |= NXMAC_ACCEPT_PROBE_REQ_BIT;
+        rx_filter |= NXMAC_ACCEPT_ALL_BEACON_BIT;
+    }
+
+    /* Add the filter flags that are set by default and cannot be changed here */
+    rx_filter |= RWNX_MAC80211_NOT_CHANGEABLE;
+
+    /* XXX */
+    //if (ieee80211_hw_check(rwnx_hw->hw, AMPDU_AGGREGATION))
+        rx_filter |= NXMAC_ACCEPT_BA_BIT;
+
+    /* Now copy all the flags into the message parameter */
+    set_filter_req_param->filter = rx_filter;
+
+    RWNX_DBG("new total_flags = 0x%08x rx filter set to 0x%08x\r\n",
+             filter, rx_filter);
+
+    /* Send the MM_SET_FILTER_REQ message to LMAC FW */
+    return rwnx_send_msg(rwnx_hw, set_filter_req_param, 1, MM_SET_FILTER_CFM, NULL);
+}
+
+
 /******************************************************************************
  *    Control messages handling functions (FULLMAC only)
  *****************************************************************************/
@@ -2345,13 +2416,14 @@ int rwnx_send_me_config_req(struct rwnx_hw *rwnx_hw)
 	return rwnx_send_msg(rwnx_hw, req, 1, ME_CONFIG_CFM, NULL);
 }
 
-int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw)
+int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw, char *ccode)
 {
 	struct me_chan_config_req *req;
 	struct wiphy *wiphy = rwnx_hw->wiphy;
 	int i;
 #ifdef CONFIG_POWER_LIMIT
 	int8_t max_pwr;
+	uint8_t r_idx;
 	txpwr_loss_conf_t txpwr_loss_tmp;
 	txpwr_loss_conf_t *txpwr_loss;
 #endif
@@ -2374,6 +2446,7 @@ int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw)
 	if (txpwr_loss->loss_enable_5g == 1)
 		AICWFDBG(LOGINFO, "%s:loss_value_5g: %d\r\n", __func__,
 				 txpwr_loss->loss_value_5g);
+	r_idx = get_ccode_region(ccode);
 #endif
 
 	req->chan2G4_cnt =  0;
@@ -2389,7 +2462,7 @@ int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw)
 			req->chan2G4[req->chan2G4_cnt].tx_power = chan_to_fw_pwr(b->channels[i].max_power);
 #ifdef CONFIG_POWER_LIMIT
 			{
-				max_pwr = get_powerlimit_by_freq(PHY_BAND_2G4, req->chan2G4[req->chan2G4_cnt].freq);
+				max_pwr = get_powerlimit_by_freq(PHY_BAND_2G4, req->chan2G4[req->chan2G4_cnt].freq, r_idx);
 				if (txpwr_loss->loss_enable_2g4 == 1)
 					max_pwr -= txpwr_loss->loss_value_2g4;
 				if (req->chan2G4[req->chan2G4_cnt].tx_power > max_pwr)
@@ -2415,7 +2488,7 @@ int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw)
 			req->chan5G[req->chan5G_cnt].tx_power = chan_to_fw_pwr(b->channels[i].max_power);
 #ifdef CONFIG_POWER_LIMIT
 			{
-				max_pwr = get_powerlimit_by_freq( PHY_BAND_5G, req->chan5G[req->chan5G_cnt].freq);
+				max_pwr = get_powerlimit_by_freq( PHY_BAND_5G, req->chan5G[req->chan5G_cnt].freq, r_idx);
 				if (txpwr_loss->loss_enable_5g == 1)
 					max_pwr -= txpwr_loss->loss_value_5g;
 				if (req->chan5G[req->chan5G_cnt].tx_power > max_pwr)
@@ -2529,12 +2602,14 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 
         req->flags |= STA_VHT_CAPA;
         req->vht_cap.vht_capa_info = cpu_to_le32(rwnx_vht_capa->cap);
-        req->vht_cap.rx_highest = cpu_to_le16(rwnx_vht_capa->vht_mcs.rx_highest);
-        req->vht_cap.rx_mcs_map = cpu_to_le16(rwnx_vht_capa->vht_mcs.rx_mcs_map);
-        req->vht_cap.tx_highest = cpu_to_le16(rwnx_vht_capa->vht_mcs.tx_highest);
-        req->vht_cap.tx_mcs_map = cpu_to_le16(rwnx_vht_capa->vht_mcs.tx_mcs_map);
+        req->vht_cap.rx_highest = sta->supp_mcs.rx_highest;//cpu_to_le16(rwnx_vht_capa->vht_mcs.rx_highest);
+        req->vht_cap.rx_mcs_map = sta->supp_mcs.rx_mcs_map;//cpu_to_le16(rwnx_vht_capa->vht_mcs.rx_mcs_map);
+        req->vht_cap.tx_highest = sta->supp_mcs.tx_highest;//cpu_to_le16(rwnx_vht_capa->vht_mcs.tx_highest);
+        req->vht_cap.tx_mcs_map = sta->supp_mcs.tx_mcs_map;//cpu_to_le16(rwnx_vht_capa->vht_mcs.tx_mcs_map);
     }
 #endif
+
+	AICWFDBG(LOGDEBUG,"rx map %x  rx high %x tx map %x tx high %x \n",req->vht_cap.rx_mcs_map,req->vht_cap.rx_highest,req->vht_cap.tx_mcs_map,req->vht_cap.tx_highest);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
 	if (link_sta_params->he_capa) {
@@ -2568,13 +2643,13 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 								(struct ieee80211_he_mcs_nss_supp *)(he_capa + 1);
 		req->flags |= STA_HE_CAPA;
 		for (i = 0; i < ARRAY_SIZE(he_capa->mac_cap_info); i++) {
-			req->he_cap.mac_cap_info[i] = he_capa->mac_cap_info[i];
+			req->he_cap.mac_cap_info[i] = sta->he_cap_elem.mac_cap_info[i];//he_capa->mac_cap_info[i];
 		}
 		for (i = 0; i < ARRAY_SIZE(he_capa->phy_cap_info); i++) {
-			req->he_cap.phy_cap_info[i] = he_capa->phy_cap_info[i];
+			req->he_cap.phy_cap_info[i] = sta->he_cap_elem.phy_cap_info[i];//he_capa->phy_cap_info[i];
 		}
-		req->he_cap.mcs_supp.rx_mcs_80 = mcs_nss_supp->rx_mcs_80;
-		req->he_cap.mcs_supp.tx_mcs_80 = mcs_nss_supp->tx_mcs_80;
+		req->he_cap.mcs_supp.rx_mcs_80 = sta->he_mcs_nss_supp.rx_mcs_80;//mcs_nss_supp->rx_mcs_80;
+		req->he_cap.mcs_supp.tx_mcs_80 = sta->he_mcs_nss_supp.tx_mcs_80;//mcs_nss_supp->tx_mcs_80;
 		req->he_cap.mcs_supp.rx_mcs_160 = mcs_nss_supp->rx_mcs_160;
 		req->he_cap.mcs_supp.tx_mcs_160 = mcs_nss_supp->tx_mcs_160;
 		req->he_cap.mcs_supp.rx_mcs_80p80 = mcs_nss_supp->rx_mcs_80p80;
@@ -2582,6 +2657,9 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
     }
 	#endif
 #endif
+
+	AICWFDBG(LOGDEBUG,"rwnx sta add he mcs/nss rx mcs 80 0x%04x \n",le16_to_cpu(req->he_cap.mcs_supp.rx_mcs_80));
+	AICWFDBG(LOGDEBUG,"rwnx sta add he mcs/nss tx mcs 80 0x%04x \n",le16_to_cpu(req->he_cap.mcs_supp.tx_mcs_80));
 
 	if (params->sta_flags_set & BIT(NL80211_STA_FLAG_WME))
 		req->flags |= STA_QOS_CAPA;
@@ -2980,7 +3058,12 @@ int rwnx_send_apm_start_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *vif,
 	req->tim_len = bcn->tim_len;
 	req->chan.band = settings->chandef.chan->band;
 	req->chan.freq = settings->chandef.chan->center_freq;
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	req->chan.flags = get_chan_flags(settings->chandef.chan->flags);
+#else
 	req->chan.flags = 0;
+#endif
+	printk("chan.flags %u \n",req->chan.flags);
 	req->chan.tx_power = chan_to_fw_pwr(settings->chandef.chan->max_power);
 	req->center_freq1 = settings->chandef.center_freq1;
 	req->center_freq2 = settings->chandef.center_freq2;
@@ -4023,6 +4106,27 @@ int rwnx_send_dbg_mem_block_write_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
 
 	/* Send the DBG_MEM_BLOCK_WRITE_REQ message to LMAC FW */
 	return rwnx_send_msg(rwnx_hw, mem_blk_write_req, 1, DBG_MEM_BLOCK_WRITE_CFM, NULL);
+}
+
+int rwnx_send_dbg_mem_block_read_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
+										u32 mem_size, struct dbg_mem_block_read_cfm *cfm)
+{
+	struct dbg_mem_block_read_req *mem_blk_read_req;
+
+	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+	/* Build the DBG_MEM_BLOCK_READ_REQ message */
+	mem_blk_read_req = rwnx_msg_zalloc(DBG_MEM_BLOCK_READ_REQ, TASK_DBG, DRV_TASK_ID,
+										sizeof(struct dbg_mem_block_read_req));
+	if (!mem_blk_read_req)
+		return -ENOMEM;
+
+	/* Set parameters for the DBG_MEM_BLOCK_READ_REQ message */
+	mem_blk_read_req->memaddr = mem_addr;
+	mem_blk_read_req->memsize = mem_size;
+
+	/* Send the DBG_MEM_BLOCK_READ_REQ message to LMAC FW */
+		return rwnx_send_msg(rwnx_hw, mem_blk_read_req, 1, DBG_MEM_BLOCK_READ_CFM, cfm);
 }
 
 int rwnx_send_dbg_start_app_req(struct rwnx_hw *rwnx_hw, u32 boot_addr,

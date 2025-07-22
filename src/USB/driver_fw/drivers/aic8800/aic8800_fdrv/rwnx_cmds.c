@@ -275,6 +275,9 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 			spin_lock_bh(&cmd_mgr->lock);
 			list_del(&cmd->list);
 			cmd_mgr->queue_sz--;
+			if(cmd_mgr->queue_sz == 0){
+                rwnx_wakeup_unlock(usbdev->rwnx_hw->ws_tx);
+            }
 			spin_unlock_bh(&cmd_mgr->lock);
 			rwnx_cmd_free(cmd);//kfree(cmd);AIDEN
             if(!list_empty(&cmd_mgr->cmds) && usbdev->state == USB_UP_ST)
@@ -390,6 +393,9 @@ void cmd_mgr_task_process(struct work_struct *work)
 				spin_lock_bh(&cmd_mgr->lock);
 				list_del(&next->list);
 				cmd_mgr->queue_sz--;
+				if(cmd_mgr->queue_sz == 0){
+                    rwnx_wakeup_unlock(usbdev->rwnx_hw->ws_tx);
+                }
 				spin_unlock_bh(&cmd_mgr->lock);
 				rwnx_cmd_free(next);//kfree(next);AIDEN
 			}
@@ -501,15 +507,16 @@ static void cmd_mgr_drain(struct rwnx_cmd_mgr *cmd_mgr)
     spin_lock_bh(&cmd_mgr->lock);
     list_for_each_entry_safe(cur, nxt, &cmd_mgr->cmds, list) {
         list_del(&cur->list);
-        cmd_mgr->queue_sz--;
+        //cmd_mgr->queue_sz--;
         if (!(cur->flags & RWNX_CMD_FLAG_NONBLOCK))
             complete(&cur->complete);
     }
     spin_unlock_bh(&cmd_mgr->lock);
-    
+    #if 0
     if(cmd_mgr->queue_sz == 0){
         rwnx_wakeup_unlock(g_rwnx_plat->usbdev->rwnx_hw->ws_tx);
     }
+	#endif
 
 }
 

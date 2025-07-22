@@ -25,6 +25,7 @@
 #include <linux/udp.h>
 #include "rwnx_msg_tx.h"
 #endif
+#include "rwnx_main.h"
 
 #ifndef IEEE80211_MAX_CHAINS
 #define IEEE80211_MAX_CHAINS 4
@@ -674,6 +675,7 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
     struct rx_vector_1 *rxvect = &hw_rxhdr->hwvect.rx_vect1;
 #ifdef CONFIG_HE_FOR_OLD_KERNEL
 	struct ieee80211_he_cap_elem *he;
+	struct ieee80211_he_mcs_nss_supp *he_mcs;
 #endif
 
 	//printk("rwnx_rx_mgmt\n");
@@ -694,6 +696,12 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
         ie = cfg80211_find_ext_ie(WLAN_EID_EXT_HE_CAPABILITY, mgmt->u.assoc_req.variable, len);
         if (ie && ie[1] >= sizeof(*he) + 1) {
             printk("assoc_req: find he\n");
+			he = (struct ieee80211_he_cap_elem *)(ie+3);
+			he_mcs = (struct ieee80211_he_mcs_nss_supp *)((u8 *)he + sizeof(*he));
+			memcpy(&sta->he_cap_elem,ie+3,sizeof(struct ieee80211_he_cap_elem));
+
+			sta->he_mcs_nss_supp.rx_mcs_80 = he_mcs->rx_mcs_80;
+			sta->he_mcs_nss_supp.tx_mcs_80 = he_mcs->tx_mcs_80;
             sta->he = true;
         }
         else {
@@ -707,6 +715,8 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
         ie = cfg80211_find_ie(WLAN_EID_VHT_CAPABILITY, mgmt->u.assoc_req.variable, len);
         if (ie && ie[1] >= sizeof(*vht)) {
             printk("assoc_req: find vht\n");
+			memcpy(&sta->vht_cap_info,ie+2,4);
+			memcpy(&sta->supp_mcs,ie+2+4,sizeof(struct ieee80211_vht_mcs_info));
             sta->vht = true;
         } else {
             printk("assoc_req: no find vht\n");
@@ -722,11 +732,12 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
     }
 #endif
 
-    if (ieee80211_is_mgmt(mgmt->frame_control) &&
+    /*if (ieee80211_is_mgmt(mgmt->frame_control) &&
         (skb->len <= 24 || skb->len > 768)) {
         printk("mgmt err\n");
         return;
-    }
+    }*/
+
     if (ieee80211_is_beacon(mgmt->frame_control)) {
         if ((RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_MESH_POINT) &&
             hw_rxhdr->flags_new_peer) {
@@ -2470,13 +2481,22 @@ check_len_update:
                         dev_kfree_skb(skb);
                 }
 	        } else if( (rwnx_vif->wdev.iftype == NL80211_IFTYPE_AP) || (rwnx_vif->wdev.iftype == NL80211_IFTYPE_P2P_GO) ) {
+#ifdef CONFIG_DYNAMIC_PERPWR
+				struct rwnx_sta *sta;
+#endif
 				struct sk_buff_head list;
 				struct sk_buff *rx_skb;
+
+#ifdef CONFIG_DYNAMIC_PERPWR
+				sta = &rwnx_hw->sta_table[hw_rxhdr->flags_sta_idx];
+				rssi_update_txpwrloss(sta, hw_rxhdr->hwvect.rx_vect1.rssi1);
+#endif
+
 				u8 flags_dst_idx = hw_rxhdr->flags_dst_idx;
 				u8 flags_need_reord = hw_rxhdr->flags_need_reord;
 				u8 flags_vif_idx = hw_rxhdr->flags_vif_idx;
                 u8 flags_is_amsdu = hw_rxhdr->flags_is_amsdu;
-				u8 reord_cnt = 0;
+				//u8 reord_cnt = 0;
 				struct recv_msdu *pframe = NULL;
 
 				__skb_queue_head_init(&list);

@@ -1207,6 +1207,8 @@ bool dfs_pattern_detector_set_domain(struct dfs_pattern_detector *dpd,
     dpd->num_radar_types = rt->num_radar_types;
 
     dpd->region = region;
+
+	AICWFDBG(LOGINFO,"set_region %d \n",region);
     return true;
 }
 
@@ -1268,6 +1270,8 @@ static void rwnx_radar_detected(struct rwnx_hw *rwnx_hw)
 {
 #ifdef CONFIG_RWNX_FULLMAC
     struct cfg80211_chan_def chan_def;
+
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
 
     if (!rwnx_chanctx_valid(rwnx_hw, rwnx_hw->cur_chanctx)) {
         WARN(1, "Radar detected without channel information");
@@ -1344,9 +1348,10 @@ static void rwnx_radar_process_pulse(struct work_struct *ws)
 #ifdef CREATE_TRACE_POINTS
             trace_radar_pulse(chain, p);
 #endif
-            if (dfs_pattern_detector_add_pulse(radar->dpd[chain], chain,
-                                               (s16)freq + (2 * p->freq),
-                                               p->rep, (p->len * 2), now)) {
+		if (dfs_pattern_detector_add_pulse(radar->dpd[chain], chain,
+								(s16)freq + (2 * p->freq),
+								p->rep, (p->len * 2), now)) {
+
                 u16 idx = radar->detected[chain].index;
 
                 if (chain == RWNX_RADAR_RIU) {
@@ -1459,6 +1464,7 @@ bool rwnx_radar_set_domain(struct rwnx_radar *radar,
 
 void rwnx_radar_detection_enable(struct rwnx_radar *radar, u8 enable, u8 chain)
 {
+	//printk("%s enable:%u  chain:%u \n",__func__,enable,chain);
     if (chain < RWNX_RADAR_LAST ) {
 #ifdef CREATE_TRACE_POINTS
         trace_radar_enable_detection(radar->dpd[chain]->region, enable, chain);

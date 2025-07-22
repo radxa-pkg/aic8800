@@ -107,7 +107,7 @@ void rwnx_ps_bh_enable(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta,
         spin_unlock_bh(&rwnx_hw->tx_lock);
 
         //if (sta->ps.pkt_ready[LEGACY_PS_ID])
-        //    rwnx_set_traffic_status(rwnx_hw, sta, true, LEGACY_PS_ID);
+            //rwnx_set_traffic_status(rwnx_hw, sta, true, LEGACY_PS_ID);
 
         //if (sta->ps.pkt_ready[UAPSD_ID])
         //    rwnx_set_traffic_status(rwnx_hw, sta, true, UAPSD_ID);
@@ -132,8 +132,8 @@ void rwnx_ps_bh_enable(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta,
         rwnx_txq_sta_start(sta, RWNX_TXQ_STOP_STA_PS, rwnx_hw);
         spin_unlock_bh(&rwnx_hw->tx_lock);
 
-        //if (sta->ps.pkt_ready[LEGACY_PS_ID])
-        //    rwnx_set_traffic_status(rwnx_hw, sta, false, LEGACY_PS_ID);
+        if (sta->ps.pkt_ready[LEGACY_PS_ID])
+            rwnx_set_traffic_status(rwnx_hw, sta, false, LEGACY_PS_ID);
 
         //if (sta->ps.pkt_ready[UAPSD_ID])
         //    rwnx_set_traffic_status(rwnx_hw, sta, false, UAPSD_ID);

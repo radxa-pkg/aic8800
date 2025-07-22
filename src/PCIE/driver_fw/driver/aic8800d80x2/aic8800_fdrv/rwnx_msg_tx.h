@@ -14,7 +14,10 @@
 #define _RWNX_MSG_TX_H_
 
 #include "rwnx_defs.h"
-
+struct rwnx_cmd *rwnx_cmd_malloc(void);
+void rwnx_cmd_free(struct rwnx_cmd *cmd);
+int rwnx_init_cmd_array(void);
+void rwnx_free_cmd_array(void);
 int rwnx_send_reset(struct rwnx_hw *rwnx_hw);
 int rwnx_send_start(struct rwnx_hw *rwnx_hw);
 int rwnx_send_version_req(struct rwnx_hw *rwnx_hw, struct mm_version_cfm *cfm);
@@ -65,9 +68,16 @@ int rwnx_send_rf_config_req(struct rwnx_hw *rwnx_hw, u8_l ofst, u8_l sel, u8_l *
 int rwnx_send_rf_calib_req(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *cfm);
 int rwnx_send_get_macaddr_req(struct rwnx_hw *rwnx_hw, struct mm_get_mac_addr_cfm *cfm);
 
+#ifdef CONFIG_TEMP_CONTROL
+int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
+#endif
+#ifdef CONFIG_TEMP_COMP
+int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
+#endif
+
 #ifdef CONFIG_RWNX_FULLMAC
 int rwnx_send_me_config_req(struct rwnx_hw *rwnx_hw);
-int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw);
+int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw, char *ccode);
 int rwnx_send_me_set_control_port_req(struct rwnx_hw *rwnx_hw, bool opened,
 									  u8 sta_idx);
 int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *params,
@@ -157,6 +167,8 @@ int rwnx_send_dbg_get_sys_stat_req(struct rwnx_hw *rwnx_hw,
 								   struct dbg_get_sys_stat_cfm *cfm);
 int rwnx_send_dbg_mem_block_write_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
 									  u32 mem_size, u32 *mem_data);
+int rwnx_send_dbg_mem_block_read_req(struct rwnx_hw *rwnx_hw, u32 mem_addr,
+									u32 mem_size, struct dbg_mem_block_read_cfm *cfm);
 int rwnx_send_dbg_start_app_req(struct rwnx_hw *rwnx_hw, u32 boot_addr,
 								u32 boot_type);
 int rwnx_send_cfg_rssi_req(struct rwnx_hw *rwnx_hw, u8 vif_index, int rssi_thold, u32 rssi_hyst);
@@ -177,6 +189,9 @@ int rwnx_send_txpwr_lvl_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_v3_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_v4_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_adj_req(struct rwnx_hw *rwnx_hw);
+#ifdef CONFIG_DYNAMIC_PERPWR
+int rwnx_send_txpwr_per_sta_req(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta);
+#endif
 int rwnx_send_resume_restore(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,
 					u8_l fwtrace_redir_en, struct rwnx_vif *vif);
 int rwnx_prepare_resume_restore_req(struct rwnx_hw *rwnx_hw, lmac_msg_id_t const id, void *param, u16_l const param_len);

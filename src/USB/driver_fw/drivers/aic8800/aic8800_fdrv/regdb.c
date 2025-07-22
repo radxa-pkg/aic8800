@@ -1800,6 +1800,19 @@ static const struct ieee80211_regdomain regdom_MY = {
 	.n_reg_rules = 4
 };
 
+static const struct ieee80211_regdomain regdom_NG = {
+    .alpha2 = "NG",
+    .dfs_region = NL80211_DFS_ETSI,
+    .reg_rules = {
+        REG_RULE_EXT(2402, 2482, 40, 0, 20, 0, 0),
+        REG_RULE_EXT(5250, 5330, 80, 0, 20, 0, NL80211_RRF_DFS|
+          0),
+        REG_RULE_EXT(5735, 5835, 80, 0, 20, 0, 0),
+    },
+    .n_reg_rules = 3
+};
+
+
 static const struct ieee80211_regdomain regdom_NI = {
 	.alpha2 = "NI",
 	.dfs_region = NL80211_DFS_FCC,
@@ -2810,6 +2823,7 @@ const struct ieee80211_regdomain *reg_regdb[] = {
 	&regdom_MW,
 	&regdom_MX,
 	&regdom_MY,
+	&regdom_NG,
 	&regdom_NI,
 	&regdom_NL,
 	&regdom_NO,

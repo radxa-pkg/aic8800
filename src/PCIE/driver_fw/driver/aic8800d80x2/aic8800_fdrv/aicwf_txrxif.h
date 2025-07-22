@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include "ipc_shared.h"
 #include "aicwf_rx_prealloc.h"
+#include "aicwf_debug.h"
 #ifdef AICWF_SDIO_SUPPORT
 #include "aicwf_sdio.h"
 #else
@@ -27,37 +28,56 @@
 
 #define RX_HWHRD_LEN                60 //58->60 word allined
 #define CCMP_OR_WEP_INFO            8
-#define MAX_RXQLEN                  2000
+#define MAX_RXQLEN                  10000
 #define RX_ALIGNMENT                4
 
-#define DEBUG_ERROR_LEVEL           0
-#define DEBUG_DEBUG_LEVEL           1
-#define DEBUG_INFO_LEVEL            2
+//#define DEBUG_ERROR_LEVEL           0
+//#define DEBUG_DEBUG_LEVEL           1
+//#define DEBUG_INFO_LEVEL            2
 
-#define DBG_LEVEL                   DEBUG_DEBUG_LEVEL
+//#define DBG_LEVEL                   DEBUG_DEBUG_LEVEL
 
 #define txrx_err(fmt, ...)          pr_err("txrx_err:<%s,%d>: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define sdio_err(fmt, ...)          pr_err("sdio_err:<%s,%d>: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define pcie_err(fmt, ...)          pr_err("pcie_err:<%s,%d>: " fmt, __func__, __LINE__, ##__VA_ARGS__)
 #define usb_err(fmt, ...)           pr_err("usb_err:<%s,%d>: " fmt, __func__, __LINE__, ##__VA_ARGS__)
-#if DBG_LEVEL >= DEBUG_DEBUG_LEVEL
-#define txrx_dbg(fmt, ...)          printk("txrx: " fmt, ##__VA_ARGS__)
-#define sdio_dbg(fmt, ...)          printk("aicsdio: " fmt, ##__VA_ARGS__)
-#define usb_dbg(fmt, ...)           printk("aicusb: " fmt, ##__VA_ARGS__)
-#else
-#define txrx_dbg(fmt, ...)
-#define sdio_dbg(fmt, ...)
-#define usb_dbg(fmt, ...)
-#endif
-#if DBG_LEVEL >= DEBUG_INFO_LEVEL
-#define txrx_info(fmt, ...)         printk("aicsdio: " fmt, ##__VA_ARGS__)
-#define sdio_info(fmt, ...)         printk("aicsdio: " fmt, ##__VA_ARGS__)
-#define usb_info(fmt, ...)          printk("aicusb: " fmt, ##__VA_ARGS__)
-#else
-#define txrx_info(fmt, ...)
-#define sdio_info(fmt, ...)
-#define usb_info(fmt, ...)
-#endif
+#define txrx_dbg(fmt, ...)	\
+do {	\
+	if (aicwf_dbg_level & LOGDEBUG) {	\
+		printk("aicpcie: " fmt, ##__VA_ARGS__); \
+	}	\
+} while (0)
+#define sdio_dbg(fmt, ...)	\
+do {	\
+	if (aicwf_dbg_level & LOGDEBUG) {	\
+		printk("aicsdio: " fmt, ##__VA_ARGS__); \
+	}	\
+} while (0)
+#define usb_dbg(fmt, ...)	\
+do {	\
+	if (aicwf_dbg_level & LOGDEBUG) {	\
+		printk("aicusb: " fmt, ##__VA_ARGS__); \
+	}	\
+} while (0)
+
+#define txrx_info(fmt, ...)	\
+do {	\
+	if (aicwf_dbg_level & LOGINFO) {	\
+		printk("aicpcie: " fmt, ##__VA_ARGS__); \
+	}	\
+} while (0)
+#define sdio_info(fmt, ...)	\
+do {	\
+	if (aicwf_dbg_level & LOGINFO) {	\
+		printk("aicsdio: " fmt, ##__VA_ARGS__); \
+	}	\
+} while (0)
+#define usb_info(fmt, ...)	\
+do {	\
+	if (aicwf_dbg_level & LOGINFO) {	\
+		printk("aicusb: " fmt, ##__VA_ARGS__); \
+	}	\
+} while (0)
 
 enum aicwf_bus_state {
 	BUS_DOWN_ST,
@@ -101,6 +121,10 @@ struct aicwf_bus {
 	struct completion busrx_trgg;
 	struct task_struct *bustx_thread;
 	struct task_struct *busrx_thread;
+#ifndef CONFIG_RX_TASKLET
+    struct completion rx_trgg;
+    struct task_struct *rx_thread;
+#endif
 };
 
 struct aicwf_tx_priv {
@@ -196,6 +220,7 @@ struct aicwf_rx_priv {
 
 	void *rwnx_vif;
 	atomic_t rx_cnt;
+    atomic_t rx_wait;
 	u32 data_len;
 	spinlock_t rxqlock;
 	#ifdef CONFIG_PREALLOC_RX_SKB
@@ -257,8 +282,8 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg);
 struct aicwf_rx_priv *aicwf_rx_init(void *arg);
 void aicwf_frame_queue_init(struct frame_queue *pq, int num_prio, int max_len);
 void aicwf_frame_queue_flush(struct frame_queue *pq);
-bool aicwf_frame_enq(struct device *dev, struct frame_queue *q, struct sk_buff *pkt, int prio);
-bool aicwf_rxframe_enqueue(struct device *dev, struct frame_queue *q, struct sk_buff *pkt);
+bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio);
+bool aicwf_rxframe_enqueue(struct frame_queue *q, struct sk_buff *pkt);
 bool aicwf_is_framequeue_empty(struct frame_queue *pq);
 void aicwf_frame_tx(void *dev, struct sk_buff *skb);
 void aicwf_dev_skb_free(struct sk_buff *skb);

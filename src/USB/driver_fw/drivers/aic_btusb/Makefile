@@ -24,6 +24,11 @@ CONFIG_PLATFORM_ALLWINNER ?= n
 CONFIG_PLATFORM_AMLOGIC ?= n
 CONFIG_PLATFORM_UBUNTU ?= y
 
+
+# MTK linux platform use bluedroid
+CONFIG_PLATFORM_MTK_LINUX ?= n
+
+
 ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
 ccflags-$(CONFIG_PLATFORM_ROCKCHIP) += -DCONFIG_PLATFORM_ROCKCHIP
 KDIR  := /home/yaya/E/Rockchip/3229/Android9/rk3229_android9.0_box/kernel
@@ -55,6 +60,10 @@ MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
 SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
 ARCH ?= $(SUBARCH)
 CROSS_COMPILE :=
+endif
+
+ifeq ($(CONFIG_PLATFORM_MTK_LINUX), y)
+        ccflags-$(CONFIG_PLATFORM_MTK_LINUX) += -DCONFIG_PLATFORM_MTK_LINUX
 endif
 
 all: modules

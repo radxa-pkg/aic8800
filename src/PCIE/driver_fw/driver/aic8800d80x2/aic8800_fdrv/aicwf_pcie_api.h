@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include "aicwf_pcie.h"
+#include "aicwf_debug.h"
 
 //#define AIC_PCIE_API_DELAY      1
 
@@ -20,7 +21,7 @@
 #define AIC_MAP_SCTL_ADDR       0x40500000
 #define AIC_MAP_SHRM_BASE       0x8000
 #define AIC_MAP_SHRM_LIMT       0xffff
-#define AIC_MAP_SHRM_ADDR       0x00190000//0x001a0000
+#define AIC_MAP_SHRM_ADDR       0x001D8000//0x001a0000
 
 //# for aic dma descriptor
 #define AIC_MAP_SHRM_DMA_OFF    0x4000
@@ -58,19 +59,32 @@ struct aicdma {
     u32 next;
 };
 
+
 #ifndef LOG_INFO
 #define LOG_INFO(fmt, args...) \
-		printk("aicpcie: " fmt, ##args)
+do {	\
+	if (aicwf_dbg_level & LOGINFO) {	\
+		printk("aicpcie: " fmt, ##args);	\
+	}	\
+} while (0)
 #endif
 
 #ifndef LOG_ERROR
 #define LOG_ERROR(fmt, args...) \
-		printk("aicpcie: " fmt, ##args)
+do {	\
+	if (aicwf_dbg_level & LOGERROR) {	\
+		printk("aicpcie: " fmt, ##args);	\
+	}	\
+} while (0)
 #endif
 
 #ifndef LOG_WARN
 #define LOG_WARN(fmt, args...) \
-		printk("aicpcie: " fmt, ##args)
+do {	\
+	if (aicwf_dbg_level & LOGERROR) {	\
+		printk("aicpcie: " fmt, ##args);	\
+	}	\
+} while (0)
 #endif
 
 void aicwf_pcie_cfg_x(struct aic_pci_dev *adev, u32 addr, u32 wr);
@@ -82,6 +96,7 @@ int  aicwf_pcie_test_dma(struct aic_pci_dev *adev, u32 off, u16 wlen, u8 dir);
 int  aicwf_pcie_test_accs_emb(struct aic_pci_dev *adev);
 int  aicwf_pcie_test_msi(struct aic_pci_dev *adev);
 int  aicwf_pcie_setst(struct aic_pci_dev *adev);
-
+void aicwf_pcie_print_st(struct aic_pci_dev *adev, u32 sim);
+void aic_pcie_map_set(struct aic_pci_dev *adev, u8 idx, u32 base, u32 limt, u32 addr);
 #endif
 

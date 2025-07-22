@@ -17,6 +17,7 @@
 #include <sound/initval.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
+#include <linux/compat.h>
 
 #define USB_OR_UART         0//if driver is usb ,value is 1. if driver is uart ,value is 0
 #define AIC_SCO_PRINT       0
@@ -75,6 +76,7 @@ struct snd_sco_cap_timer {
 	struct timer_list play_timer;
 	struct uart_sco_data *snd_data;
 	int snd_sco_length;
+	int sco_wr_length;
 };
 static struct snd_sco_cap_timer snd_cap_timer;
 static struct uart_sco_data p_uart_sco;
@@ -750,7 +752,7 @@ static ssize_t ioctl_read(struct file *file_p,
         loff_t *pos_p)
 {
     ssize_t ret = 0;
-    unsigned short temp_data[240];
+    unsigned short temp_data[1024];
     unsigned short *temp_ptr = NULL;
 
 	struct uart_sco_data *data = file_p->private_data;
@@ -766,12 +768,29 @@ static ssize_t ioctl_read(struct file *file_p,
     if(test_bit(ALSA_PLAYBACK_RUNNING, &data->pSCOSnd->states)){
 		runtime = data->pSCOSnd->playback.substream->runtime;
 		period_size = runtime->period_size;
-		buffer = (u8 *)vmalloc((3*period_size)+1);
+		buffer = (u8 *)vmalloc(2048);
         sco_count = snd_copy_send_sco_data(data->pSCOSnd,&buffer[1]);
 #if AIC_SCO_PRINT
 		printk("%s sco_count %d,sco_packet_bytes %d, 1 %d, 2 %d\r\n", __func__,sco_count,sco_packet_bytes,\
 		data->pSCOSnd->capture.sco_packet_bytes,snd_cap_timer.snd_sco_length);
 #endif
+        if(snd_cap_timer.snd_sco_length==0) {
+            if(snd_cap_timer.sco_wr_length) {
+                switch(pSCOSnd->playback.channels){
+                    case 1:
+                        snd_cap_timer.snd_sco_length = snd_cap_timer.sco_wr_length;
+                        break;
+                    case 2:
+                        snd_cap_timer.snd_sco_length = snd_cap_timer.sco_wr_length*2;
+                        break;
+                    default:
+#if AIC_SCO_PRINT
+                        printk("%s playback.channels error\r\n", __func__);
+#endif
+                        break;
+                }
+            }
+        }
 		if (sco_packet_bytes != snd_cap_timer.snd_sco_length) {
 			if (sco_packet_bytes > snd_cap_timer.snd_sco_length) {
 				buffer[0] = sco_count * (sco_packet_bytes/snd_cap_timer.snd_sco_length);
@@ -888,7 +907,7 @@ static ssize_t ioctl_write(struct file *file_p,
                 }
                 break;
             default:
-		snd_cap_timer.snd_sco_length = count;
+                snd_cap_timer.sco_wr_length = count;
                 break;
         }
 	}
@@ -928,7 +947,7 @@ static long ioctl_ioctl(struct file *file_p,unsigned int cmd, unsigned long arg)
     return 0;
 }
 
-
+static inline void __user *compat_ptr(compat_uptr_t uptr);
 #ifdef CONFIG_COMPAT
 static long compat_ioctlchr_ioctl (struct file *filp, unsigned int cmd, unsigned long arg)
 {

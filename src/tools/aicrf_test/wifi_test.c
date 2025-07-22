@@ -57,6 +57,36 @@ typedef struct cob_result_ptr_t {
 	int8_t dut_rssi_static;
 	u_int16_t reserved;
 }cob_result_ptr_t;
+
+struct aicwf_cs_info {
+    u_int8_t phymode;
+    u_int8_t bandwidth;
+    u_int16_t freq;
+
+    int8_t rssi;
+    int8_t snr;
+    int8_t noise;
+    u_int8_t txpwr;
+
+    //chanutil
+    u_int16_t chan_time_ms;
+    u_int16_t chan_time_busy_ms;
+
+    char countrycode[4];
+    u_int8_t rxnss;
+    u_int8_t rxmcs;
+    u_int8_t txnss;
+    u_int8_t txmcs;
+
+    u_int32_t tx_phyrate;
+    u_int32_t rx_phyrate;
+
+    u_int32_t tx_ack_succ_stat;
+    u_int32_t tx_ack_fail_stat;
+
+    u_int16_t chan_tx_time_busy_ms;
+};
+
 int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 {
 	int sock;
@@ -107,6 +137,9 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 		if (argC < 8) {
 			is_param_err = 1;
 		}
+	} else if (strcasecmp(argV[2], "country_set") == 0) {
+		if (argC < 3)
+			is_param_err = 1;
 	} else if (strcasecmp(argV[2], "SET_TXTONE") == 0) {
 		if (((argC == 4) && (argV[3][0] != '0'))
 			|| ((argC == 5) && (argV[3][0] == '0'))) {
@@ -475,22 +508,27 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 		}
 		#elif (CHIP_SELECT == CHIP_AIC8800D80X2)
         int type, ch_grp;
+		int tmp_index_fls = 3*3 + 3*3 + 3*6 + 3*6;
+		signed char * rem_buff_fls ;
+		rem_buff_fls = (signed char *)&priv_cmd.buf[tmp_index_fls];
         printf("done:\n"
             "ef_pwrofst2x_2.4g(ant0/ant1): [0]:11b, [1]:ofdm_highrate\n"
             "  chan=" "\t1-4" "\t5-9" "\t10-13");
             for (type = 0; type < 2; type++) {
             printf("\n  [%d] =", type);
             for (ch_grp = 0; ch_grp < 3; ch_grp++) {
-                printf("\t%d/%d", buff[type + 3 * ch_grp], buff[type + 3 * ch_grp + 3 * 3]);
+                printf("\t%d(r:%x)/%d(r:%x)", buff[type + 3 * ch_grp],rem_buff_fls[type + 3 * ch_grp],
+					buff[type + 3 * ch_grp + 3 * 3],rem_buff_fls[type + 3 * ch_grp + 3 * 3]);
             }
         }
-        printf("\nef_pwrofst2x_5g(ant0/ant1): [0]:ofdm_lowrate, [1]:ofdm_highrate\n"
+        printf("\nef_pwrofst2x_5g(ant0/ant1): [0]:ofdm_highrate\n"
             "  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
         buff = (signed char *)&priv_cmd.buf[3 * 3 * 2];
         for (type = 0; type < 1; type++) {
             printf("\n  [%d] =", type);
             for (ch_grp = 0; ch_grp < 6; ch_grp++) {
-                printf("\t%d/%d", buff[type + 3 *ch_grp], buff[type + 3 *ch_grp + 3 * 6]);
+                printf("\t%d(r:%x)/%d(r:%x)", buff[type + 3 *ch_grp],rem_buff_fls[type + 3 *ch_grp + 18],
+					buff[type + 3 *ch_grp + 3 * 6],rem_buff_fls[type + 3 *ch_grp + 3 * 6 + 18]);
             }
         }
         printf("\n");
@@ -617,8 +655,27 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 	} else if (strcasecmp(argV[2], "RDWR_BT_EFUSE_PWROFST") == 0) {
 		signed char *buff = (signed char *)&priv_cmd.buf[0];
 		printf("done: bt efsue pwrofst %d (remain: %x)\n", priv_cmd.buf[0], priv_cmd.buf[1]);
-	}
-	else {
+	} else if(strcasecmp(argV[2], "GET_CS_INFO") == 0) {
+		struct aicwf_cs_info *cs_info = (struct aicwf_cs_info *)priv_cmd.buf;
+		printf("phymode=%d(0:B 1:G 2:A 3:N 4:AC 5:AX)\n", cs_info->phymode);
+		printf("bandwidth=%d(0:20 1:40 2:80)\n", cs_info->bandwidth);
+		printf("freq=%d\n", cs_info->freq);
+		printf("rssi=%d\n", cs_info->rssi);
+		printf("snr=%d\n", cs_info->snr);
+		printf("noise=%d\n", cs_info->noise);
+		printf("txpwr=%d\n", cs_info->txpwr);
+		//chanutil
+		printf("chan rxbusy times=%d/%d(ms), txbusy times=%d/%d(ms)\n", cs_info->chan_time_busy_ms, cs_info->chan_time_ms, cs_info->chan_tx_time_busy_ms, cs_info->chan_time_ms);
+		printf("coutry code =%s\n", cs_info->countrycode);
+		printf("rx nss=%d, mcs=%x\n", cs_info->rxnss, cs_info->rxmcs);
+		printf("tx nss=%d, mcs=%x\n", cs_info->txnss, cs_info->txmcs);
+		printf("tx_phyrate=%d(Kbps)\n", cs_info->tx_phyrate);
+		printf("rx_phyrate=%d(Kbps)\n", cs_info->rx_phyrate);
+		printf("tx_ack_succ_stat=%d\n", cs_info->tx_ack_succ_stat);
+		printf("tx_ack_fail_stat=%d\n", cs_info->tx_ack_fail_stat);
+	} else if(strcasecmp(argV[2], "GET_NOISE") == 0) {
+		printf("noise: %d,%d\n", priv_cmd.buf[0], priv_cmd.buf[1]);
+        } else {
 		printf("done\n");
 	}
 
@@ -633,12 +690,18 @@ int main(int argC, char *argV[])
 	//char* ko = "rwnx_fdrv.ko";
 
 	//printf("enter!!!AIC    argC=%d    argV[0]=%s    argV[1]=%s    argV[2]=%s\n", argC, argV[0], argV[1],argV[2]);
-	if(argC >= 3)
+	if (argC == 1) {
+		printf("Please enter parameters!\n");
+		return -1;
+	}
+
+	if (argC >= 3)
 		wifi_send_cmd_to_net_interface(argV[1], argC, argV);
 	else if ((strcasecmp(argV[1], "-v") == 0) || (strcasecmp(argV[1], "version") == 0))
 		printf("wifi_test %s_%d\n", RELEASE_DATE, CHIP_SELECT);
 	else
 		printf("Bad parameter! %d\n",argC);
+
 
 	return 0;
 }

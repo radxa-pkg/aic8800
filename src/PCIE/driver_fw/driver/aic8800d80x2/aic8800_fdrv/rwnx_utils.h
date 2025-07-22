@@ -24,10 +24,17 @@
 #define RWNX_FN_ENTRY_STR ">>> %s()\n", __func__
 #endif
 
+//because android kernel 5.15 uses kernel 6.0 or 6.1 kernel api
 #ifdef ANDROID_PLATFORM
 #define HIGH_KERNEL_VERSION KERNEL_VERSION(5, 15, 41)
+#define HIGH_KERNEL_VERSION2 KERNEL_VERSION(5, 15, 41)
+#define HIGH_KERNEL_VERSION3 KERNEL_VERSION(5, 15, 104)
+#define HIGH_KERNEL_VERSION4 KERNEL_VERSION(6, 1, 0)
 #else
 #define HIGH_KERNEL_VERSION KERNEL_VERSION(6, 0, 0)
+#define HIGH_KERNEL_VERSION2 KERNEL_VERSION(6, 1, 0)
+#define HIGH_KERNEL_VERSION3 KERNEL_VERSION(6, 3, 0)
+#define HIGH_KERNEL_VERSION4 KERNEL_VERSION(6, 3, 0)
 #endif
 
 enum rwnx_dev_flag {
@@ -102,11 +109,15 @@ static const u32 rwnx_tx_pattern = 0xCAFEFADE;
 /**
  * IPC environment control
  */
+void rwnx_pcie_shared_init(struct rwnx_hw *rwnx_hw);
+int rwnx_init_aic(struct rwnx_hw *rwnx_hw);
+void rwnx_aic_deinit(struct rwnx_hw *rwnx_hw);
 int rwnx_ipc_init(struct rwnx_hw *rwnx_hw, u8 *shared_ram);
 void rwnx_ipc_deinit(struct rwnx_hw *rwnx_hw);
 void rwnx_ipc_start(struct rwnx_hw *rwnx_hw);
 void rwnx_ipc_stop(struct rwnx_hw *rwnx_hw);
 void rwnx_ipc_msg_push(struct rwnx_hw *rwnx_hw, void *msg_buf, uint16_t len);
+void aic_host_tx_flush(struct rwnx_hw *rwnx_hw);
 
 /**
  * IPC buffer management

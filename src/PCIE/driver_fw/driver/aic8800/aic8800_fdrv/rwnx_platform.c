@@ -112,8 +112,10 @@ userconfig_info_t userconfig_info = {
             { 20,   20,   20,   20,   18,   18,   16,   16,   16,   15,   14,   14},
     },
     .txpwr_loss = {
-		.loss_enable	  = 1,
-		.loss_value 	  = 0,
+		.loss_enable_2g4 = 0,
+		.loss_value_2g4  = 0,
+		.loss_enable_5g  = 0,
+		.loss_value_5g   = 0,
 	},
     .txpwr_ofst = {
         .enable       = 1,
@@ -147,6 +149,262 @@ userconfig_info_t userconfig_info = {
     },
 };
 
+typedef struct {
+	char ccode[3];
+	Regions_code region;
+} reg_table;
+
+/* If the region conflicts with the kernel, the actual authentication standard prevails */
+reg_table reg_tables[] = {
+	{.ccode = "CN", .region = REGIONS_SRRC},
+	{.ccode = "US", .region = REGIONS_FCC},
+	{.ccode = "DE", .region = REGIONS_ETSI},
+	{.ccode = "00", .region = REGIONS_DEFAULT},
+	{.ccode = "WW", .region = REGIONS_DEFAULT},
+	{.ccode = "XX", .region = REGIONS_DEFAULT},
+	{.ccode = "JP", .region = REGIONS_JP},
+	{.ccode = "AD", .region = REGIONS_ETSI},
+	{.ccode = "AE", .region = REGIONS_ETSI},
+	{.ccode = "AF", .region = REGIONS_ETSI},
+	{.ccode = "AI", .region = REGIONS_ETSI},
+	{.ccode = "AL", .region = REGIONS_ETSI},
+	{.ccode = "AM", .region = REGIONS_ETSI},
+	{.ccode = "AN", .region = REGIONS_ETSI},
+	{.ccode = "AR", .region = REGIONS_FCC},
+	{.ccode = "AS", .region = REGIONS_FCC},
+	{.ccode = "AT", .region = REGIONS_ETSI},
+	{.ccode = "AU", .region = REGIONS_ETSI},
+	{.ccode = "AW", .region = REGIONS_ETSI},
+	{.ccode = "AZ", .region = REGIONS_ETSI},
+	{.ccode = "BA", .region = REGIONS_ETSI},
+	{.ccode = "BB", .region = REGIONS_FCC},
+	{.ccode = "BD", .region = REGIONS_JP},
+	{.ccode = "BE", .region = REGIONS_ETSI},
+	{.ccode = "BF", .region = REGIONS_FCC},
+	{.ccode = "BG", .region = REGIONS_ETSI},
+	{.ccode = "BH", .region = REGIONS_ETSI},
+	{.ccode = "BL", .region = REGIONS_ETSI},
+	{.ccode = "BM", .region = REGIONS_FCC},
+	{.ccode = "BN", .region = REGIONS_JP},
+	{.ccode = "BO", .region = REGIONS_JP},
+	{.ccode = "BR", .region = REGIONS_FCC},
+	{.ccode = "BS", .region = REGIONS_FCC},
+	{.ccode = "BT", .region = REGIONS_ETSI},
+	{.ccode = "BW", .region = REGIONS_ETSI},
+	{.ccode = "BY", .region = REGIONS_ETSI},
+	{.ccode = "BZ", .region = REGIONS_JP},
+	{.ccode = "CA", .region = REGIONS_FCC},
+	{.ccode = "CF", .region = REGIONS_FCC},
+	{.ccode = "CH", .region = REGIONS_ETSI},
+	{.ccode = "CI", .region = REGIONS_FCC},
+	{.ccode = "CL", .region = REGIONS_ETSI},
+	{.ccode = "CO", .region = REGIONS_FCC},
+	{.ccode = "CR", .region = REGIONS_FCC},
+	{.ccode = "CX", .region = REGIONS_FCC},
+	{.ccode = "CY", .region = REGIONS_ETSI},
+	{.ccode = "CZ", .region = REGIONS_ETSI},
+	{.ccode = "DK", .region = REGIONS_ETSI},
+	{.ccode = "DM", .region = REGIONS_FCC},
+	{.ccode = "DO", .region = REGIONS_FCC},
+	{.ccode = "DZ", .region = REGIONS_JP},
+	{.ccode = "EC", .region = REGIONS_FCC},
+	{.ccode = "EE", .region = REGIONS_ETSI},
+	{.ccode = "EG", .region = REGIONS_ETSI},
+	{.ccode = "ES", .region = REGIONS_ETSI},
+	{.ccode = "ET", .region = REGIONS_ETSI},
+	{.ccode = "FI", .region = REGIONS_ETSI},
+	{.ccode = "FM", .region = REGIONS_FCC},
+	{.ccode = "FR", .region = REGIONS_ETSI},
+	{.ccode = "GB", .region = REGIONS_ETSI},
+	{.ccode = "GD", .region = REGIONS_FCC},
+	{.ccode = "GE", .region = REGIONS_ETSI},
+	{.ccode = "GF", .region = REGIONS_ETSI},
+	{.ccode = "GH", .region = REGIONS_FCC},
+	{.ccode = "GI", .region = REGIONS_ETSI},
+	{.ccode = "GL", .region = REGIONS_ETSI},
+	{.ccode = "GP", .region = REGIONS_ETSI},
+	{.ccode = "GR", .region = REGIONS_ETSI},
+	{.ccode = "GT", .region = REGIONS_FCC},
+	{.ccode = "GU", .region = REGIONS_FCC},
+	{.ccode = "GY", .region = REGIONS_DEFAULT},
+	{.ccode = "HK", .region = REGIONS_ETSI},
+	{.ccode = "HN", .region = REGIONS_FCC},
+	{.ccode = "HR", .region = REGIONS_ETSI},
+	{.ccode = "HT", .region = REGIONS_FCC},
+	{.ccode = "HU", .region = REGIONS_ETSI},
+	{.ccode = "ID", .region = REGIONS_ETSI},
+	{.ccode = "IE", .region = REGIONS_ETSI},
+	{.ccode = "IL", .region = REGIONS_ETSI},
+	{.ccode = "IN", .region = REGIONS_ETSI},
+	{.ccode = "IQ", .region = REGIONS_ETSI},
+	{.ccode = "IR", .region = REGIONS_JP},
+	{.ccode = "IS", .region = REGIONS_ETSI},
+	{.ccode = "IT", .region = REGIONS_ETSI},
+	{.ccode = "JM", .region = REGIONS_FCC},
+	{.ccode = "JO", .region = REGIONS_ETSI},
+	{.ccode = "KE", .region = REGIONS_ETSI},
+	{.ccode = "KG", .region = REGIONS_ETSI},
+	{.ccode = "KH", .region = REGIONS_ETSI},
+	{.ccode = "KN", .region = REGIONS_ETSI},
+	{.ccode = "KP", .region = REGIONS_JP},
+	{.ccode = "KR", .region = REGIONS_ETSI},
+	{.ccode = "KW", .region = REGIONS_ETSI},
+	{.ccode = "KY", .region = REGIONS_FCC},
+	{.ccode = "KZ", .region = REGIONS_DEFAULT},
+	{.ccode = "LB", .region = REGIONS_ETSI},
+	{.ccode = "LC", .region = REGIONS_ETSI},
+	{.ccode = "LI", .region = REGIONS_ETSI},
+	{.ccode = "LK", .region = REGIONS_FCC},
+	{.ccode = "LS", .region = REGIONS_ETSI},
+	{.ccode = "LT", .region = REGIONS_ETSI},
+	{.ccode = "LU", .region = REGIONS_ETSI},
+	{.ccode = "LV", .region = REGIONS_ETSI},
+	{.ccode = "LY", .region = REGIONS_ETSI},
+	{.ccode = "MA", .region = REGIONS_ETSI},
+	{.ccode = "MC", .region = REGIONS_ETSI},
+	{.ccode = "MD", .region = REGIONS_ETSI},
+	{.ccode = "ME", .region = REGIONS_ETSI},
+	{.ccode = "MF", .region = REGIONS_ETSI},
+	{.ccode = "MH", .region = REGIONS_FCC},
+	{.ccode = "MK", .region = REGIONS_ETSI},
+	{.ccode = "MN", .region = REGIONS_ETSI},
+	{.ccode = "MO", .region = REGIONS_ETSI},
+	{.ccode = "MP", .region = REGIONS_FCC},
+	{.ccode = "MQ", .region = REGIONS_ETSI},
+	{.ccode = "MR", .region = REGIONS_ETSI},
+	{.ccode = "MT", .region = REGIONS_ETSI},
+	{.ccode = "MU", .region = REGIONS_FCC},
+	{.ccode = "MV", .region = REGIONS_ETSI},
+	{.ccode = "MW", .region = REGIONS_ETSI},
+	{.ccode = "MX", .region = REGIONS_FCC},
+	{.ccode = "MY", .region = REGIONS_FCC},
+	{.ccode = "NA", .region = REGIONS_ETSI},
+	{.ccode = "NG", .region = REGIONS_ETSI},
+	{.ccode = "NI", .region = REGIONS_FCC},
+	{.ccode = "NL", .region = REGIONS_ETSI},
+	{.ccode = "NO", .region = REGIONS_ETSI},
+	{.ccode = "NP", .region = REGIONS_JP},
+	{.ccode = "NZ", .region = REGIONS_ETSI},
+	{.ccode = "OM", .region = REGIONS_ETSI},
+	{.ccode = "PA", .region = REGIONS_FCC},
+	{.ccode = "PE", .region = REGIONS_FCC},
+	{.ccode = "PF", .region = REGIONS_ETSI},
+	{.ccode = "PG", .region = REGIONS_FCC},
+	{.ccode = "PH", .region = REGIONS_FCC},
+	{.ccode = "PK", .region = REGIONS_ETSI},
+	{.ccode = "PL", .region = REGIONS_ETSI},
+	{.ccode = "PM", .region = REGIONS_ETSI},
+	{.ccode = "PR", .region = REGIONS_FCC},
+	{.ccode = "PT", .region = REGIONS_ETSI},
+	{.ccode = "PW", .region = REGIONS_FCC},
+	{.ccode = "PY", .region = REGIONS_FCC},
+	{.ccode = "QA", .region = REGIONS_ETSI},
+	{.ccode = "RE", .region = REGIONS_ETSI},
+	{.ccode = "RO", .region = REGIONS_ETSI},
+	{.ccode = "RS", .region = REGIONS_ETSI},
+	{.ccode = "RU", .region = REGIONS_ETSI},
+	{.ccode = "RW", .region = REGIONS_FCC},
+	{.ccode = "SA", .region = REGIONS_ETSI},
+	{.ccode = "SE", .region = REGIONS_ETSI},
+	{.ccode = "SG", .region = REGIONS_ETSI},
+	{.ccode = "SI", .region = REGIONS_ETSI},
+	{.ccode = "SK", .region = REGIONS_ETSI},
+	{.ccode = "SM", .region = REGIONS_ETSI},
+	{.ccode = "SN", .region = REGIONS_FCC},
+	{.ccode = "SR", .region = REGIONS_ETSI},
+	{.ccode = "SV", .region = REGIONS_FCC},
+	{.ccode = "SY", .region = REGIONS_DEFAULT},
+	{.ccode = "TC", .region = REGIONS_FCC},
+	{.ccode = "TD", .region = REGIONS_ETSI},
+	{.ccode = "TG", .region = REGIONS_ETSI},
+	{.ccode = "TH", .region = REGIONS_FCC},
+	{.ccode = "TJ", .region = REGIONS_ETSI},
+	{.ccode = "TM", .region = REGIONS_ETSI},
+	{.ccode = "TN", .region = REGIONS_ETSI},
+	{.ccode = "TR", .region = REGIONS_ETSI},
+	{.ccode = "TT", .region = REGIONS_FCC},
+	{.ccode = "TW", .region = REGIONS_FCC},
+	{.ccode = "UA", .region = REGIONS_ETSI},
+	{.ccode = "UG", .region = REGIONS_FCC},
+	{.ccode = "UY", .region = REGIONS_FCC},
+	{.ccode = "UZ", .region = REGIONS_ETSI},
+	{.ccode = "VC", .region = REGIONS_ETSI},
+	{.ccode = "VE", .region = REGIONS_FCC},
+	{.ccode = "VI", .region = REGIONS_FCC},
+	{.ccode = "VN", .region = REGIONS_JP},
+	{.ccode = "VU", .region = REGIONS_FCC},
+	{.ccode = "WF", .region = REGIONS_ETSI},
+	{.ccode = "YE", .region = REGIONS_DEFAULT},
+	{.ccode = "YT", .region = REGIONS_ETSI},
+	{.ccode = "ZA", .region = REGIONS_ETSI},
+	{.ccode = "ZM", .region = REGIONS_ETSI},
+	{.ccode = "ZW", .region = REGIONS_ETSI},
+};
+
+uint8_t get_ccode_region(char * ccode)
+{
+	int i, cnt;
+	AICWFDBG(LOGDEBUG, "%s ccode:%s\r\n", __func__, ccode);
+
+	cnt = sizeof(reg_tables) / sizeof(reg_tables[0]);
+
+	for (i = 0; i < cnt; i++) {
+		if (reg_tables[i].ccode[0] == ccode[0] &&
+			reg_tables[i].ccode[1] == ccode[1]) {
+			AICWFDBG(LOGDEBUG, "region: %d\r\n", reg_tables[i].region);
+			return reg_tables[i].region;
+		}
+	}
+	AICWFDBG(LOGDEBUG, "use default region\r\n");
+	return REGIONS_DEFAULT;
+}
+
+u8 get_region_index(char * name)
+{
+	if (strncmp(name, "SRRC", 4) == 0)
+		return REGIONS_SRRC;
+	else if (strncmp(name, "FCC", 3) == 0)
+		return REGIONS_FCC;
+	else if (strncmp(name, "ETSI", 4) == 0)
+		return REGIONS_ETSI;
+	else if (strncmp(name, "JP", 2) == 0)
+		return REGIONS_JP;
+	else if (strncmp(name, "UNSET", 5) == 0)
+		return REGIONS_DEFAULT;
+
+	return REGIONS_DEFAULT;
+}
+
+
+#ifdef CONFIG_POWER_LIMIT
+#define POWER_LIMIT_INVALID_VAL     POWER_LEVEL_INVALID_VAL
+
+#define POWER_LIMIT_CC_MATCHED_BIT  (0x1U << 0)
+
+#define MAX_2_4G_BW_NUM    2
+#define MAX_5G_BW_NUM      3
+#define MAX_REGION_NUM            5
+
+
+typedef struct
+{
+    u8_l ch_cnt_2g4[MAX_2_4G_BW_NUM];
+    u8_l ch_cnt_5g[MAX_5G_BW_NUM];
+    u8_l ch_num_2g4[MAX_2_4G_BW_NUM][MAC_DOMAINCHANNEL_24G_MAX];
+    u8_l ch_num_5g[MAX_5G_BW_NUM][MAC_DOMAINCHANNEL_5G_MAX];
+    s8_l max_pwr_2g4[MAX_2_4G_BW_NUM][MAC_DOMAINCHANNEL_24G_MAX];
+    s8_l max_pwr_5g[MAX_5G_BW_NUM][MAC_DOMAINCHANNEL_5G_MAX];
+} txpwr_lmt_info_t;
+
+typedef struct
+{
+    u32_l flags;
+    txpwr_lmt_info_t txpwr_lmt[MAX_REGION_NUM];
+} powerlimit_info_t;
+
+powerlimit_info_t powerlimit_info = {0,};
+#endif
+
 typedef u32 (*array2_tbl_t)[2];
 
 #define AIC_PATCH_MAGIG_NUM     0x48435450 // "PTCH"
@@ -166,13 +424,22 @@ typedef struct {
 #define AIC_PATCH_OFST(mem) ((size_t) &((aic_patch_t *)0)->mem)
 #define AIC_PATCH_ADDR(mem) ((u32)(aic_patch_str_base + AIC_PATCH_OFST(mem)))
 
+#define USER_PWROFST_COVER_CALIB_FLAG   (0x01U << 0)
 #define USER_CHAN_MAX_TXPWR_EN_FLAG     (0x01U << 1)
 #define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
+#define USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG    (0x01U << 3)
+#define USER_HE_MU_EDCA_UPDATE_DISABLE_FLAG     (0x01U << 4)
 
+#define CFG_PWROFST_COVER_CALIB     1
+#ifdef CONFIG_POWER_LIMIT
+#define CFG_USER_CHAN_MAX_TXPWR_EN  1
+#else
 #define CFG_USER_CHAN_MAX_TXPWR_EN  0
+#endif
 #define CFG_USER_TX_USE_ANA_F       0
+#define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE	0
 
-#define CFG_USER_EXT_FLAGS_EN   (CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
+#define CFG_USER_EXT_FLAGS_EN   (CFG_PWROFST_COVER_CALIB || CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F || CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE)
 
 u32 adaptivity_patch_tbl_8800d80[][2] = {
 	{0x000C, 0x0000320A}, //linkloss_thd
@@ -186,16 +453,26 @@ u32 adaptivity_patch_tbl_8800d80_tp[][2] = {
 };
 
 u32 patch_tbl_8800d80[][2] = {
-    #if CFG_USER_EXT_FLAGS_EN
-    {0x0188, 0x00000001
-        #if CFG_USER_CHAN_MAX_TXPWR_EN
-        | USER_CHAN_MAX_TXPWR_EN_FLAG
-        #endif
-        #if CFG_USER_TX_USE_ANA_F
-        | USER_TX_USE_ANA_F_FLAG
-        #endif
-    }, // user_ext_flags
-    #endif
+#if CFG_USER_EXT_FLAGS_EN
+	{0x0188, 0x00000000
+#if CFG_PWROFST_COVER_CALIB
+		| USER_PWROFST_COVER_CALIB_FLAG
+#endif
+#if CFG_USER_CHAN_MAX_TXPWR_EN
+		| USER_CHAN_MAX_TXPWR_EN_FLAG
+#endif
+#if CFG_USER_TX_USE_ANA_F
+		| USER_TX_USE_ANA_F_FLAG
+#endif
+#if CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE
+		| USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG
+#endif
+	}, // user_ext_flags
+#ifdef CONFIG_LOWPOWER
+    {0x01a0, 0x00000100}
+#endif
+#endif
+
 	#ifdef CONFIG_RADAR_OR_IR_DETECT
 	{0x0019c,0x00000100},
 	#endif
@@ -588,7 +865,7 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr,
 					}
 				}
 			}
-	
+
 			if (!err && (i < size)) {
 				//printk("wr blk 1: %p -> %x\r\n", dst + i / 4, fw_addr + i);
 				//err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, size - i, dst + i / 4);
@@ -803,8 +1080,14 @@ s8_l get_txpwr_max(s8_l power){
 			power = userconfig_info.txpwr_lvl_v3.pwrlvl_11ax_5g[i];
 	}
 
-	if(userconfig_info.txpwr_loss.loss_enable == 1)
-		power += userconfig_info.txpwr_loss.loss_value;
+	if ((userconfig_info.txpwr_loss.loss_enable_2g4 == 1) ||
+			(userconfig_info.txpwr_loss.loss_enable_5g == 1)) {
+		if (userconfig_info.txpwr_loss.loss_value_2g4 <
+			userconfig_info.txpwr_loss.loss_value_5g)
+			power += userconfig_info.txpwr_loss.loss_value_5g;
+		else
+			power += userconfig_info.txpwr_loss.loss_value_2g4;
+	}
 
 	printk("%s:txpwr_max:%d \r\n",__func__,power);
 	return power;
@@ -1268,10 +1551,14 @@ void rwnx_plat_nvram_set_value_v3(char *command, char *value)
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[4] = rwnx_atoi(value);
     } else if (!strcmp(command, "lvl_adj_5g_chan_155")) {
         userconfig_info.txpwr_lvl_adj.pwrlvl_adj_tbl_5g[5] = rwnx_atoi(value);
-    } else if (!strcmp(command, "loss_enable")) {
-        userconfig_info.txpwr_loss.loss_enable = rwnx_atoi(value);
-    } else if (!strcmp(command, "loss_value")) {
-        userconfig_info.txpwr_loss.loss_value = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_enable_2g4")) {
+        userconfig_info.txpwr_loss.loss_enable_2g4 = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_value_2g4")) {
+        userconfig_info.txpwr_loss.loss_value_2g4 = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_enable_5g")) {
+        userconfig_info.txpwr_loss.loss_enable_5g = rwnx_atoi(value);
+    } else if (!strcmp(command, "loss_value_5g")) {
+        userconfig_info.txpwr_loss.loss_value_5g = rwnx_atoi(value);
     } else if (!strcmp(command, "ofst_enable")) {
         userconfig_info.txpwr_ofst.enable = rwnx_atoi(value);
 		userconfig_info.txpwr_ofst2x.enable = rwnx_atoi(value);
@@ -2362,12 +2649,16 @@ void get_userconfig_txpwr_lvl_adj_in_fdrv(txpwr_lvl_adj_conf_t *txpwr_lvl_adj)
 
 void get_userconfig_txpwr_loss(txpwr_loss_conf_t *txpwr_loss)
 {
-    txpwr_loss->loss_enable      = userconfig_info.txpwr_loss.loss_enable;
-    txpwr_loss->loss_value       = userconfig_info.txpwr_loss.loss_value;
+	txpwr_loss->loss_enable_2g4 = userconfig_info.txpwr_loss.loss_enable_2g4;
+	txpwr_loss->loss_value_2g4 = userconfig_info.txpwr_loss.loss_value_2g4;
+	txpwr_loss->loss_enable_5g = userconfig_info.txpwr_loss.loss_enable_5g;
+	txpwr_loss->loss_value_5g = userconfig_info.txpwr_loss.loss_value_5g;
 
-    AICWFDBG(LOGINFO, "%s:loss_enable:%d\r\n",     __func__, txpwr_loss->loss_enable);
-    AICWFDBG(LOGINFO, "%s:loss_value:%d\r\n",      __func__, txpwr_loss->loss_value);
+	AICWFDBG(LOGDEBUG, "%s:loss_enable_2g4: %d, val_2g4: %d, loss_enable_5g: %d, val_5g: %d\r\n", __func__,
+				txpwr_loss->loss_enable_2g4, txpwr_loss->loss_value_2g4,
+				txpwr_loss->loss_enable_5g, txpwr_loss->loss_value_5g);
 }
+
 
 /**
  * rwnx_plat_userconfig_load  ---Load aic_userconfig.txt
@@ -2385,8 +2676,459 @@ static int rwnx_plat_userconfig_load(struct rwnx_hw *rwnx_hw) {
 		rwnx_plat_userconfig_load_8800d80(rwnx_hw);
 	}*/
 	rwnx_plat_userconfig_load_8800d80(rwnx_hw);
+#ifdef CONFIG_POWER_LIMIT
+	rwnx_plat_powerlimit_load_8800d80(rwnx_hw);
+#endif
 	return 0;
 }
+
+#ifdef CONFIG_POWER_LIMIT
+#define GetLineFromBuffer(buffer)   strsep(&buffer, "\n")
+
+int isAllSpaceOrTab(uint8_t *data, uint8_t size)
+{
+    uint8_t cnt = 0, NumOfSpaceAndTab = 0;
+    while (size > cnt) {
+        if (data[cnt] == ' ' || data[cnt] == '\t' || data[cnt] == '\0')
+            ++NumOfSpaceAndTab;
+        ++cnt;
+    }
+    return size == NumOfSpaceAndTab;
+}
+
+int IsCommentString(char *szStr)
+{
+    if (*szStr == '#' && *(szStr + 1) == ' ')
+        return 1;
+    else
+        return 0;
+}
+
+int ParseQualifiedString(char *In, u32 *Start, char *Out, char LeftQualifier, char RightQualifier)
+{
+    u32 i = 0, j = 0;
+    char c = In[(*Start)++];
+    if (c != LeftQualifier)
+        return 0;
+    i = (*Start);
+    c = In[(*Start)++];
+    while (c != RightQualifier && c != '\0')
+        c = In[(*Start)++];
+    if (c == '\0')
+        return 0;
+    j = (*Start) - 2;
+    strncpy((char *)Out, (const char *)(In + i), j - i + 1);
+    return 1;
+}
+
+int GetU1ByteIntegerFromStringInDecimal(char *Str, u8 *pInt)
+{
+    u16 i = 0;
+    *pInt = 0;
+    while (Str[i] != '\0') {
+        if (Str[i] >= '0' && Str[i] <= '9') {
+            *pInt *= 10;
+            *pInt += (Str[i] - '0');
+        } else
+            return 0;
+        ++i;
+    }
+    return 1;
+}
+int GetS1ByteIntegerFromStringInDecimal(char *str, s8 *val)
+{
+    u8 negative = 0;
+    u16 i = 0;
+    *val = 0;
+    while (str[i] != '\0') {
+        if (i == 0 && (str[i] == '+' || str[i] == '-')) {
+            if (str[i] == '-')
+                negative = 1;
+        } else if (str[i] >= '0' && str[i] <= '9') {
+            *val *= 10;
+            *val += (str[i] - '0');
+        } else
+            return 0;
+        ++i;
+    }
+    if (negative)
+        *val = -*val;
+    return 1;
+}
+
+int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name)
+{
+	u8 channel_num, powerLimit_val, reg_idx;
+
+	if (GetU1ByteIntegerFromStringInDecimal((char *)channel, &channel_num) == 0
+		|| GetS1ByteIntegerFromStringInDecimal((char *)limit, &powerLimit_val) == 0) {
+		AICWFDBG(LOGERROR, "Illegal index of power limit table [ch %s][val %s]\n", channel, limit);
+		return -1;
+	}
+
+	reg_idx = get_region_index(name);
+
+	if (band == PHY_BAND_2G4) {
+		uint8_t cur_idx = powerlimit_info.txpwr_lmt[reg_idx].ch_cnt_2g4[bw];
+		AICWFDBG(LOGINFO, "reg_idx=%d, band=%d, bw=%d, cur_idx=%d, ch=%s, pwr=%s\n",
+				reg_idx, band, bw, cur_idx, channel, limit);
+		if (cur_idx < MAC_DOMAINCHANNEL_24G_MAX) {
+			powerlimit_info.txpwr_lmt[reg_idx].ch_num_2g4[bw][cur_idx] = channel_num;
+			powerlimit_info.txpwr_lmt[reg_idx].max_pwr_2g4[bw][cur_idx] = powerLimit_val;
+			powerlimit_info.txpwr_lmt[reg_idx].ch_cnt_2g4[bw]++;
+		} else {
+			AICWFDBG(LOGERROR, "band %d chan_cnt reached %d\n", band, MAC_DOMAINCHANNEL_24G_MAX);
+			AICWFDBG(LOGERROR, "channel=%s(%d) powerLimit=%s(%d)\n", channel, channel_num, limit, powerLimit_val);
+		}
+	} else if (band == PHY_BAND_5G) {
+		uint8_t cur_idx = powerlimit_info.txpwr_lmt[reg_idx].ch_cnt_5g[bw];
+		AICWFDBG(LOGINFO, "reg_idx=%d, band=%d, bw=%d, cur_idx=%d, ch=%s, pwr=%s\n",
+				reg_idx, band, bw, cur_idx, channel, limit);
+		if (cur_idx < MAC_DOMAINCHANNEL_5G_MAX) {
+			powerlimit_info.txpwr_lmt[reg_idx].ch_num_5g[bw][cur_idx] = channel_num;
+			powerlimit_info.txpwr_lmt[reg_idx].max_pwr_5g[bw][cur_idx] = powerLimit_val;
+			powerlimit_info.txpwr_lmt[reg_idx].ch_cnt_5g[bw]++;
+		} else {
+			AICWFDBG(LOGERROR, "band %d chan_cnt reached %d\n", band, MAC_DOMAINCHANNEL_5G_MAX);
+			AICWFDBG(LOGERROR, "channel=%s(%d) powerLimit=%s(%d)\n", channel, channel_num, limit, powerLimit_val);
+		}
+	}
+
+	return 0;
+}
+
+void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
+{
+#define LD_STAGE_EXC_MAPPING    0
+#define LD_STAGE_TAB_DEFINE     1
+#define LD_STAGE_TAB_START      2
+#define LD_STAGE_COLUMN_DEFINE  3
+#define LD_STAGE_CH_ROW         4
+
+	uint8_t loadingStage = LD_STAGE_EXC_MAPPING;
+	uint32_t i = 0, forCnt = 0;
+	uint32_t i_cc;
+	char *szLine, *ptmp;
+	char band[10], colNumBuf[10], bandwidth[10];
+	uint8_t colNum = 0, band_cc = 0, bw_cc = 0;
+	char **reg_name = NULL;
+	// clear powerlimit info at first
+	memset((void *)&powerlimit_info, 0, sizeof(powerlimit_info_t));
+	ptmp = buffer;
+	for (szLine = GetLineFromBuffer(ptmp); szLine != NULL; szLine = GetLineFromBuffer(ptmp)) {
+		if (isAllSpaceOrTab(szLine, sizeof(*szLine)))
+			continue;
+		if (IsCommentString(szLine))
+			continue;
+
+		if (loadingStage == LD_STAGE_EXC_MAPPING) {
+			if (szLine[0] == '#' || szLine[1] == '#') {
+				loadingStage = LD_STAGE_TAB_DEFINE;
+			} else {
+				continue;
+			}
+		}
+
+		if (loadingStage == LD_STAGE_TAB_DEFINE) {
+			/* read "##	2.4G" */
+			if (szLine[0] != '#' || szLine[1] != '#')
+				continue;
+
+			/* skip the space */
+			i = 2;
+			while (szLine[i] == ' ' || szLine[i] == '\t')
+				++i;
+
+			szLine[--i] = ' '; /* return the space in front of the regulation info */
+
+			/* Parse the label of the table */
+			memset((void *)band, 0, 10);
+			memset((void *)bandwidth, 0, 10);
+			memset((void *)colNumBuf, 0, 10);
+
+			if (!ParseQualifiedString(szLine, &i, band, ' ', ',')) {
+				AICWFDBG(LOGERROR, "Fail to parse band!\n");
+				goto exit;
+			}
+			if (strncmp(band, "2.4G", 4) == 0) {
+				band_cc = PHY_BAND_2G4;
+			} else if (strncmp(band, "5G", 2) == 0) {
+				band_cc = PHY_BAND_5G;
+			}
+
+			if (!ParseQualifiedString(szLine, &i, bandwidth, ' ', ',')) {
+				AICWFDBG(LOGERROR, "Fail to parse bandwidth!\n");
+				goto exit;
+			}
+			if (strncmp(bandwidth, "20M", 3) == 0)
+				bw_cc = PHY_CHNL_BW_20;
+			else if (strncmp(bandwidth, "40M", 3) == 0)
+				bw_cc = PHY_CHNL_BW_40;
+			else if (strncmp(bandwidth, "80M", 3) == 0)
+				bw_cc = PHY_CHNL_BW_80;
+
+			if (!ParseQualifiedString(szLine, &i, colNumBuf, '#', '#')) {
+				AICWFDBG(LOGERROR, "Fail to parse column number!\n");
+				goto exit;
+			}
+			if (!GetU1ByteIntegerFromStringInDecimal(colNumBuf, &colNum)) {
+			AICWFDBG(LOGERROR, "Column number \"%s\" is not unsigned decimal\n", colNumBuf);
+			goto exit;
+			}
+			if (colNum == 0) {
+				AICWFDBG(LOGERROR, "Column number is 0\n");
+				goto exit;
+			}
+
+			AICWFDBG(LOGINFO, "band=%s, bandwidth=%s, colnum=%d\n", band, bandwidth, colNum);
+			loadingStage = LD_STAGE_TAB_START;
+		} else if (loadingStage == LD_STAGE_TAB_START) {
+			/* read "##	START" */
+			if (szLine[0] != '#' || szLine[1] != '#')
+				continue;
+
+			/* skip the space */
+			i = 2;
+			while (szLine[i] == ' ' || szLine[i] == '\t')
+				++i;
+
+			if (strncmp((u8 *)(szLine + i), "START", 5)) {
+				AICWFDBG(LOGERROR, "Missing \"##   START\" label\n");
+				goto exit;
+			}
+
+			loadingStage = LD_STAGE_COLUMN_DEFINE;
+		} else if (loadingStage == LD_STAGE_COLUMN_DEFINE) {
+			/* read "##  FCC  ETSI" */
+			if (szLine[0] != '#' || szLine[1] != '#')
+				continue;
+
+			/* skip the space */
+			i = 2;
+			while (szLine[i] == ' ' || szLine[i] == '\t')
+				++i;
+
+			reg_name = (char **)kmalloc(sizeof(char *) * colNum, GFP_KERNEL);
+			if (!reg_name) {
+				AICWFDBG(LOGERROR, "reg_name alloc fail\n");
+				goto exit;
+			}
+
+			for (forCnt = 0; forCnt < colNum; ++forCnt) {
+				/* skip the space */
+				while (szLine[i] == ' ' || szLine[i] == '\t')
+					i++;
+				i_cc = i;
+
+				while (szLine[i] != ' ' && szLine[i] != '\t' && szLine[i] != '\0')
+					i++;
+
+				reg_name[forCnt] = (char *)kmalloc(i - i_cc + 1, GFP_KERNEL);
+				if (!reg_name[forCnt]) {
+					AICWFDBG(LOGERROR, "reg_name element alloc fail\n");
+					goto exit;
+				}
+
+				strncpy(reg_name[forCnt], szLine + i_cc, i - i_cc);
+				reg_name[forCnt][i - i_cc] = '\0';
+				AICWFDBG(LOGINFO, "reg_name: %s\n", reg_name[forCnt]);
+
+			}
+
+			loadingStage = LD_STAGE_CH_ROW;
+		} else if (loadingStage == LD_STAGE_CH_ROW) {
+			char channel[10] = {0}, powerLimit[10] = {0};
+			u8 cnt = 0;
+
+			/* the table ends */
+			if (szLine[0] == '#' && szLine[1] == '#') {
+				i = 2;
+				while (szLine[i] == ' ' || szLine[i] == '\t')
+					++i;
+
+				if (strncmp((u8 *)(szLine + i), "END", 3) == 0) {
+					loadingStage = LD_STAGE_TAB_DEFINE;
+					if (reg_name) {
+						for (forCnt = 0; forCnt < colNum; ++forCnt) {
+							if (reg_name[forCnt]) {
+								kfree(reg_name[forCnt]);
+								reg_name[forCnt] = NULL;
+							}
+						}
+						kfree(reg_name);
+						reg_name = NULL;
+					}
+					colNum = 0;
+					continue;
+				} else {
+					AICWFDBG(LOGERROR, "Missing \"##   END\" label\n");
+					goto exit;
+				}
+			}
+
+			if ((szLine[0] != 'c' && szLine[0] != 'C') ||
+				(szLine[1] != 'h' && szLine[1] != 'H')) {
+				AICWFDBG(LOGERROR, "Wrong channel prefix: '%c','%c'(%d,%d)\n", szLine[0], szLine[1], szLine[0], szLine[1]);
+				continue;
+			}
+			i = 2;/* move to the  location behind 'h' */
+
+			/* load the channel number */
+			cnt = 0;
+			while (szLine[i] >= '0' && szLine[i] <= '9') {
+				channel[cnt] = szLine[i];
+				++cnt;
+				++i;
+			}
+
+			for (forCnt = 0; forCnt < colNum; ++forCnt) {
+				/* skip the space between channel number and the power limit value */
+				while (szLine[i] == ' ' || szLine[i] == '\t')
+					++i;
+
+				/* load the power limit value */
+				memset((void *)powerLimit, 0, 10);
+
+				if (szLine[i] == 'N' && szLine[i + 1] == 'A') {
+					/*
+					* means channel not available
+					*/
+					sprintf(powerLimit, "%d", POWER_LIMIT_INVALID_VAL);
+					i += 2;
+				} else if ((szLine[i] >= '0' && szLine[i] <= '9')
+					|| szLine[i] == '+' || szLine[i] == '-') {
+					/* case of dBm value */
+					cnt = 0;
+					while ((szLine[i] >= '0' && szLine[i] <= '9')
+						|| szLine[i] == '+' || szLine[i] == '-'
+					) {
+						powerLimit[cnt] = szLine[i];
+						++cnt;
+						++i;
+					}
+				} else {
+					AICWFDBG(LOGERROR, "Wrong limit expression \"%c%c\"(%d, %d)\n",
+						szLine[i], szLine[i + 1], szLine[i], szLine[i + 1]);
+					goto exit;
+				}
+
+				if (rwnx_plat_powerlimit_save(band_cc, channel, bw_cc, powerLimit, reg_name[forCnt]) < 0)
+					goto exit;
+			}
+		}
+	}
+
+	powerlimit_info.flags |= POWER_LIMIT_CC_MATCHED_BIT;
+exit:
+	if (reg_name) {
+		for (forCnt = 0; forCnt < colNum; ++forCnt) {
+			if (reg_name[forCnt]) {
+				kfree(reg_name[forCnt]);
+				reg_name[forCnt] = NULL;
+			}
+		}
+		kfree(reg_name);
+		reg_name = NULL;
+	}
+
+	return;
+}
+
+/// 5G lower bound freq
+#define PHY_FREQ_5G 5000
+
+uint16_t phy_channel_to_freq(uint8_t band, int channel)
+{
+    if ((band == PHY_BAND_2G4) && (channel >= 1) && (channel <= 14)) {
+        if (channel == 14)
+            return 2484;
+        else
+            return 2407 + channel * 5;
+    } else if ((band == PHY_BAND_5G) && (channel >= 1) && (channel <= 165)) {
+        return PHY_FREQ_5G + channel * 5;
+    }
+    return 0;
+}
+
+int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx)
+{
+	int8_t ret = POWER_LIMIT_INVALID_VAL;
+	uint8_t idx;
+	if (!(powerlimit_info.flags & POWER_LIMIT_CC_MATCHED_BIT)) {
+		AICWFDBG(LOGERROR, "powerlimit flag not set\n");
+		return ret;
+	}
+
+	if (band == PHY_BAND_2G4) {
+		uint8_t idx_cnt = powerlimit_info.txpwr_lmt[r_idx].ch_cnt_2g4[0];
+		for (idx = 0; idx < idx_cnt; idx++) {
+			int ch_num = powerlimit_info.txpwr_lmt[r_idx].ch_num_2g4[0][idx];
+			uint16_t freq_tmp = phy_channel_to_freq(PHY_BAND_2G4, ch_num);
+			if (freq == freq_tmp) {
+				ret = powerlimit_info.txpwr_lmt[r_idx].max_pwr_2g4[0][idx];
+				AICWFDBG(LOGINFO, "[%d]: ch=%d(freq=%d), pwr=%d\n", idx, ch_num, freq, ret);
+				break;
+			}
+		}
+		if (idx == idx_cnt)
+			AICWFDBG(LOGERROR, "powerlimit search failed: band=%d freq=%d\n", band, freq);
+	} else if (band == PHY_BAND_5G) {
+		uint8_t idx_cnt = powerlimit_info.txpwr_lmt[r_idx].ch_cnt_5g[0];
+		for (idx = 0; idx < idx_cnt; idx++) {
+			int ch_num = powerlimit_info.txpwr_lmt[r_idx].ch_num_5g[0][idx];
+			uint16_t freq_tmp = phy_channel_to_freq(PHY_BAND_5G, ch_num);
+			if (freq == freq_tmp) {
+				ret = powerlimit_info.txpwr_lmt[r_idx].max_pwr_5g[0][idx];
+				AICWFDBG(LOGINFO, "[%d]: ch=%d(freq=%d), pwr=%d\n", idx, ch_num, freq, ret);
+				break;
+			}
+		}
+		if (idx == idx_cnt)
+			AICWFDBG(LOGERROR, "powerlimit search failed: band=%d freq=%d\n", band, freq);
+	}
+    return ret;
+}
+
+int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw)
+{
+	int8_t ret = POWER_LIMIT_INVALID_VAL;
+	uint8_t idx;
+	if (!(powerlimit_info.flags & POWER_LIMIT_CC_MATCHED_BIT)) {
+		AICWFDBG(LOGERROR, "powerlimit flag not set\n");
+		return ret;
+	}
+
+	if (chnum <= 14) {
+		uint8_t idx_cnt = powerlimit_info.txpwr_lmt[r_idx].ch_cnt_2g4[bw];
+		for (idx = 0; idx < idx_cnt; idx++) {
+			uint8_t ch_num = powerlimit_info.txpwr_lmt[r_idx].ch_num_2g4[bw][idx];
+			if (chnum == ch_num) {
+				ret = powerlimit_info.txpwr_lmt[r_idx].max_pwr_2g4[bw][idx];
+				AICWFDBG(LOGINFO, "[%d]: ch=%d, pwr=%d\n", idx, ch_num, ret);
+				break;
+			}
+		}
+		if (idx == idx_cnt)
+			AICWFDBG(LOGERROR, "%s powerlimit search failed: chnum=%d, please confirm the center frequency\n",
+					__func__, chnum);
+	} else if (chnum <= 165) {
+		uint8_t idx_cnt = powerlimit_info.txpwr_lmt[r_idx].ch_cnt_5g[bw];
+		for (idx = 0; idx < idx_cnt; idx++) {
+			uint8_t ch_num = powerlimit_info.txpwr_lmt[r_idx].ch_num_5g[bw][idx];
+			if (chnum == ch_num) {
+				ret = powerlimit_info.txpwr_lmt[r_idx].max_pwr_5g[bw][idx];
+				AICWFDBG(LOGINFO, "[%d]: ch=%d, pwr=%d\n", idx, ch_num, ret);
+				break;
+			}
+		}
+		if (idx == idx_cnt)
+			AICWFDBG(LOGERROR, "%s powerlimit search failed: chnum=%d, please confirm the center frequency\n",
+					__func__, chnum);
+	}
+
+	return ret;
+}
+#endif
 
 #ifdef CONFIG_USB_BT
 int aicbt_patch_table_free(struct aicbt_patch_table *head)
@@ -2761,11 +3503,33 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
 	int ret;
 	struct rwnx_plat *rwnx_plat = rwnx_hw->plat;
 	(void)ret;
+#if (defined(CONFIG_NO_FIRMWARE_RELOAD) || defined(CONFIG_LOWPOWER))
+    unsigned int sysctl;
+    volatile unsigned int *dst_mail;
+#endif
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
 	if (rwnx_plat->enabled)
 		return 0;
+
+#if (defined(CONFIG_NO_FIRMWARE_RELOAD) || defined(CONFIG_LOWPOWER))
+    *(volatile uint32_t *)&rwnx_hw->ipc_env->shared->fw_init_done = 2;
+    dst_mail = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar2_vaddr + 0x800ec);
+    dst_mail[0] = 0x4;  //generate an empty int
+    mdelay(2);
+    sysctl = readl(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500010);
+    printk("0x40500010=%x\n", sysctl);
+    if((testmode == 0) && (sysctl & 0x2)) {
+        if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+            patch_config(rwnx_hw);
+
+        printk("fw already load\n");
+        pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
+        rwnx_plat_userconfig_load(rwnx_hw);
+        return 0;
+    }
+#endif
 
     // halt cpu
 #ifdef CONFIG_USB_BT

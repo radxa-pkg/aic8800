@@ -51,6 +51,16 @@ enum rwnx_platform_addr {
 	RWNX_ADDR_MAX,
 };
 
+#define POWER_LEVEL_INVALID_VAL     (127)
+
+typedef enum {
+	REGIONS_SRRC,
+	REGIONS_FCC,
+	REGIONS_ETSI,
+	REGIONS_JP,
+	REGIONS_DEFAULT,
+} Regions_code;
+
 struct rwnx_hw;
 
 /**
@@ -125,11 +135,14 @@ void get_userconfig_txpwr_lvl_v2_in_fdrv(txpwr_lvl_conf_v2_t *txpwr_lvl_v2);
 void get_userconfig_txpwr_lvl_v3_in_fdrv(txpwr_lvl_conf_v3_t *txpwr_lvl_v3);
 void get_userconfig_txpwr_lvl_v4_in_fdrv(txpwr_lvl_conf_v4_t *txpwr_lvl_v4);
 void get_userconfig_txpwr_lvl_adj_in_fdrv(txpwr_lvl_adj_conf_t *txpwr_lvl_adj);
+uint8_t get_ccode_region(char * ccode);
+u8 get_region_index(char * name);
 
 #ifdef CONFIG_POWER_LIMIT
+int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name);
 void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
-int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq);
-int8_t get_powerlimit_by_chnum(uint8_t chnum);
+int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx);
+int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw);
 #endif
 
 void get_userconfig_txpwr_ofst_in_fdrv(txpwr_ofst_conf_t *txpwr_ofst);

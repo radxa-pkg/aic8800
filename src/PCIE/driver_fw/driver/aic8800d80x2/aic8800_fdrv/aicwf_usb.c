@@ -149,7 +149,7 @@ static void aicwf_usb_rx_complete(struct urb *urb)
 		skb_put(skb, urb->actual_length);
 
 		spin_lock_irqsave(&rx_priv->rxqlock, flags);
-		if (!aicwf_rxframe_enqueue(usb_dev->dev, &rx_priv->rxq, skb)) {
+		if (!aicwf_rxframe_enqueue(&rx_priv->rxq, skb)) {
 			spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
 			usb_err("rx_priv->rxq is over flow!!!\n");
 			aicwf_dev_skb_free(skb);
@@ -490,7 +490,11 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
 
 	if (usb_dev->state != USB_UP_ST) {
 		usb_err("usb state is not up!\n");
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+#else
+		kfree(txhdr->sw_hdr);
+#endif
 		dev_kfree_skb_any(skb);
 		return -EIO;
 	}
@@ -499,7 +503,11 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
 						&usb_dev->tx_free_count, &usb_dev->tx_free_lock);
 	if (!usb_buf) {
 		usb_err("free:%d, post:%d\n", usb_dev->tx_free_count, usb_dev->tx_post_count);
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+#else
+		kfree(txhdr->sw_hdr);
+#endif
 		dev_kfree_skb_any(skb);
 		ret = -ENOMEM;
 		goto flow_ctrl;
@@ -529,7 +537,11 @@ static int aicwf_usb_bus_txdata(struct device *dev, struct sk_buff *skb)
 		skb_pull(skb, txhdr->sw_hdr->headroom);
 		skb_push(skb, sizeof(struct txdesc_api));
 		memcpy(&skb->data[0], (u8 *)(long)&txhdr->sw_hdr->desc, sizeof(struct txdesc_api));
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+#else
+		kfree(txhdr->sw_hdr);
+#endif
 
 		skb_push(skb, sizeof(usb_header));
 		usb_header[0] = ((skb->len) & 0xff);

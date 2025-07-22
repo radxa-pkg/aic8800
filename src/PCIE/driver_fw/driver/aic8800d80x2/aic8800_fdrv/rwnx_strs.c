@@ -132,6 +132,8 @@ static const char *const rwnx_mmid2str[MSG_I(MM_MAX)] = {
     [MSG_I(MM_GET_WIFI_DISABLE_REQ)]            = "MM_GET_WIFI_DISABLE_REQ",
     [MSG_I(MM_GET_WIFI_DISABLE_CFM)]            = "MM_GET_WIFI_DISABLE_CFM",
     [MSG_I(MM_CFG_RSSI_CFM)]                    = "MM_CFG_RSSI_CFM",
+    [MSG_I(MM_SET_TXPWR_PER_STA_REQ)]            = "MM_SET_TXPWR_PER_STA_REQ",
+    [MSG_I(MM_SET_TXPWR_PER_STA_CFM)]            = "MM_SET_TXPWR_PER_STA_CFM",
 };
 
 static const char *const rwnx_dbgid2str[MSG_I(DBG_MAX)] = {

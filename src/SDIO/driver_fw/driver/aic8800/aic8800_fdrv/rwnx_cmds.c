@@ -109,6 +109,20 @@ int cmd_mgr_queue_force_defer(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd
 	return 0;
 }
 
+#if 1
+static void aic8800_start_system_reset_flow(struct aic_sdio_dev *aic)
+{
+    int ret = 0;
+    char *event_string = "DHDISDOWN=1";
+    char *envp[] = { event_string, NULL };
+    printk(KERN_ERR "wlan error reset flow.\n");
+    printk(KERN_ERR "send event.\n");
+	ret=kobject_uevent_env(&aic->dev->kobj, KOBJ_CHANGE,envp);
+	if(!ret)
+	   printk(KERN_ERR "wlan error event send.\n");
+}
+#endif
+
 static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 {
 #ifdef AICWF_SDIO_SUPPORT
@@ -243,6 +257,8 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 			}
 		#endif
 
+			aic8800_start_system_reset_flow(sdiodev);
+
 			cmd_dump(cmd);
 			spin_lock_bh(&cmd_mgr->lock);
 			cmd_mgr->state = RWNX_CMD_MGR_STATE_CRASHED;
@@ -363,6 +379,8 @@ void cmd_mgr_task_process(struct work_struct *work)
 					sdio_err("reg:%d write failed!\n", sdiodev->sdio_reg.wakeup_reg);
 				}
 #endif
+				aic8800_start_system_reset_flow(sdiodev);
+
 				cmd_dump(next);
 				spin_lock_bh(&cmd_mgr->lock);
 				cmd_mgr->state = RWNX_CMD_MGR_STATE_CRASHED;

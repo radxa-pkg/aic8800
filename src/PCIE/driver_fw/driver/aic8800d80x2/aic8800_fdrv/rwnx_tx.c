@@ -107,7 +107,7 @@ void rwnx_ps_bh_enable(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta,
 		spin_unlock_bh(&rwnx_hw->tx_lock);
 
 		//if (sta->ps.pkt_ready[LEGACY_PS_ID])
-		//	rwnx_set_traffic_status(rwnx_hw, sta, true, LEGACY_PS_ID);
+			//rwnx_set_traffic_status(rwnx_hw, sta, true, LEGACY_PS_ID);
 
 		//if (sta->ps.pkt_ready[UAPSD_ID])
 		//	rwnx_set_traffic_status(rwnx_hw, sta, true, UAPSD_ID);
@@ -132,8 +132,8 @@ void rwnx_ps_bh_enable(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta,
 		rwnx_txq_sta_start(sta, RWNX_TXQ_STOP_STA_PS, rwnx_hw);
 		spin_unlock_bh(&rwnx_hw->tx_lock);
 
-		//if (sta->ps.pkt_ready[LEGACY_PS_ID])
-		//	rwnx_set_traffic_status(rwnx_hw, sta, false, LEGACY_PS_ID);
+		if (sta->ps.pkt_ready[LEGACY_PS_ID])
+			rwnx_set_traffic_status(rwnx_hw, sta, false, LEGACY_PS_ID);
 
 		//if (sta->ps.pkt_ready[UAPSD_ID])
 		//	rwnx_set_traffic_status(rwnx_hw, sta, false, UAPSD_ID);
@@ -585,7 +585,7 @@ static int rwnx_prep_dma_tx(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_tx
 	wmb();
 
 	if (dma_mapping_error(rwnx_hw->dev, ipc_hostdesc_buf->dma_addr)) {
-		printk("fail to push\n");
+		AICWFDBG(LOGERROR, "fail to push\n");
 		rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
 		//dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
 		return -1;
@@ -688,8 +688,8 @@ void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags)
 		sw_txhdr->need_cfm = 1;
 		sw_txhdr->desc.api.host.hostid = ((1<<31) | rwnx_hw->ipc_env->txdesc_free_idx[0]);
 		aicwf_pcie_host_txdesc_push(rwnx_hw->ipc_env, 0, (long)skb);
-		printk("need cfm ethertype:%8x,user_idx=%d, %x, skb=%p , headroom = %d \n", sw_txhdr->desc.api.host.ethertype, rwnx_hw->ipc_env->txdesc_free_idx[0], *(skb->data+sw_txhdr->headroom), skb,sw_txhdr->headroom);
-		printk("skb-> data[0] = %x , data[1] = %x \n",skb->data[0],skb->data[1]);
+		AICWFDBG(LOGINFO, "need cfm ethertype:%8x,user_idx=%d, %x, skb=%p , headroom = %d \n", sw_txhdr->desc.api.host.ethertype, rwnx_hw->ipc_env->txdesc_free_idx[0], *(skb->data+sw_txhdr->headroom), skb,sw_txhdr->headroom);
+		AICWFDBG(LOGDEBUG, "skb-> data[0] = %x , data[1] = %x \n",skb->data[0],skb->data[1]);
 	} else {
 		sw_txhdr->need_cfm = 0;
 		if (sw_txhdr->raw_frame) {
@@ -731,7 +731,7 @@ void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags)
 	if (((sw_txhdr->desc.host.flags & TXU_CNTRL_MGMT) && \
 		((*(skb->data+sw_txhdr->headroom) == 0xd0) || (*(skb->data+sw_txhdr->headroom) == 0x10) || (*(skb->data+sw_txhdr->headroom) == 0x30))) || \
 		(sw_txhdr->desc.host.ethertype == 0x8e88)) {
-		printk("push need cfm flags 0x%x\n", sw_txhdr->desc.host.flags);
+		AICWFDBG(LOGINFO, "push need cfm flags 0x%x\n", sw_txhdr->desc.host.flags);
 		sw_txhdr->need_cfm = 1;
 		sw_txhdr->desc.host.hostid = ((1<<31) | rwnx_hw->usb_env.txdesc_free_idx[0]);
 		aicwf_usb_host_txdesc_push(&(rwnx_hw->usb_env), 0, (long)(skb));
@@ -1057,7 +1057,7 @@ static bool rwnx_amsdu_add_subframe(struct rwnx_hw *rwnx_hw, struct sk_buff *skb
 
 		if (len1 + AMSDU_PADDING(len1) + len2 > txq->amsdu_len) {
 			/* not enough space to aggregate those two buffers */
-            printk("am no enough space\n");
+            AICWFDBG(LOGERROR, "am no enough space\n");
 			goto end;
         }
 
@@ -1069,7 +1069,7 @@ static bool rwnx_amsdu_add_subframe(struct rwnx_hw *rwnx_hw, struct sk_buff *skb
 		sw_txhdr->amsdu.nb = 1;
 		sw_txhdr->amsdu.pad = AMSDU_PADDING(len1);
         if (rwnx_amsdu_add_subframe_header(rwnx_hw, skb, sw_txhdr)) {
-            printk("am add fail\n");
+            AICWFDBG(LOGERROR, "am add fail\n");
 			goto end;
           }
 
@@ -1299,7 +1299,7 @@ int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg)
 	kfree(msg);
 
 	if (g_rwnx_plat->pcidev->rwnx_hw->pci_suspending == 1) {
-		printk("%s rwnx_pci is pci_suspending\n", __func__);
+		AICWFDBG(LOGINFO, "%s rwnx_pci is pci_suspending\n", __func__);
 		consume_skb(skb);
 		return 0;
 	}
@@ -1343,7 +1343,11 @@ int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg)
 	/* Retrieve the pointer to the Ethernet data */
 	// eth = (struct ethhdr *)skb->data;
 
+#ifdef CONFIG_CACHE_GUARD
 	sw_txhdr = kmem_cache_alloc(rwnx_hw->sw_txhdr_cache, GFP_ATOMIC);
+#else
+	sw_txhdr = kmalloc(sizeof(struct rwnx_sw_txhdr),GFP_ATOMIC);
+#endif
 	if (unlikely(sw_txhdr == NULL))
 		goto free;
 
@@ -1416,8 +1420,13 @@ int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg)
 	return 0;//NETDEV_TX_OK;
 
 free:
-	if (sw_txhdr)
-        kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+	if (sw_txhdr){
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
+	}
 	dev_kfree_skb_any(skb);
 
 	return 0;//NETDEV_TX_OK;
@@ -1452,6 +1461,7 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct msg_buf *msgbuf;
 #endif
     static u32 cnt = 0;
+	struct rwnx_vif *temp_vif;
 
 	//rwnx_data_dump("dhcp1", skb->data, 128);
 
@@ -1498,12 +1508,16 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     }*/
 
+    if (unlikely(rwnx_hw->fc)) {
+        AICWFDBG(LOGDEBUG, "%s fc:%d txdata cnt:%d push:%d reserved:%d\n", __func__, rwnx_hw->fc, atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push), atomic_read(&rwnx_hw->txdata_reserved));
+    }
+
 #ifdef CONFIG_ONE_TXQ
 	 skb->queue_mapping = rwnx_select_txq(rwnx_vif, skb);
 #endif
 
 	if (g_rwnx_plat->pcidev->rwnx_hw->pci_suspending == 1) {
-		printk("rwnx_pci is pci_suspending\n");
+		AICWFDBG(LOGINFO, "rwnx_pci is pci_suspending\n");
 		consume_skb(skb);
 		return 0;
 	}
@@ -1536,23 +1550,27 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef CONFIG_FILTER_TCP_ACK
 	if(cpu_to_le16(skb->len) <= MAX_TCP_ACK){
-	msgbuf=intf_tcp_alloc_msg(msgbuf);
-	msgbuf->rwnx_vif=rwnx_vif;
-	msgbuf->skb=skb;
-	if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
-        spin_lock_bh(&rwnx_hw->tx_lock);
-        if (((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) >= 245) && (rwnx_hw->fc == 0)) {
-            netif_tx_stop_all_queues(txq->ndev);
-            rwnx_hw->fc = 1;
-            AICWFDBG(LOGINFO,"fc\n");
-        }
-        spin_unlock_bh(&rwnx_hw->tx_lock);
-    
-		return NETDEV_TX_OK;
-	}else{
-		move_tcpack_msg(rwnx_hw,msgbuf);
-		kfree(msgbuf);
-	}
+		msgbuf=intf_tcp_alloc_msg(msgbuf);
+		msgbuf->rwnx_vif=rwnx_vif;
+		msgbuf->skb=skb;
+		if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
+			spin_lock_bh(&rwnx_hw->tx_lock);
+			if ((atomic_read(&rwnx_hw->txdata_total) >= 245) && (rwnx_hw->fc == 0)) {
+				list_for_each_entry(temp_vif, &rwnx_hw->vifs, list) {
+					if (!temp_vif || !temp_vif->ndev || !temp_vif->up)
+						continue;
+					netif_tx_stop_all_queues(temp_vif->ndev);
+				}
+				rwnx_hw->fc = 1;
+				AICWFDBG(LOGINFO,"fc\n");
+			}
+			spin_unlock_bh(&rwnx_hw->tx_lock);
+
+			return NETDEV_TX_OK;
+		}else{
+			move_tcpack_msg(rwnx_hw,msgbuf);
+			kfree(msgbuf);
+		}
 	}
 #endif
 
@@ -1589,7 +1607,11 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Retrieve the pointer to the Ethernet data */
 	// eth = (struct ethhdr *)skb->data;
 
+#ifdef CONFIG_CACHE_GUARD
 	sw_txhdr = kmem_cache_alloc(rwnx_hw->sw_txhdr_cache, GFP_ATOMIC);
+#else
+	sw_txhdr = kmalloc(sizeof(struct rwnx_sw_txhdr),GFP_ATOMIC);
+#endif
 	if (unlikely(sw_txhdr == NULL))
 		goto free;
 
@@ -1667,8 +1689,14 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 
 free:
-	if (sw_txhdr)
-        kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+	if (sw_txhdr){
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
+	}
+
 	dev_kfree_skb_any(skb);
 
 	return NETDEV_TX_OK;
@@ -1734,8 +1762,8 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 	frame_len = len;	
 #endif
 
-	if((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) > 248){
-		printk("%s txq flow ctrl \n",__func__);
+	if(atomic_read(&rwnx_hw->txdata_total) > 248){
+		AICWFDBG(LOGINFO, "%s fc:%d txdata cnt:%d push:%d reserved:%d\n", __func__, rwnx_hw->fc, atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push), atomic_read(&rwnx_hw->txdata_reserved));
 		return -EBUSY;
 	}
 
@@ -1768,7 +1796,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 
 	*cookie = (unsigned long)skb;
 
-    sw_txhdr = kmem_cache_alloc(rwnx_hw->sw_txhdr_cache, GFP_ATOMIC);
+#ifdef CONFIG_CACHE_GUARD
+	sw_txhdr = kmem_cache_alloc(rwnx_hw->sw_txhdr_cache, GFP_ATOMIC);
+#else
+	sw_txhdr = kmalloc(sizeof(struct rwnx_sw_txhdr),GFP_ATOMIC);
+#endif
     if (unlikely(sw_txhdr == NULL)) {
         dev_kfree_skb(skb);
         return -ENOMEM;
@@ -1833,7 +1865,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 
     /* Prepare IPC buffer for DMA transfer */
     if (unlikely(rwnx_prep_dma_tx(rwnx_hw, sw_txhdr, data))) {
+#ifdef CONFIG_CACHE_GUARD
         kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
         dev_kfree_skb(skb);
         return -EBUSY;
     }
@@ -1923,7 +1959,11 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 #ifdef AICWF_USB_SUPPORT
     if (rwnx_hw->usbdev->state == USB_DOWN_ST) {
         headroom = sw_txhdr->headroom;
+#ifdef CONFIG_CACHE_GUARD
         kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
         skb_pull(skb, headroom);
         consume_skb(skb);
         return 0;
@@ -1932,7 +1972,11 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 #ifdef AICWF_SDIO_SUPPORT
     if(rwnx_hw->sdiodev->bus_if->state == BUS_DOWN_ST) {
         headroom = sw_txhdr->headroom;
-        kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
         skb_pull(skb, headroom);
         consume_skb(skb);
         return 0;
@@ -1940,11 +1984,15 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 #endif
 #ifdef AICWF_PCIE_SUPPORT
 	if(rwnx_hw->pcidev->bus_if->state == BUS_DOWN_ST) {
-		printk("rwnx_hw->pcidev->bus_if->state == BUS_DOWN_ST \n");
+		AICWFDBG(LOGERROR, "rwnx_hw->pcidev->bus_if->state == BUS_DOWN_ST \n");
 		headroom = sw_txhdr->headroom;
 		rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_desc);
 		dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
 		skb_pull(skb, headroom);
 		consume_skb(skb);
 		return 0;
@@ -1958,7 +2006,7 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 
 	/* Update txq and HW queue credits */
 	if (sw_txhdr->desc.api.host.flags & TXU_CNTRL_MGMT) {
-		printk("done=%d retry_required=%d sw_retry_required=%d acknowledged=%d\n",
+		AICWFDBG(LOGINFO, "done=%d retry_required=%d sw_retry_required=%d acknowledged=%d\n",
 					 rwnx_txst.tx_done, rwnx_txst.retry_required,
 					 rwnx_txst.sw_retry_required, rwnx_txst.acknowledged);
 #ifdef CREATE_TRACE_POINTS
@@ -2034,7 +2082,11 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 
 #ifndef AICWF_PCIE_SUPPORT
 			headroom = sw_txhdr->headroom;
+#ifdef CONFIG_CACHE_GUARD
 			kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+			kfree(sw_txhdr);
+#endif
 			skb_pull(skb, headroom);
 			consume_skb(skb);
 #else
@@ -2042,7 +2094,11 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 			headroom = sw_txhdr->headroom;
 			rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_desc);
 			dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
 			kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+			kfree(sw_txhdr);
+#endif
 			skb_pull(skb, headroom);
 			consume_skb(skb);
 		}

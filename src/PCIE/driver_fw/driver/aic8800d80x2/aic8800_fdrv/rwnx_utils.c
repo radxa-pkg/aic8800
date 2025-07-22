@@ -17,6 +17,83 @@
 #ifdef CONFIG_RWNX_FULLMAC
 #define FW_STR  "fmac"
 #endif
+extern u8 data_cnt;
+
+void aic_host_tx_flush(struct rwnx_hw *rwnx_hw)
+{
+
+    uint32_t idx = 0;
+    uint32_t queue_idx = 0;
+    uint32_t desc_idx = 0;
+    struct rwnx_sw_txhdr *sw_txhdr;
+    int headroom;
+
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+    while (idx < IPC_TXDMA_DESC_CNT) {
+        sw_txhdr = (struct rwnx_sw_txhdr *)rwnx_hw->ipc_env->txcfm[idx];
+        if (!sw_txhdr) {
+            idx++;
+            continue;
+        }
+
+        struct rwnx_ipc_buf *tx_buf = &sw_txhdr->ipc_desc;
+        struct sk_buff *skb_tmp = sw_txhdr->skb;
+
+        AICWFDBG(LOGDEBUG,"aic_host_tx_flush: Completed TX descriptor found at index %d\n"
+                "                     sw_txhdr=%p, ipc_desc=%p, skb=%p\n",
+                idx, sw_txhdr, tx_buf, skb_tmp);
+        rwnx_ipc_buf_a2e_release(rwnx_hw, tx_buf);
+        dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr,
+                         sw_txhdr->ipc_hostdesc.size,  DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
+
+        if (skb_tmp) {
+            AICWFDBG(LOGDEBUG,"aic_host_tx_flush: Consuming skb at %p with headroom %ld\n",
+                     skb_tmp, RWNX_TX_HEADROOM);
+            skb_pull(skb_tmp, RWNX_TX_HEADROOM);
+            consume_skb(skb_tmp);
+        }
+        rwnx_hw->ipc_env->txcfm[idx] = NULL;
+        atomic_dec(&rwnx_hw->txdata_cnt);
+        atomic_dec(&rwnx_hw->txdata_total);
+        idx++;
+    }
+
+    for (queue_idx = 0; queue_idx < PCIE_TXQUEUE_CNT; queue_idx++) {
+        for (desc_idx = 0; desc_idx < PCIE_TXDESC_CNT; desc_idx++) {
+            if (rwnx_hw->ipc_env->tx_host_id[queue_idx][desc_idx]) {
+                AICWFDBG(LOGTRACE,"aic_host_tx_flush: Found non-zero entry in tx_host_id[%d][%d]\n",
+                    queue_idx, desc_idx);
+                struct sk_buff *skb_tmp = (struct sk_buff *)(uint64_t)rwnx_hw->ipc_env->tx_host_id[queue_idx][desc_idx];
+                sw_txhdr = ((struct rwnx_txhdr *)skb_tmp->data)->sw_hdr;
+                headroom = sw_txhdr->headroom;
+                struct rwnx_ipc_buf *tx_buf = &sw_txhdr->ipc_desc;
+
+                rwnx_ipc_buf_a2e_release(rwnx_hw, tx_buf);
+                dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr,
+                        sw_txhdr->ipc_hostdesc.size,  DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
+				kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+				kfree(sw_txhdr);
+#endif
+
+                if (skb_tmp) {
+                    AICWFDBG(LOGDEBUG,"aic_host_tx_flush: Consuming skb at %p with headroom %d\n",
+                        skb_tmp, headroom);
+                    skb_pull(skb_tmp, headroom);
+                    consume_skb(skb_tmp);
+                }
+                rwnx_hw->ipc_env->tx_host_id[queue_idx][desc_idx] = 0;
+            }
+        }
+    }
+}
 
 /**
  * rwnx_ipc_buf_pool_alloc() - Allocate and push to fw a pool of IPC buffer.
@@ -439,7 +516,7 @@ int rwnx_ipc_rxbuf_alloc(struct rwnx_hw *rwnx_hw)
     }
     if (nb == RWNX_RXBUFF_MAX) {
         dev_err(rwnx_hw->dev, "No more free space for rxbuff");
-        printk("No more free space for rxbuff %d %d %d\n", rwnx_hw->rxbuf_idx, atomic_read(&rwnx_hw->rxbuf_cnt), rwnx_hw->ipc_env->rxbuf_idx);
+        AICWFDBG(LOGERROR, "No more free space for rxbuff %d %d %d\n", rwnx_hw->rxbuf_idx, atomic_read(&rwnx_hw->rxbuf_cnt), rwnx_hw->ipc_env->rxbuf_idx);
         spin_unlock_bh(&rwnx_hw->rxbuf_lock);
         return -ENOMEM;
     }
@@ -449,7 +526,7 @@ int rwnx_ipc_rxbuf_alloc(struct rwnx_hw *rwnx_hw)
     //printk("alloc %d\n", idx);
     err = rwnx_ipc_rxskb_alloc(rwnx_hw, buf, rwnx_hw->ipc_env->rxbuf_sz);
     if (err){
-        printk("ipc_rxskb_alloc fail %d %d %d %d\n", rwnx_hw->rxbuf_idx, atomic_read(&rwnx_hw->rxbuf_cnt), rwnx_hw->ipc_env->rxbuf_idx, err);
+        AICWFDBG(LOGERROR, "ipc_rxskb_alloc fail %d %d %d %d\n", rwnx_hw->rxbuf_idx, atomic_read(&rwnx_hw->rxbuf_cnt), rwnx_hw->ipc_env->rxbuf_idx, err);
         spin_unlock_bh(&rwnx_hw->rxbuf_lock);
         return err;
     }
@@ -584,7 +661,7 @@ struct rwnx_ipc_buf *rwnx_ipc_rxbuf_from_hostid(struct rwnx_hw *rwnx_hw, u32 hos
  */
 static void rwnx_elems_deallocs(struct rwnx_hw *rwnx_hw)
 {
-	printk("rwnx_elems_deallocs 1\n");
+	AICWFDBG(LOGTRACE, "rwnx_elems_deallocs 1\n");
     rwnx_ipc_rxbufs_dealloc(rwnx_hw);
     rwnx_ipc_unsuprxvecs_dealloc(rwnx_hw);
 #ifdef CONFIG_RWNX_FULLMAC
@@ -597,7 +674,7 @@ static void rwnx_elems_deallocs(struct rwnx_hw *rwnx_hw)
     rwnx_ipc_buf_dealloc(rwnx_hw, &rwnx_hw->tx_pattern);
     rwnx_ipc_buf_dealloc(rwnx_hw, &rwnx_hw->dbgdump.buf);
 
-	printk("rwnx_elems_deallocs end\n");
+	AICWFDBG(LOGTRACE, "rwnx_elems_deallocs end\n");
 }
 
 /**
@@ -967,7 +1044,7 @@ static u8 rwnx_dbgind(void *pthis, void *arg)
     }
 
     /* Display the string */
-    printk("%s %s", (char *)FW_STR, (char *)dbg_msg->string);
+    AICWFDBG(LOGERROR, "%s %s", (char *)FW_STR, (char *)dbg_msg->string);
 
     /* Reset the msg buffer and re-use it */
     dbg_msg->pattern = 0;
@@ -1100,7 +1177,7 @@ void rwnx_ipc_tx_drain(struct rwnx_hw *rwnx_hw)
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 
     if (!rwnx_hw->ipc_env) {
-        printk(KERN_CRIT "%s: bypassing (restart must have failed)\n", __func__);
+        AICWFDBG(LOGERROR, KERN_CRIT "%s: bypassing (restart must have failed)\n", __func__);
         return;
     }
 
@@ -1117,7 +1194,11 @@ void rwnx_ipc_tx_drain(struct rwnx_hw *rwnx_hw)
         }
 #endif
 		rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
+#ifdef CONFIG_CACHE_GUARD
         kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
         skb_pull(skb, RWNX_TX_HEADROOM);
         dev_kfree_skb_any(skb);
     }
@@ -1177,10 +1258,34 @@ void rwnx_umh_done(struct rwnx_hw *rwnx_hw)
     ipc_host_dbginfo_push(rwnx_hw->ipc_env, &rwnx_hw->dbgdump.buf);
 }
 
+void rwnx_pcie_shared_init(struct rwnx_hw *rwnx_hw)
+{
+	struct ipc_shared_env_tag *shared_env = NULL;
+
+    rwnx_hw->ipc_env = (struct ipc_host_env_tag *) kzalloc(sizeof(struct ipc_host_env_tag), GFP_KERNEL);
+
+    if (!rwnx_hw->ipc_env){
+        return ;
+    }
+
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC000), rwnx_hw);
+        shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC000);
+    } else {
+	    aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm), rwnx_hw);
+	    shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm);
+    }
+	AICWFDBG(LOGINFO, "sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %lx\n", sizeof(struct ipc_shared_env_tag),
+												(u8 *)&shared_env->host_rxdesc - (u8 *)shared_env,
+												(u8 *)&shared_env->host_rxbuf - (u8 *)shared_env,
+												(u8 *)&shared_env->buffered - (u8 *)shared_env,
+												(u8 *)&rwnx_hw->ipc_env->shared->txdesc - (u8 *)shared_env);
+	AICWFDBG(LOGINFO, "txdesc size %ld\n", sizeof(rwnx_hw->ipc_env->shared->txdesc));
+}
+
 int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
 {
 	int res = 0;
-	struct ipc_shared_env_tag *shared_env = NULL;
 
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 #ifdef AICWF_SDIO_SUPPORT
@@ -1192,31 +1297,12 @@ int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
 #endif
 
 #ifdef AICWF_PCIE_SUPPORT
-    rwnx_hw->ipc_env = (struct ipc_host_env_tag *) kzalloc(sizeof(struct ipc_host_env_tag), GFP_KERNEL);
-
-    if (!rwnx_hw->ipc_env){
-        return -ENOMEM;
-    }
-
-    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
-        aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC000), rwnx_hw);
-        shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->pci_bar0_vaddr + 0x1DC000);
-    } else {
-	    aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm), rwnx_hw);
-	    shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm);
-    }
-
     res = rwnx_elems_allocs(rwnx_hw);
     if (res) {
         kfree(rwnx_hw->ipc_env);
         rwnx_hw->ipc_env = NULL;
+		return res;
     }
-	printk("sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %lx\n", sizeof(struct ipc_shared_env_tag),
-												(u8 *)&shared_env->host_rxdesc - (u8 *)shared_env,
-												(u8 *)&shared_env->host_rxbuf - (u8 *)shared_env,
-												(u8 *)&shared_env->buffered - (u8 *)shared_env,
-												(u8 *)&rwnx_hw->ipc_env->shared->txdesc - (u8 *)shared_env);
-	printk("txdesc size %ld\n", sizeof(rwnx_hw->ipc_env->shared->txdesc));
 
 #endif
     rwnx_cmd_mgr_init(rwnx_hw->cmd_mgr);
@@ -1229,7 +1315,9 @@ void rwnx_aic_deinit(struct rwnx_hw *rwnx_hw)
     RWNX_DBG(RWNX_FN_ENTRY_STR);
 
     //rwnx_ipc_tx_drain(rwnx_hw);
+    aic_host_tx_flush(rwnx_hw);
     rwnx_elems_deallocs(rwnx_hw);
+    data_cnt = 0;
     if (rwnx_hw->ipc_env) {
         kfree(rwnx_hw->ipc_env);
         rwnx_hw->ipc_env = NULL;

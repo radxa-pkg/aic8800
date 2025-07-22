@@ -1,4 +1,5 @@
-
+#ifndef AICWF_DEBUG_H
+#define AICWF_DEBUG_H
 
 #define RWNX_FN_ENTRY_STR ">>> %s()\n", __func__
 
@@ -49,4 +50,4 @@ do {	\
 #endif
 
 
-
+#endif/* AICWF_DEBUG_H */

@@ -18,6 +18,7 @@
 #include "rwnx_txq.h"
 #include "hal_desc.h"
 #include "rwnx_utils.h"
+#include "aicwf_tcp_ack.h"
 
 #define RWNX_HWQ_BK                     0
 #define RWNX_HWQ_BE                     1
@@ -29,7 +30,7 @@
 #define RWNX_HWQ_ALL_ACS_BIT (BIT(RWNX_HWQ_BK) | BIT(RWNX_HWQ_BE) |    \
 							  BIT(RWNX_HWQ_VI) | BIT(RWNX_HWQ_VO))
 
-#define RWNX_TX_LIFETIME_MS             1000
+#define RWNX_TX_LIFETIME_MS             500
 #define RWNX_TX_MAX_RATES               NX_TX_MAX_RATES
 
 #define RWNX_SWTXHDR_ALIGN_SZ           4
@@ -152,7 +153,9 @@ struct rwnx_sw_txhdr {
  */
 struct rwnx_txhdr {
 	struct rwnx_sw_txhdr *sw_hdr;
+#ifdef CONFIG_CACHE_GUARD
 	char cache_guard[L1_CACHE_BYTES];
+#endif
 	struct rwnx_hw_txhdr hw_hdr;
 };
 
@@ -259,5 +262,6 @@ int rwnx_dbgfs_print_sta(char *buf, size_t size, struct rwnx_sta *sta,
 void rwnx_txq_credit_update(struct rwnx_hw *rwnx_hw, int sta_idx, u8 tid,
 							s8 update);
 void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags);
+int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg);
 
 #endif /* _RWNX_TX_H_ */

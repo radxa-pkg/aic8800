@@ -156,6 +156,7 @@ typedef struct AIC_sco_card {
 #define BTUSB_DID_ISO_RESUME    4
 
 #define HCI_VENDOR_USB_DISC_HARDWARE_ERROR   0xFF
+#define HCI_VENDOR_USB_RESUME_HARDWARE_ERROR   0xFE
 
 #define HCI_CMD_READ_BD_ADDR 0x1009
 #define HCI_VENDOR_READ_LMP_VERISION 0x1001
@@ -767,7 +768,7 @@ struct fw_status {
 
 #define HCI_VSC_DBG_RD_MEM_CMD              0xFC01
 
-#define MAX_AD_FILTER_NUM        5// Max AD Filter num
+#define MAX_AD_FILTER_NUM        4// Max AD Filter num
 #define MAX_GPIO_TRIGGER_NUM     2// Max user config num of gpio
 #define MAX_ROLE_COMNO_IDX_NUM   2// Max num of ad role type combo,form( enum gpio_combo_idx) 
 
@@ -796,6 +797,7 @@ struct wakeup_ad_data_filter {
     uint8_t ad_len;
     uint8_t ad_type;
     uint8_t ad_data[31];
+	bdaddr_t wl_addr;
 };
 
 struct ble_wakeup_param_t {

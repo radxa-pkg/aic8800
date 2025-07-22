@@ -1281,10 +1281,10 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 	}
 
 	buf[len] = '\0';
-	ret = sscanf(buf, "%x %x %x %x %x %x %x %x %x %x %x %x %x %x",
-                            &hwconfig_id, &addr[0], &addr[1], &addr[2], &addr[3], &addr[4], &addr[5], &addr[6], &addr[7], &addr[8], &addr[9], &addr[10], &addr[11], &addr[12]);
-	if(ret > 14) {
-		printk("param error > 14\n");
+	ret = sscanf(buf, "%x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
+                            &hwconfig_id, &addr[0], &addr[1], &addr[2], &addr[3], &addr[4], &addr[5], &addr[6], &addr[7], &addr[8], &addr[9], &addr[10], &addr[11], &addr[12], &addr[13]);
+	if(ret > 15) {
+		printk("param error > 15\n");
 	} else {
 		switch(hwconfig_id)
 		    {
@@ -1296,8 +1296,8 @@ static ssize_t rwnx_dbgfs_vendor_hwconfig_write(struct file *file,
 			printk("ACS_TXOP_REQ bk:0x%x be:0x%x vi:0x%x vo:0x%x\n",addr[0],  addr[1], addr[2], addr[3]);
 			break;
 		    case 1:
-			if(ret != 14) {
-			    printk("param error  != 14\n");
+			if(ret != 15) {
+			    printk("param error  != 15\n");
 			    break;}
 			addr[12] = ~addr[12] + 1;
 			ret = rwnx_send_vendor_hwconfig_req(priv, hwconfig_id, addr, NULL);

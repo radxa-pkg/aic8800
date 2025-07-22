@@ -478,6 +478,14 @@ struct aic_sta {
     u8 sta_idx;            /* Identifier of the station */
 	bool he;               /* Flag indicating if the station supports HE */
     bool vht;               /* Flag indicating if the station supports VHT */
+
+	struct ieee80211_he_cap_elem he_cap_elem;
+	struct ieee80211_he_mcs_nss_supp he_mcs_nss_supp;
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0) || defined(CONFIG_VHT_FOR_OLD_KERNEL)
+	__le32 vht_cap_info;
+	struct ieee80211_vht_mcs_info supp_mcs;
+#endif
 };
 #endif
 
@@ -525,6 +533,12 @@ struct rwnx_sta {
     struct rwnx_tdls tdls; /* TDLS station information */
     struct rwnx_sta_stats stats;
     enum nl80211_mesh_power_mode mesh_pm; /*  link-specific mesh power save mode */
+#ifdef CONFIG_DYNAMIC_PERPWR
+	s8_l rssi_save;
+	s8_l per_pwrloss;
+	struct work_struct per_pwr_work;
+	unsigned long last_jiffies;
+#endif
 };
 
 static inline const u8 *rwnx_sta_addr(struct rwnx_sta *rwnx_sta) {
@@ -788,6 +802,13 @@ struct rwnx_hw {
 	char wext_essid[33];
 	int support_freqs[SCAN_CHANNEL_MAX];
 	int support_freqs_number;
+#ifdef CONFIG_DYNAMIC_PWR
+	struct timer_list pwrloss_timer;
+	struct work_struct pwrloss_work;
+	struct rwnx_vif *read_rssi_vif;
+	s8 pwrloss_lvl;
+	u8 sta_rssi_idx;
+#endif
 #endif
 };
 

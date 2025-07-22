@@ -19,7 +19,7 @@
 
 int rwnx_fw_log_init(struct rwnx_fw_log *fw_log)
 {
-	u8 *buf = kmalloc(FW_LOG_SIZE, GFP_KERNEL);
+	u8 *buf = kzalloc(FW_LOG_SIZE, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 

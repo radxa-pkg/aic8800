@@ -8,11 +8,11 @@
 
 void aicwf_pcie_cfg_x(struct aic_pci_dev *adev, u32 addr, u32 wr)
 {
-	//u32  rd, bk;
-	//pci_read_config_dword (adev->pdev, addr, &rd);
+	u32  rd, bk;
+	pci_read_config_dword (adev->pdev, addr, &rd);
 	pci_write_config_dword(adev->pdev, addr,  wr);
-	//pci_read_config_dword (adev->pdev, addr, &bk);
-    //LOG_INFO("w %08x %08x, %08x -> %08x", addr, wr, rd, bk);
+	pci_read_config_dword (adev->pdev, addr, &bk);
+    LOG_INFO("w %08x %08x, %08x -> %08x", addr, wr, rd, bk);
 }
 
 void aic_pcie_map_set(struct aic_pci_dev *adev, u8 idx, u32 base, u32 limt, u32 addr)
@@ -81,6 +81,74 @@ void aicwf_pcie_cfg(struct aic_pci_dev *adev)
     atomic_set(&adev->cnt_msi, 0);
 }
 
+void aicwf_pcie_print_st(struct aic_pci_dev *adev, u32 sim)
+{
+	u32  rd, addr, k, n, x[8];
+
+	addr = 0x728; pci_read_config_dword (adev->pdev, addr, &rd);
+	LOG_INFO("-> pl_debug0 (%03x) = %08x\n", addr, rd);
+
+	if(sim == 0)
+	{
+    	addr = 0x900; pci_read_config_dword (adev->pdev, addr, &rd);
+		LOG_INFO(" %x = %x\n", addr, rd);
+		for(k=0; k<=4; k++)
+		{
+			pci_write_config_dword(adev->pdev, 0x900, 0x80000000 + k);
+			for(n=0; n<=0x7; n++)
+			{
+				addr = 0x900 + (n<<2); pci_read_config_dword (adev->pdev, addr, &x[n]);
+			}
+			LOG_INFO(" -- MAP %d: %x %x %x %x %x %x %x %x\n", k, x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]);
+		}
+	
+		for(k=0; k<3; k++)
+		{
+			addr = 0x728; pci_read_config_dword (adev->pdev, addr, &rd);
+			LOG_INFO("-> pl_debug0 (%03x) = %08x\n", addr, rd);
+		}
+
+	    addr = 0x72c; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> pl_debug1 (%03x) = %08x\n", addr, rd);
+
+	    addr = 0x810; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> phy_status(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x8fc; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> pl_last   (%03x) = %08x\n", addr, rd);
+
+	    addr = 0x044; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> pm_ctrl   (%03x) = %08x\n", addr, rd);
+
+	    addr = 0x078; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> dev_ctrl  (%03x) = %08x\n", addr, rd);
+
+	    addr = 0x080; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> link_ctrl1(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x0a0; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> link_ctrl2(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x104; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> uncorr_st0(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x108; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> uncorr_st1(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x10c; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> uncorr_st2(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x110; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> uncorr_st3(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x114; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> uncorr_st4(%03x) = %08x\n", addr, rd);
+
+	    addr = 0x118; pci_read_config_dword (adev->pdev, addr, &rd);
+	    LOG_INFO("-> uncorr_st5(%03x) = %08x\n", addr, rd);
+	}
+}
+
 int aicwf_pcie_dma(struct aic_pci_dev *adev, void *dst, void *src, u32 size, u8 dir)
 {
     //> aic pcie dma api
@@ -133,17 +201,18 @@ int aicwf_pcie_dma(struct aic_pci_dev *adev, void *dst, void *src, u32 size, u8 
         //msleep(1);
 #endif
         rd = readl(adev->emb_hdma + lli_off);
-        LOG_INFO("    aic dma cnt = %x", rd);
-    } while((rd < lli_tar) && (k < 30));
+        //LOG_INFO("    aic dma cnt = %x", rd);
+    } while((rd < lli_tar) && (k < 10000));
 
     if(rd == lli_tar)
     {
-        LOG_INFO("    aic dma done, dma irq success, lli_cnt %d -> %d(%d)", lli_old, rd, lli_tar);
+        //LOG_INFO("    aic dma done, dma irq success, lli_cnt %d -> %d(%d)", lli_old, rd, lli_tar);
         return 0;
     }
     else
     {
         LOG_WARN("    aic dma done, dma irq failed!, lli_cnt %d -> %d(%d)", lli_old, rd, lli_tar);
+        aicwf_pcie_print_st(adev, 0);
         return -1;
     }
 }
@@ -439,12 +508,15 @@ int aicwf_pcie_setst(struct aic_pci_dev *adev)
     int ret;
 
     // 1. hardware initial config
+    aicwf_pcie_print_st(adev, 1);
     aicwf_pcie_cfg(adev);
 
     // 2. test pcie
+    aicwf_pcie_print_st(adev, 1);
     ret = aicwf_pcie_test_accs_emb(adev);
     if(ret)
     {
+        aicwf_pcie_print_st(adev, 0);
         LOG_INFO("FAILED TEST: aic_pcie_test_accs_emb %d", ret);
         return ret;
     }
@@ -452,13 +524,16 @@ int aicwf_pcie_setst(struct aic_pci_dev *adev)
     ret = aicwf_pcie_test_dma(adev, AIC_TEST_TRAN_OFF0, AIC_TEST_TRAN_WLEN, AIC_TRAN_DRV2EMB);
     if(ret)
     {
+        aicwf_pcie_print_st(adev, 0);
         LOG_INFO("FAILED TEST: aic_pcie_test_accs_emb %d", ret);
         return ret;
     }
 
+    aicwf_pcie_print_st(adev, 1);
     ret = aicwf_pcie_test_dma(adev, AIC_TEST_TRAN_OFF1, AIC_TEST_TRAN_WLEN, AIC_TRAN_EMB2DRV);
     if(ret)
     {
+        aicwf_pcie_print_st(adev, 0);
         LOG_INFO("FAILED TEST: aic_pcie_test_accs_emb %d", ret);
         return ret;
     }

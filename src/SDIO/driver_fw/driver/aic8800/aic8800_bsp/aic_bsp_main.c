@@ -201,24 +201,24 @@ const struct aicbsp_firmware fw_8800d80_h_u02[] = {
 const struct aicbsp_firmware fw_8800d80x2[] = {
 	[AICBSP_CPMODE_WORK] = {
 		.desc          = "normal work mode(8800d80x2 sdio)",
-		.bt_adid       = "fw_adid_8800d80_u02.bin",
-		.bt_patch      = "fw_patch_8800d80_u02.bin",
-		.bt_table      = "fw_patch_table_8800d80_u02.bin",
+		.bt_adid       = "fw_adid_8800d80x2_u05.bin",
+		.bt_patch      = "fw_patch_8800d80x2_u05.bin",
+		.bt_table      = "fw_patch_table_8800d80x2_u05.bin",
 	#ifdef CONFIG_SDIO_BT
 		.wl_fw         = "fmacfwbt_8800d80_h_u02.bin",
 	#else
 		.wl_fw         = "fmacfw_8800d80x2.bin",
 	#endif
-        .bt_ext_patch  = "fw_patch_8800d80_u02_ext"
+        .bt_ext_patch  = "fw_patch_8800d80x2_u05_ext"
 	},
 
 	[AICBSP_CPMODE_TEST] = {
 		.desc          = "rf test mode(8800d80x2 sdio)",
-		.bt_adid       = "fw_adid_8800d80_u02.bin",
-		.bt_patch      = "fw_patch_8800d80_u02.bin",
-		.bt_table      = "fw_patch_table_8800d80_u02.bin",
+		.bt_adid       = "fw_adid_8800d80x2_u05.bin",
+		.bt_patch      = "fw_patch_8800d80x2_u05.bin",
+		.bt_table      = "fw_patch_table_8800d80x2_u05.bin",
 		.wl_fw         = "lmacfw_rf_8800d80x2.bin",
-		.bt_ext_patch  = "fw_patch_8800d80_u02_ext"
+		.bt_ext_patch  = "fw_patch_8800d80x2_u05_ext"
 	},
 };
 

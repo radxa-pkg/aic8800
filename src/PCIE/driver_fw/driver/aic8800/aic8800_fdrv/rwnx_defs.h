@@ -749,6 +749,14 @@ struct rwnx_hw {
 	unsigned long started_jiffies;
 	s8_l temp;
 #endif
+#ifdef CONFIG_DYNAMIC_PWR
+	struct timer_list pwrloss_timer;
+	struct work_struct pwrloss_work;
+	struct rwnx_vif *read_rssi_vif;
+	s8 pwrloss_lvl;
+	u8 sta_rssi_idx;
+#endif
+
 };
 
 u8 *rwnx_build_bcn(struct rwnx_bcn *bcn, struct cfg80211_beacon_data *new);

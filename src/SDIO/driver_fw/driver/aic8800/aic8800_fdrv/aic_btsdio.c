@@ -16,8 +16,8 @@
 #include "aic_btsdio.h"
 #include "rwnx_msg_tx.h"
 
+#if CONFIG_BLUEDROID == 1
 static spinlock_t queue_lock;
-
 static inline struct sk_buff *bt_skb_alloc(unsigned int len, gfp_t how)
 {
     struct sk_buff *skb;
@@ -140,18 +140,7 @@ int bt_sdio_recv(u8 *data,u32 data_len)
         AICWFDBG(LOGERROR,"%s: Failed to get hci dev[NULL]", __func__);
         return -ENODEV;
     }
-	
-	//printk("%s type %x  len %d \n",__func__,type,len);
-	//bt_data_dump("bt_recv", ind->bt_data, 64);
 
-	/*#if (CONFIG_BLUEDROID) || (HCI_VERSION_CODE < KERNEL_VERSION(3, 18, 0))
-		if (hci_recv_fragment(hdev, type,
-						ind->bt_data[0],
-						ind->data_len) < 0) {
-			AICWFDBG(LOGERROR,"%s: Corrupted event packet", __func__);
-			hdev->stat.err_rx++;
-		}
-	#endif*/
 	skb = alloc_skb(len,GFP_ATOMIC);
 	if(!skb){
 		AICWFDBG(LOGERROR, "alloc skb fail %s \n",__func__);
@@ -1307,4 +1296,4 @@ void hdev_exit(void)
 	hci_unregister_dev(hdev);
 	hci_free_dev(hdev);
 }
-
+#endif

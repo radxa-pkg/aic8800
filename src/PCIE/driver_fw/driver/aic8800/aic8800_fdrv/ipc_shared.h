@@ -637,6 +637,8 @@ struct ipc_shared_env_tag {
 	u32_l buffered[NX_REMOTE_STA_MAX_FOR_OLD_IC][TID_MAX];
     volatile struct txdesc_host txdesc[IPC_TXDMA_DESC_CNT];
     volatile uint32_t e2a_fc;
+
+    volatile uint32_t fw_init_done;
 };
 
 extern struct ipc_shared_env_tag ipc_shared_env;

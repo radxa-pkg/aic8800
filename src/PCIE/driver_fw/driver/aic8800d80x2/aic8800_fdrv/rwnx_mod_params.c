@@ -347,7 +347,7 @@ struct ieee80211_regdomain *getRegdomainFromRwnxDBIndex(struct wiphy *wiphy,
 	country_code[0] = reg_regdb[idx]->alpha2[0];
 	country_code[1] = reg_regdb[idx]->alpha2[1];
 
-	printk("%s set ccode:%s \r\n", __func__, country_code);
+	AICWFDBG(LOGINFO, "%s set ccode:%s \r\n", __func__, country_code);
 
 	rwnx_get_countrycode_channels(wiphy, reg_regdb[idx]);
 
@@ -820,7 +820,7 @@ static void rwnx_set_vht_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		}
 
 			rwnx_hw->vht_cap_2G.cap |= IEEE80211_VHT_CAP_MAX_A_MPDU_LENGTH_EXPONENT_MASK;
-		printk("%s, vht_capa_info=0x%x\n", __func__, rwnx_hw->vht_cap_2G.cap);
+		AICWFDBG(LOGINFO, "%s, vht_capa_info=0x%x\n", __func__, rwnx_hw->vht_cap_2G.cap);
 #ifdef USE_5G
 	if (rwnx_hw->band_5g_support) {
 	    rwnx_hw->vht_cap_5G.vht_supported = true;
@@ -1193,16 +1193,23 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	he_cap = (struct ieee80211_sta_he_cap *) &rwnx_he_capa.he_cap;
 	he_cap->has_he = true;
 	he_cap->he_cap_elem.mac_cap_info[2] |= IEEE80211_HE_MAC_CAP2_ALL_ACK;
-	if (rwnx_hw->mod_params->use_2040) {
-		he_cap->he_cap_elem.phy_cap_info[0] |=
-						IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
-		he_cap->ppe_thres[0] |= 0x10;
-	}
-        if (rwnx_hw->mod_params->use_80) {
-	    he_cap->ppe_thres[0] |= 0x20;
-            he_cap->ppe_thres[2] |= 0xc0;
-	    he_cap->ppe_thres[3] |= 0x07;
-	}
+    if (rwnx_hw->mod_params->use_2040) {
+        he_cap->he_cap_elem.phy_cap_info[0] |=
+                        IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
+        he_cap->ppe_thres[0] |= 0x10;
+    }
+    if (rwnx_hw->mod_params->use_80) {
+        he_cap->ppe_thres[0] |= 0x20;
+        he_cap->ppe_thres[2] |= 0xc0;
+        he_cap->ppe_thres[3] |= 0x01;
+    }
+    if (rwnx_hw->mod_params->nss == 2) {
+        he_cap->ppe_thres[0] |= 0x01;
+        he_cap->ppe_thres[3] |= 0x70;
+        he_cap->ppe_thres[4] |= 0x1c;
+        he_cap->ppe_thres[5] |= 0x07;
+    }
+
 	//if (rwnx_hw->mod_params->use_80)
 	{
 		he_cap->he_cap_elem.phy_cap_info[0] |=
@@ -1248,8 +1255,9 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 										   IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMER_FB |
 										   IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMER_FB |
 										   IEEE80211_HE_PHY_CAP6_PPE_THRESHOLD_PRESENT |
-										   IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO;
-	he_cap->he_cap_elem.phy_cap_info[7] |= IEEE80211_HE_PHY_CAP7_HE_SU_MU_PPDU_4XLTF_AND_08_US_GI;
+										   IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO |
+										   IEEE80211_HE_PHY_CAP6_PARTIAL_BW_EXT_RANGE;
+	//he_cap->he_cap_elem.phy_cap_info[7] |= IEEE80211_HE_PHY_CAP7_HE_SU_MU_PPDU_4XLTF_AND_08_US_GI;
 	he_cap->he_cap_elem.phy_cap_info[8] |= IEEE80211_HE_PHY_CAP8_20MHZ_IN_40MHZ_HE_PPDU_IN_2G;
 	he_cap->he_cap_elem.phy_cap_info[9] |= IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_COMP_SIGB |
 										   IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_NON_COMP_SIGB;
@@ -1316,16 +1324,22 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	he_cap = (struct ieee80211_sta_he_cap *) &band_2GHz->iftype_data->he_cap;
 	he_cap->has_he = true;
 	he_cap->he_cap_elem.mac_cap_info[2] |= IEEE80211_HE_MAC_CAP2_ALL_ACK;
-	if (rwnx_hw->mod_params->use_2040) {
-		he_cap->he_cap_elem.phy_cap_info[0] |=
-						IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
-		he_cap->ppe_thres[0] |= 0x10;
-	}
-	if (rwnx_hw->mod_params->use_80) {
-	    he_cap->ppe_thres[0] |= 0x20;
-	    he_cap->ppe_thres[2] |= 0xc0;
-	    he_cap->ppe_thres[3] |= 0x07;
-	}
+    if (rwnx_hw->mod_params->use_2040) {
+        he_cap->he_cap_elem.phy_cap_info[0] |=
+                        IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
+        he_cap->ppe_thres[0] |= 0x10;
+    }
+    if (rwnx_hw->mod_params->use_80) {
+        he_cap->ppe_thres[0] |= 0x20;
+        he_cap->ppe_thres[2] |= 0xc0;
+        he_cap->ppe_thres[3] |= 0x01;
+    }
+    if (rwnx_hw->mod_params->nss == 2) {
+        he_cap->ppe_thres[0] |= 0x01;
+        he_cap->ppe_thres[3] |= 0x70;
+        he_cap->ppe_thres[4] |= 0x1c;
+        he_cap->ppe_thres[5] |= 0x07;
+    }
 	//if (rwnx_hw->mod_params->use_80)
 	{
 		he_cap->he_cap_elem.phy_cap_info[0] |=
@@ -1382,17 +1396,19 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 					IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMING_FB |
 					IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMING_PARTIAL_BW_FB |
 					IEEE80211_HE_PHY_CAP6_PPE_THRESHOLD_PRESENT |
-					IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO;
+					IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO |
+					IEEE80211_HE_PHY_CAP6_PARTIAL_BW_EXT_RANGE;
 	#else
 	he_cap->he_cap_elem.phy_cap_info[6] |= IEEE80211_HE_PHY_CAP6_CODEBOOK_SIZE_42_SU |
 					IEEE80211_HE_PHY_CAP6_CODEBOOK_SIZE_75_MU |
 					IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMER_FB |
 					IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMER_FB |
 					IEEE80211_HE_PHY_CAP6_PPE_THRESHOLD_PRESENT |
-					IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO;
+					IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO |
+					IEEE80211_HE_PHY_CAP6_PARTIAL_BW_EXT_RANGE;
 	#endif
 
-	he_cap->he_cap_elem.phy_cap_info[7] |= IEEE80211_HE_PHY_CAP7_HE_SU_MU_PPDU_4XLTF_AND_08_US_GI;
+	//he_cap->he_cap_elem.phy_cap_info[7] |= IEEE80211_HE_PHY_CAP7_HE_SU_MU_PPDU_4XLTF_AND_08_US_GI;
 	he_cap->he_cap_elem.phy_cap_info[8] |= IEEE80211_HE_PHY_CAP8_20MHZ_IN_40MHZ_HE_PPDU_IN_2G;
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 	he_cap->he_cap_elem.phy_cap_info[9] |= IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_COMP_SIGB |
@@ -1440,16 +1456,23 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 		he_cap = (struct ieee80211_sta_he_cap *) &band_5GHz->iftype_data->he_cap;
 		he_cap->has_he = true;
 		he_cap->he_cap_elem.mac_cap_info[2] |= IEEE80211_HE_MAC_CAP2_ALL_ACK;
-		if (rwnx_hw->mod_params->use_2040) {
-			he_cap->he_cap_elem.phy_cap_info[0] |=
-							IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
-			he_cap->ppe_thres[0] |= 0x10;
-		}
-		if (rwnx_hw->mod_params->use_80) {
-			he_cap->ppe_thres[0] |= 0x20;
-			he_cap->ppe_thres[2] |= 0xc0;
-			he_cap->ppe_thres[3] |= 0x07;
-		}
+        if (rwnx_hw->mod_params->use_2040) {
+            he_cap->he_cap_elem.phy_cap_info[0] |=
+                            IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
+            he_cap->ppe_thres[0] |= 0x10;
+        }
+        if (rwnx_hw->mod_params->use_80) {
+            he_cap->ppe_thres[0] |= 0x20;
+            he_cap->ppe_thres[2] |= 0xc0;
+            he_cap->ppe_thres[3] |= 0x01;
+        }
+        if (rwnx_hw->mod_params->nss == 2) {
+            he_cap->ppe_thres[0] |= 0x01;
+            he_cap->ppe_thres[3] |= 0x70;
+            he_cap->ppe_thres[4] |= 0x1c;
+            he_cap->ppe_thres[5] |= 0x07;
+        }
+
 		//if (rwnx_hw->mod_params->use_80)
 		{
 			he_cap->he_cap_elem.phy_cap_info[0] |=
@@ -1503,17 +1526,19 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 				IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMING_FB |
 				IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMING_PARTIAL_BW_FB |
 				IEEE80211_HE_PHY_CAP6_PPE_THRESHOLD_PRESENT |
-				IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO;
+				IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO |
+				IEEE80211_HE_PHY_CAP6_PARTIAL_BW_EXT_RANGE;
 		#else
 			he_cap->he_cap_elem.phy_cap_info[6] |= IEEE80211_HE_PHY_CAP6_CODEBOOK_SIZE_42_SU |
 				IEEE80211_HE_PHY_CAP6_CODEBOOK_SIZE_75_MU |
 				IEEE80211_HE_PHY_CAP6_TRIG_SU_BEAMFORMER_FB |
 				IEEE80211_HE_PHY_CAP6_TRIG_MU_BEAMFORMER_FB |
 				IEEE80211_HE_PHY_CAP6_PPE_THRESHOLD_PRESENT |
-				IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO;
+				IEEE80211_HE_PHY_CAP6_PARTIAL_BANDWIDTH_DL_MUMIMO |
+				IEEE80211_HE_PHY_CAP6_PARTIAL_BW_EXT_RANGE;
 		#endif
 
-		he_cap->he_cap_elem.phy_cap_info[7] |= IEEE80211_HE_PHY_CAP7_HE_SU_MU_PPDU_4XLTF_AND_08_US_GI;
+		//he_cap->he_cap_elem.phy_cap_info[7] |= IEEE80211_HE_PHY_CAP7_HE_SU_MU_PPDU_4XLTF_AND_08_US_GI;
 		he_cap->he_cap_elem.phy_cap_info[8] |= IEEE80211_HE_PHY_CAP8_20MHZ_IN_40MHZ_HE_PPDU_IN_2G;
 		#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0)
 		he_cap->he_cap_elem.phy_cap_info[9] |= IEEE80211_HE_PHY_CAP9_RX_FULL_BW_SU_USING_MU_WITH_COMP_SIGB |
@@ -1598,7 +1623,7 @@ if (rwnx_hw->mod_params->custregd) {
         // function, that needs to be called after wiphy registration
         memcpy(country_code, default_ccode, sizeof(default_ccode));
 		regdomain = getRegdomainFromRwnxDB(wiphy, default_ccode);
-        printk(KERN_CRIT
+        AICWFDBG(LOGINFO, KERN_CRIT
                "\n\n%s: CAUTION: USING PERMISSIVE CUSTOM REGULATORY RULES\n\n",
                __func__);
         wiphy->regulatory_flags |= REGULATORY_CUSTOM_REG;
@@ -1607,7 +1632,7 @@ if (rwnx_hw->mod_params->custregd) {
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
         memcpy(country_code, default_ccode, sizeof(default_ccode));
 		regdomain = getRegdomainFromRwnxDB(wiphy, default_ccode);
-		printk(KERN_CRIT"%s: Registering custom regulatory\n", __func__);
+		AICWFDBG(LOGINFO, KERN_CRIT"%s: Registering custom regulatory\n", __func__);
 		wiphy->flags |= WIPHY_FLAG_CUSTOM_REGULATORY;
 		wiphy_apply_custom_regulatory(wiphy, regdomain);
 #endif
@@ -1732,10 +1757,12 @@ int rwnx_handle_dynparams(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	if (ret)
 		return ret;
 #endif
-
 	/* Allocate the RX buffers according to the maximum AMSDU RX size */
-	ret = rwnx_ipc_rxbuf_init(rwnx_hw, (4 * (rwnx_hw->mod_params->amsdu_rx_max + 1)) * 1024);//(rwnx_hw, 2048);
-							 // (4 * (rwnx_hw->mod_params->amsdu_rx_max + 1) + 1) * 1024);
+    #ifdef CONFIG_RX_SKBLIST
+	ret = rwnx_ipc_rxbuf_init(rwnx_hw, 2048);
+    #else
+    ret = rwnx_ipc_rxbuf_init(rwnx_hw, (rwnx_hw, (4 * (rwnx_hw->mod_params->amsdu_rx_max + 1) + 1) * 1024));
+    #endif
 	if (ret) {
 		wiphy_err(wiphy, "Cannot allocate the RX buffers\n");
 		return ret;

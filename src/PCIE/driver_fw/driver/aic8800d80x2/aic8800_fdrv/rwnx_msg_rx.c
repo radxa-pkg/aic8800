@@ -123,13 +123,13 @@ static inline int rwnx_rx_chan_switch_ind(struct rwnx_hw *rwnx_hw,
 			/* Keep in mind that we have switched on the channel */
 			roc_elem->on_chan = true;
 		} else {
-			printk("roc_elem == null\n");
+			AICWFDBG(LOGERROR, "roc_elem == null\n");
 		}
 		// Enable traffic on OFF channel queue
 		rwnx_txq_offchan_start(rwnx_hw);
 	}
 
-	//tasklet_schedule(&rwnx_hw->task_txrestart);
+	tasklet_schedule(&rwnx_hw->task_txrestart);
 
 	rwnx_hw->cur_chanctx = chan_idx;
 	rwnx_radar_detection_enable_on_cur_channel(rwnx_hw);
@@ -363,6 +363,40 @@ static inline int rwnx_rx_pktloss_notify_ind(struct rwnx_hw *rwnx_hw,
 #endif /* CONFIG_RWNX_FULLMAC */
 
 	return 0;
+}
+
+static inline int rwnx_radar_detect_ind(struct rwnx_hw *rwnx_hw,
+                                                struct rwnx_cmd *cmd,
+                                                struct ipc_e2a_msg *msg)
+{
+    struct radar_pulse_array_desc *pulses = (struct radar_pulse_array_desc *)msg->param;
+	int i;
+
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
+    //printk("%s\n", __func__);
+
+    if(pulses->cnt == 0) {
+		AICWFDBG(LOGERROR, "cnt error\n");
+		return -1;
+    }
+
+	if(rwnx_radar_detection_is_enable(&rwnx_hw->radar, pulses->idx)) {
+		for(i=0; i<pulses->cnt; i++) {
+			struct rwnx_radar_pulses *p = &rwnx_hw->radar.pulses[pulses->idx];
+
+			p->buffer[p->index] = pulses->pulse[i];
+			p->index = (p->index + 1)%RWNX_RADAR_PULSE_MAX;
+			if(p->count < RWNX_RADAR_PULSE_MAX)
+				p->count++;
+			//printk("pulse=%x\n", pulses->pulse[i]);
+		}
+
+		if(!work_pending(&rwnx_hw->radar.detection_work))
+			schedule_work(&rwnx_hw->radar.detection_work);
+    } else
+		AICWFDBG(LOGINFO, "not enable\n");
+
+    return 0;
 }
 
 static inline int rwnx_apm_staloss_ind(struct rwnx_hw *rwnx_hw,
@@ -759,6 +793,13 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
 			rwnx_vif->tdls_chsw_prohibited = extcap->ext_capab[4] & WLAN_EXT_CAPA5_TDLS_CH_SW_PROHIBITED;
 		}
 
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+		if (chan->flags & IEEE80211_CHAN_RADAR)
+			rwnx_radar_detection_enable(&rwnx_hw->radar,
+											RWNX_RADAR_DETECT_REPORT,
+											RWNX_RADAR_RIU);
+#endif
+
 		if (rwnx_vif->wep_enabled)
 			rwnx_vif->wep_auth_err = false;
 
@@ -802,7 +843,7 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
 	} else if (ind->status_code == WLAN_STATUS_NOT_SUPPORTED_AUTH_ALG) {
 		if (rwnx_vif->wep_enabled) {
 			rwnx_vif->wep_auth_err = true;
-			printk("con ind wep_auth_err %d\n", rwnx_vif->wep_auth_err);
+			AICWFDBG(LOGINFO, "con ind wep_auth_err %d\n", rwnx_vif->wep_auth_err);
 		}
 		atomic_set(&rwnx_vif->drv_conn_state, (int)RWNX_DRV_STATUS_DISCONNECTED);
 	}else{
@@ -869,6 +910,10 @@ static inline int rwnx_rx_sm_connect_ind(struct rwnx_hw *rwnx_hw,
 		netif_carrier_on(dev);
 	}
 
+#ifdef CONFIG_DYNAMIC_PWR
+	rwnx_hw->sta_rssi_idx = ind->ap_idx;
+#endif
+
 	return 0;
 }
 
@@ -882,7 +927,7 @@ static inline int rwnx_rx_sm_disconnect_ind(struct rwnx_hw *rwnx_hw,
 	struct net_device *dev;
 #ifdef AICWF_RX_REORDER
 	struct reord_ctrl_info *reord_info, *tmp;
-	u8 *macaddr;
+	const u8 *macaddr;
 	struct aicwf_rx_priv *rx_priv;
 #endif
 
@@ -933,13 +978,13 @@ static inline int rwnx_rx_sm_disconnect_ind(struct rwnx_hw *rwnx_hw,
 
 	if ((rwnx_vif->wdev.iftype == NL80211_IFTYPE_STATION) || (rwnx_vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT)) {
 		macaddr = rwnx_vif->ndev->dev_addr;
-		printk("deinit:macaddr:%x,%x,%x,%x,%x,%x\r\n", macaddr[0], macaddr[1], macaddr[2], \
+		AICWFDBG(LOGINFO, "deinit:macaddr:%x,%x,%x,%x,%x,%x\r\n", macaddr[0], macaddr[1], macaddr[2], \
 							   macaddr[3], macaddr[4], macaddr[5]);
 
 		spin_lock_bh(&rx_priv->stas_reord_lock);
 		list_for_each_entry_safe(reord_info, tmp, &rx_priv->stas_reord_list, list) {
 			macaddr = rwnx_vif->ndev->dev_addr;
-			printk("reord_mac:%x,%x,%x,%x,%x,%x\r\n", reord_info->mac_addr[0], reord_info->mac_addr[1], reord_info->mac_addr[2], \
+			AICWFDBG(LOGINFO, "reord_mac:%x,%x,%x,%x,%x,%x\r\n", reord_info->mac_addr[0], reord_info->mac_addr[1], reord_info->mac_addr[2], \
 								   reord_info->mac_addr[3], reord_info->mac_addr[4], reord_info->mac_addr[5]);
 			if (!memcmp(reord_info->mac_addr, macaddr, 6)) {
 				reord_deinit_sta(rx_priv, reord_info);
@@ -979,6 +1024,8 @@ static inline int rwnx_rx_sm_external_auth_required_ind(struct rwnx_hw *rwnx_hw,
 	struct cfg80211_external_auth_params params;
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+	memset((void*)&params, 0, sizeof(struct cfg80211_external_auth_params));
 
 	params.action = NL80211_EXTERNAL_AUTH_START;
 	memcpy(params.bssid, ind->bssid.array, ETH_ALEN);
@@ -1272,7 +1319,7 @@ static inline int rwnx_rx_dbg_custmsg_ind(struct rwnx_hw *rwnx_hw,
     str_len = (ind->len < 32) ? ind->len : 32;
     memcpy(str_msg, (char *)ind->buf, str_len);
     str_msg[str_len] = '\0';
-    printk("CustMsgInd: cmd=0x%x, len=%d, str=%s\r\n", ind->cmd, ind->len, str_msg);
+    AICWFDBG(LOGINFO, "CustMsgInd: cmd=0x%x, len=%d, str=%s\r\n", ind->cmd, ind->len, str_msg);
 
     return 0;
 }
@@ -1295,6 +1342,7 @@ static msg_cb_fct mm_hdlrs[MSG_I(MM_MAX)] = {
 	[MSG_I(MM_RSSI_STATUS_IND)]        = rwnx_rx_rssi_status_ind,
 	[MSG_I(MM_PKTLOSS_IND)]            = rwnx_rx_pktloss_notify_ind,
     [MSG_I(MM_APM_STALOSS_IND)]        = rwnx_apm_staloss_ind,
+    [MSG_I(MM_RADAR_DETECT_IND)] 	   = rwnx_radar_detect_ind,
 };
 
 static msg_cb_fct scan_hdlrs[MSG_I(SCANU_MAX)] = {
@@ -1373,7 +1421,7 @@ void rwnx_rx_handle_print(struct rwnx_hw *rwnx_hw, u8 *msg, u32 len)
 		return;
 	}
 
-	printk("FWLOG: %s", msg);
+	//printk("FWLOG: %s", msg);
 
 #ifdef CONFIG_RWNX_DEBUGFS
 	data_end = rwnx_hw->debugfs.fw_log.buf.dataend;

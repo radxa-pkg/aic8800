@@ -670,9 +670,16 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
 
         #ifdef CONFIG_HE_FOR_OLD_KERNEL
         struct ieee80211_he_cap_elem *he;
+		struct ieee80211_he_mcs_nss_supp *he_mcs;
         ie = cfg80211_find_ext_ie(WLAN_EID_EXT_HE_CAPABILITY, mgmt->u.assoc_req.variable, len);
         if (ie && ie[1] >= sizeof(*he) + 1) {
             printk("assoc_req: find he\n");
+			he = (struct ieee80211_he_cap_elem *)(ie+3);
+			he_mcs = (struct ieee80211_he_mcs_nss_supp *)((u8 *)he + sizeof(*he));
+			memcpy(&sta->he_cap_elem,ie+3,sizeof(struct ieee80211_he_cap_elem));
+
+			sta->he_mcs_nss_supp.rx_mcs_80 = he_mcs->rx_mcs_80;
+			sta->he_mcs_nss_supp.tx_mcs_80 = he_mcs->tx_mcs_80;
             sta->he = true;
         }
         else {
@@ -686,6 +693,8 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
         ie = cfg80211_find_ie(WLAN_EID_VHT_CAPABILITY, mgmt->u.assoc_req.variable, len);
         if (ie && ie[1] >= sizeof(*vht)) {
             printk("assoc_req: find vht\n");
+			memcpy(&sta->vht_cap_info,ie+2,4);
+			memcpy(&sta->supp_mcs,ie+2+4,sizeof(struct ieee80211_vht_mcs_info));
             sta->vht = true;
         } else {
             printk("assoc_req: no find vht\n");
@@ -695,11 +704,11 @@ static void rwnx_rx_mgmt(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
     }
 #endif
 
-	if (ieee80211_is_mgmt(mgmt->frame_control) &&
+	/*if (ieee80211_is_mgmt(mgmt->frame_control) &&
 	    (skb->len <= 24 || skb->len > 768)) {
 	    printk("mgmt err\n");
 	    return;
-	}
+	}*/
 	if (ieee80211_is_beacon(mgmt->frame_control)) {
 		if ((RWNX_VIF_TYPE(rwnx_vif) == NL80211_IFTYPE_MESH_POINT) &&
 			hw_rxhdr->flags_new_peer) {

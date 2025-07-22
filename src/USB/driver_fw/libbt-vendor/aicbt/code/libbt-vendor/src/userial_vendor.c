@@ -96,6 +96,47 @@ struct aic_object_t {
   void (*write_ready)(void *context);  // function to call when the file descriptor becomes writeable.
 };
 
+uint16_t aic_acl_handle_list[10];
+void hci_disconnect_complete_event(uint16_t handle,uint8_t reason)
+{
+    int len = 7;
+    unsigned char p_buf[7] = {HCIT_TYPE_EVENT, 0x05, 0x04, 0x00, 0x00, 0x00, 0x00};
+    p_buf[4] = (unsigned char)(handle & 0x00ff);
+    p_buf[5] = (unsigned char)((handle & 0xff00)>>8);
+    p_buf[6] = reason;
+    printf("%s\n",__func__);
+    userial_recv_rawdata_hook(p_buf,len);
+}
+static void aic_clean_store_acl_handle(uint16_t handle)
+{
+    int i = 0;
+    printf("%s,handle = 0x%x\n", __func__,handle);
+    for(i = 0 ;i < 10; i++){
+        if(aic_acl_handle_list[i] == handle && aic_acl_handle_list[i] != 0){
+            aic_acl_handle_list[i] = 0;
+            break;
+        }
+    }
+}
+
+static int aic_disconnect_all_store_acl_handle()
+{
+    int i = 0;
+    int ret = 0;
+    printf("%s\n", __func__);
+    for(i = 0 ;i < 10; i++){
+        if(aic_acl_handle_list[i] != 0){
+            printf("%s,handle = 0x%x\n", __func__,aic_acl_handle_list[i]);
+			if(aic_acl_handle_list[i]>=0x80){
+            	hci_disconnect_complete_event(aic_acl_handle_list[i],0x13);
+			}
+            aic_clean_store_acl_handle(aic_acl_handle_list[i]);
+            ret = 1;
+        }
+    }
+    printf("%s ret = %d\n", __func__,ret);
+    return ret;
+}
 /* vendor serial control block */
 typedef struct
 {
@@ -2004,12 +2045,13 @@ done:;
 }
 
 #ifdef AIC_HANDLE_EVENT
-static void userial_handle_event(unsigned char * recv_buffer, int total_length)
+static bool userial_handle_event(unsigned char * recv_buffer, int total_length)
 {
     AIC_UNUSED(total_length);
     uint8_t event;
     uint8_t *p_data = recv_buffer;
     event = p_data[0];
+    bool ret = false;
     switch (event) {
     case HCI_COMMAND_COMPLETE_EVT:
     {
@@ -2118,9 +2160,21 @@ static void userial_handle_event(unsigned char * recv_buffer, int total_length)
     }
     break;
 #endif
+case HCI_HARDWARE_ERROR_EVT:
+{
+    uint8_t reason = p_data[2];
+    printf("hw_error,reason = 0x%x\n",reason);
+    if(USERIAL_HWERR_CODE_USB_RESUME == reason){
+        ret = true;
+        aic_disconnect_all_store_acl_handle();
+    }
+}
+	break;
+	
     default :
     break;
-  }
+    }
+return ret;
 }
 
 #ifdef CONFIG_SCO_OVER_HCI
@@ -2224,7 +2278,7 @@ static int userial_handle_recv_data(unsigned char * recv_buffer, unsigned int to
     unsigned char * p_data = recv_buffer;
     unsigned int length = total_length;
     uint8_t event;
-
+    bool ret = false;
     if(!length){
         ALOGE("%s, length is 0, return immediately", __func__);
         return total_length;
@@ -2323,7 +2377,7 @@ static int userial_handle_recv_data(unsigned char * recv_buffer, unsigned int to
         case AICBT_PACKET_END:
             switch (recv_packet_current_type) {
                 case DATA_TYPE_EVENT :
-                    userial_handle_event(received_resvered_header, received_resvered_length);
+                ret = userial_handle_event(received_resvered_header, received_resvered_length);
                 break;
 #ifdef CONFIG_SCO_OVER_HCI
                 case DATA_TYPE_SCO :

@@ -15,6 +15,7 @@
 #include "rwnx_defs.h"
 #include "usb_host.h"
 #include "rwnx_platform.h"
+#include "rwnx_msg_tx.h"
 
 #ifdef CONFIG_GPIO_WAKEUP
 #ifdef CONFIG_PLATFORM_ROCKCHIP
@@ -2351,7 +2352,11 @@ static int aicwf_usb_chipmatch(struct aic_usb_dev *usb_dev, u16_l vid, u16_l pid
         if (usb_dev->udev->speed <= USB_SPEED_HIGH) {
             aicwf_usb_rx_aggr = true;
         } else {
+            #ifdef CONFIG_PLATFORM_HI
+            aicwf_usb_rx_aggr = true;
+            #else
             aicwf_usb_rx_aggr = false;
+            #endif
         }
         AICWFDBG(LOGINFO, "%s USE AIC8800D81X2\r\n", __func__);
         return 0;
@@ -2361,7 +2366,11 @@ static int aicwf_usb_chipmatch(struct aic_usb_dev *usb_dev, u16_l vid, u16_l pid
         if (usb_dev->udev->speed <= USB_SPEED_HIGH) {
             aicwf_usb_rx_aggr = true;
         } else {
+            #ifdef CONFIG_PLATFORM_HI
+            aicwf_usb_rx_aggr = true;
+            #else
             aicwf_usb_rx_aggr = false;
+            #endif
         }
         AICWFDBG(LOGINFO, "%s USE AIC8800D89X2\r\n", __func__);
         return 0;
@@ -2563,60 +2572,51 @@ static void aicwf_usb_disconnect(struct usb_interface *intf)
 static int aicwf_usb_suspend(struct usb_interface *intf, pm_message_t state)
 {
     struct aic_usb_dev *usb_dev =
-        (struct aic_usb_dev *) usb_get_intfdata(intf);
-#ifdef CONFIG_GPIO_WAKEUP
-	struct rwnx_vif *rwnx_vif, *tmp;
-	//unsigned long irqflags;
-#endif
-
-	printk("%s enter\r\n", __func__);
-
-#ifdef CONFIG_GPIO_WAKEUP
-//	spin_lock_irqsave(&irq_lock, irqflags);
-//	rwnx_enable_hostwake_irq();
-//    spin_unlock_irqrestore(&irq_lock, irqflags);
-    atomic_inc(&irq_count);
-
-	list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
-	if (rwnx_vif->ndev)
-		netif_device_detach(rwnx_vif->ndev);
-	}
-#endif
-
-	aicwf_usb_state_change(usb_dev, USB_SLEEP_ST);
+    (struct aic_usb_dev *) usb_get_intfdata(intf);
+    struct rwnx_vif *rwnx_vif, *tmp;
+        
+    AICWFDBG(LOGINFO, "%s enter\r\n", __func__);
+#ifdef CONFIG_WOWLAN
+    rwnx_send_dummy_reboot(usb_dev->rwnx_hw);
+#endif       
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev){
+            netif_tx_stop_all_queues(rwnx_vif->ndev);
+            mdelay(1000);
+        }
+    }
+    aicwf_usb_state_change(usb_dev, USB_SLEEP_ST);
     aicwf_bus_stop(usb_dev->bus_if);
 
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev)
+            netif_device_detach(rwnx_vif->ndev);
+    }
 
-    return 0;
+return 0;
 }
 
 static int aicwf_usb_resume(struct usb_interface *intf)
 {
     struct aic_usb_dev *usb_dev =
-        (struct aic_usb_dev *) usb_get_intfdata(intf);
-#ifdef CONFIG_GPIO_WAKEUP
-	struct rwnx_vif *rwnx_vif, *tmp;
-//	unsigned long irqflags;
-#endif
-	printk("%s enter\r\n", __func__);
+         (struct aic_usb_dev *) usb_get_intfdata(intf);
+    struct rwnx_vif *rwnx_vif, *tmp;
+    AICWFDBG(LOGINFO, "%s enter\r\n", __func__);
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev)
+            netif_device_attach(rwnx_vif->ndev);
+    }
 
-#ifdef CONFIG_GPIO_WAKEUP
-//	spin_lock_irqsave(&irq_lock, irqflags);
-//	rwnx_disable_hostwake_irq();
-//	spin_unlock_irqrestore(&irq_lock, irqflags);
-	atomic_dec(&irq_count);
+        if (usb_dev->state != USB_UP_ST){
+        aicwf_bus_start(usb_dev->bus_if);
+        }
 
-	list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
-	if (rwnx_vif->ndev)
-		netif_device_attach(rwnx_vif->ndev);
-	}
-#endif
-
-    if (usb_dev->state == USB_UP_ST)
-        return 0;
-
-    aicwf_bus_start(usb_dev->bus_if);
-    return 0;
+    list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
+        if (rwnx_vif->ndev){
+            netif_tx_wake_all_queues(rwnx_vif->ndev);
+        }
+    }
+     return 0;
 }
 
 static int aicwf_usb_reset_resume(struct usb_interface *intf)

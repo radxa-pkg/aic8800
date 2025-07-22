@@ -1177,9 +1177,8 @@ void rwnx_umh_done(struct rwnx_hw *rwnx_hw)
     ipc_host_dbginfo_push(rwnx_hw->ipc_env, &rwnx_hw->dbgdump.buf);
 }
 
-int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
+bool rwnx_pcie_shared_init(struct rwnx_hw *rwnx_hw)
 {
-    int res = 0;
     struct ipc_shared_env_tag *shared_env = NULL;
 
     RWNX_DBG(RWNX_FN_ENTRY_STR);
@@ -1210,18 +1209,25 @@ int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
         aicwf_pcie_host_init(rwnx_hw->ipc_env, NULL, (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm), rwnx_hw);
         shared_env = (struct ipc_shared_env_tag *)(rwnx_hw->pcidev->emb_shrm);
     }
-
-    res = rwnx_elems_allocs(rwnx_hw);
-    if (res) {
-        kfree(rwnx_hw->ipc_env);
-        rwnx_hw->ipc_env = NULL;
-    }
     printk("sizeof struct ipc_shared_env_tag is %ld byte,  offset=%ld, %ld, %ld , txdesc %lx\n", sizeof(struct ipc_shared_env_tag),
                                                 (u8 *)&shared_env->host_rxdesc - (u8 *)shared_env,
                                                 (u8 *)&shared_env->host_rxbuf - (u8 *)shared_env,
                                                 (u8 *)&shared_env->buffered - (u8 *)shared_env,
                                                 (u8 *)&rwnx_hw->ipc_env->shared->txdesc - (u8 *)shared_env);
     printk("txdesc size %ld\n", sizeof(rwnx_hw->ipc_env->shared->txdesc));
+
+    return 0;
+}
+
+int rwnx_init_aic(struct rwnx_hw *rwnx_hw)
+{
+    int res = 0;
+
+    res = rwnx_elems_allocs(rwnx_hw);
+    if (res) {
+        kfree(rwnx_hw->ipc_env);
+        rwnx_hw->ipc_env = NULL;
+    }
 
 #endif
     rwnx_cmd_mgr_init(rwnx_hw->cmd_mgr);

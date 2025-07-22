@@ -111,6 +111,7 @@
  */
 #define IPC_MSGE2A_VALID_PATTERN 0xADDEDE2A
 #define IPC_CFME2A_VALID_PATTERN 0xADDEDE2B
+#define IPC_PRTE2A_VALID_PATTERN 0xADDEDE2C
 
 /*
  * Define used for Debug messages buffers validity.
@@ -639,6 +640,9 @@ struct ipc_shared_env_tag {
     volatile struct txdesc_host txdesc[IPC_TXDMA_DESC_CNT];
     volatile uint32_t e2a_fc;
     volatile uint32_t txdesc_addr[IPC_TXDMA_DESC_CNT];
+    volatile uint32_t fw_init_done;
+    volatile uint32_t txc_cnt;
+    volatile uint32_t rxc_cnt;
 };
 
 extern struct ipc_shared_env_tag ipc_shared_env;

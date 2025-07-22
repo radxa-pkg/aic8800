@@ -19,10 +19,14 @@
 #include "aic_priv_cmd.h"
 #include "aicwf_compat_8800dc.h"
 #include "aicwf_compat_8800d80.h"
+#include "rwnx_mod_params.h"
+
 
 extern int testmode;
 static void print_help(const char *cmd);
 struct dbg_rftest_cmd_cfm cfm = {{0,}};
+
+extern char country_code[4];
 
 #ifdef CONFIG_RFTEST
 enum {
@@ -121,7 +125,7 @@ typedef struct
 } cmd_ef_usrdata_t;
 
 #define CMD_MAXARGS 30
-#define POWER_LEVEL_INVALID_VAL     (127)
+
 #if 0//#include <linux/ctype.h>
 #define isblank(c)		((c) == ' ' || (c) == '\t')
 #define isascii(c)		(((unsigned char)(c)) <= 0x7F)
@@ -248,11 +252,18 @@ int str_starts(const char *str, const char *start)
 static int aic_priv_cmd_set_tx (struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
 {
 	cmd_rf_settx_t settx_param;
+	u8_l set_p = 0;
+	u8_l lvl_band, lvl_mod, lvl_idx, lvl_pwr = 0;
+	u8_l buf[10];
 #ifdef CONFIG_POWER_LIMIT
 	int8_t max_pwr;
+	uint8_t r_idx;
 	txpwr_loss_conf_t txpwr_loss_tmp;
 	txpwr_loss_conf_t *txpwr_loss;
 	txpwr_loss = &txpwr_loss_tmp;
+#endif
+#ifdef AICWF_PCIE_SUPPORT
+		struct aic_pci_dev *dev = g_rwnx_plat->pcidev;
 #endif
 
 	if (argc < 6)
@@ -268,10 +279,43 @@ static int aic_priv_cmd_set_tx (struct rwnx_hw *rwnx_hw, int argc, char *argv[],
 	} else {
 		settx_param.tx_intv_us = 10000; // set default val 10ms
 	}
+	if (argc > 7) {
+		if (dev->chip_id == PRODUCT_ID_AIC8801){
+			AICWFDBG(LOGERROR, "unsupported cmd\n");
+			return -EINVAL;
+		}
+		lvl_pwr = command_strtoul(argv[7], NULL, 10);
+		AICWFDBG(LOGINFO, "lvl_pwr: %d\n", lvl_pwr);
+
+		if (settx_param.chan >= 36)
+			lvl_band = 2;
+		else
+			lvl_band = 1;
+		if (settx_param.mode == 0)
+			lvl_mod = 0;
+		else if (settx_param.mode == 2 || settx_param.mode == 4)
+			lvl_mod = 1;
+		else if (settx_param.mode == 5)
+			lvl_mod = 2;
+		if (settx_param.mode >= 4)
+			lvl_idx = settx_param.rate & 0xF;
+		else if (settx_param.mode >= 2)
+			lvl_idx = settx_param.rate & 0x7;
+		else
+			lvl_idx = settx_param.rate;
+
+		buf[0] = lvl_band;
+		buf[1] = lvl_mod;
+		buf[2] = lvl_idx;
+		buf[3] = lvl_pwr;
+
+		set_p = 1;
+	}
 	settx_param.max_pwr = POWER_LEVEL_INVALID_VAL;
 	AICWFDBG(LOGINFO, "txparam:%d,%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
 		settx_param.mode, settx_param.rate, settx_param.length, settx_param.tx_intv_us);
 #ifdef CONFIG_POWER_LIMIT
+	r_idx = get_ccode_region(country_code);
 	txpwr_loss = &txpwr_loss_tmp;
 	get_userconfig_txpwr_loss(txpwr_loss);
 	if (txpwr_loss->loss_enable_2g4 == 1)
@@ -280,7 +324,7 @@ static int aic_priv_cmd_set_tx (struct rwnx_hw *rwnx_hw, int argc, char *argv[],
 	if (txpwr_loss->loss_enable_5g == 1)
 		AICWFDBG(LOGINFO, "%s:loss_value_5g: %d\r\n", __func__,
 				 txpwr_loss->loss_value_5g);
-	max_pwr = get_powerlimit_by_chnum(settx_param.chan);
+	max_pwr = get_powerlimit_by_chnum(settx_param.chan, r_idx, settx_param.bw);
 	if (settx_param.chan >= 36) {
 		if (txpwr_loss->loss_enable_5g == 1)
 			max_pwr -= txpwr_loss->loss_value_5g;
@@ -288,12 +332,21 @@ static int aic_priv_cmd_set_tx (struct rwnx_hw *rwnx_hw, int argc, char *argv[],
 		if (txpwr_loss->loss_enable_2g4 == 1)
 			max_pwr -= txpwr_loss->loss_value_2g4;
 	}
-	settx_param.max_pwr = max_pwr;
-	AICWFDBG(LOGINFO, "max_pwr:%d\n", settx_param.max_pwr);
+
+	if (!set_p || (lvl_pwr == 255)) {
+		settx_param.max_pwr = max_pwr;
+		AICWFDBG(LOGINFO, "max_pwr:%d\n", settx_param.max_pwr);
+	} else
+		AICWFDBG(LOGINFO, "the specified power is input without power limit\n");
 #endif
+
+	if (set_p && (lvl_pwr != 255))
+		rwnx_send_rftest_req(rwnx_hw, RDWR_PWRLVL, 4, buf, &cfm);
+
 	rwnx_send_rftest_req(rwnx_hw, SET_TX, sizeof(cmd_rf_settx_t), (u8_l *)&settx_param, NULL);
 	return 0;
 }
+
 
 static int aic_priv_cmd_set_txstop (struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
 {
@@ -1293,6 +1346,41 @@ static int aic_priv_cmd_rdwr_bt_efuse_pwrofst (struct rwnx_hw *rwnx_hw, int argc
 	return 2;
 }
 
+static int aic_priv_cmd_country_set(struct rwnx_hw *rwnx_hw, int argc,
+									char *argv[], char *command)
+{
+	int ret = 0;
+	struct ieee80211_regdomain *regdomain;
+
+	if (argc < 2) {
+		AICWFDBG(LOGINFO, "%s param err\n", __func__);
+		return -1;
+	}
+
+	AICWFDBG(LOGINFO, "cmd country_set: %s\n", argv[1]);
+
+	regdomain = getRegdomainFromRwnxDB(rwnx_hw->wiphy, argv[1]);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
+	ret = regulatory_set_wiphy_regd(
+		rwnx_hw->wiphy, regdomain);
+#else
+	ret = wiphy_apply_custom_regulatory(
+		rwnx_hw->wiphy, regdomain);
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0) */
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	rwnx_radar_set_domain(&rwnx_hw->radar, regdomain->dfs_region);
+#endif
+
+#ifdef CONFIG_POWER_LIMIT
+	if (!testmode){
+		rwnx_send_me_chan_config_req(rwnx_hw, argv[1]);
+	}
+#endif
+
+	return ret;
+}
 
 static int aic_priv_cmd_help (struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
 {
@@ -1403,6 +1491,7 @@ static const struct aic_priv_cmd aic_priv_commands[] = {
 	  "<val> = 0/ant0, 1/ant1, 2/both" },
 	{ "rdwr_bt_efuse_pwrofst", aic_priv_cmd_rdwr_bt_efuse_pwrofst,
 	  "<pwrofst> = read/write bt tx power offset into efuse" },
+	{"country_set", aic_priv_cmd_country_set, "<ccode>"},
 //Reserve for new aic_priv_cmd.
 	{ "help", aic_priv_cmd_help,
 	  "= show usage help" },
@@ -1436,10 +1525,13 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 	
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
+#if 0
 	if(!testmode) {
 		AICWFDBG(LOGERROR, "not in testmode\n");
 		return -1;
 	}
+#endif
+
 	argc = parse_line(command, argv);
 	if (argc == 0) {
 		return -1;
@@ -1448,7 +1540,8 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 	count = 0;
 	cmd = aic_priv_commands;
 	while (cmd->cmd) {
-		if (strncasecmp(cmd->cmd, argv[0], strlen(argv[0])) == 0)
+		if (strncasecmp(cmd->cmd, argv[0], strlen(argv[0])) == 0 &&
+			strncasecmp(cmd->cmd, argv[0], strlen(cmd->cmd)) == 0)
 		{
 			match = cmd;
 			if (strcasecmp(cmd->cmd, argv[0]) == 0) {
@@ -1491,7 +1584,7 @@ int handle_private_cmd(struct net_device *net, char *command, u32 cmd_len)
 #define CMD_SET_AP_WPS_P2P_IE   "SET_AP_WPS_P2P_IE"
 
 #define CMD_SET_MON_FREQ	"SET_MON_FREQ"
-
+#define CMD_PCIE_DUMP  "AICDUMP"
 
 struct ieee80211_regdomain *getRegdomainFromRwnxDB(struct wiphy *wiphy, char *alpha2);
 struct ieee80211_regdomain *getRegdomainFromRwnxDBIndex(struct wiphy *wiphy, int index);
@@ -1581,6 +1674,36 @@ void set_mon_chan(struct rwnx_vif *vif, char *parameter){
 
 }
 
+extern u8 data_cnt;
+void aicwf_pcie_dump(struct rwnx_hw *rwnx_hw)
+{
+	int i = 0;
+	struct rwnx_ipc_buf *buf;
+	struct ipc_e2a_msg *msg;
+	//aic debug add
+	printk("rxbuf_idx %d rxbuf_rd_idx %d rxbuf_cnt %d\n", rwnx_hw->ipc_env->rxbuf_idx, data_cnt, atomic_read(&rwnx_hw->rxbuf_cnt));
+	for (i = 0; i < rwnx_hw->ipc_env->rxbuf_nb; i++) {
+		printk("rx[%d] dma %x, pt %x\n", i, rwnx_hw->ipc_env->shared->host_rxbuf[i].dma_addr, rwnx_hw->ipc_env->shared->host_rxbuf[i].pattern);
+	}
+
+	printk("txdesc_idx %d txcfm_idx %d\n",rwnx_hw->ipc_env->txdmadesc_idx, rwnx_hw->ipc_env->txcfm_idx);
+	for (i = 0; i < IPC_TXDMA_DESC_CNT; i++) {
+		printk("tx[%d] dma %x, ready %x, pt %x\n", i, rwnx_hw->ipc_env->shared->txdesc[i].packet_dma_addr, rwnx_hw->ipc_env->shared->txdesc[i].ready, rwnx_hw->ipc_env->shared->txdesc[i].pattern);
+	}
+
+	printk("fc %d txdata cnt %d push %d reserved %d\n",
+		rwnx_hw->fc, atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push), rwnx_hw->txdata_reserved);
+
+	printk("msgbuf_idx:%d\n", rwnx_hw->ipc_env->msgbuf_idx);
+	buf = rwnx_hw->ipc_env->msgbuf[rwnx_hw->ipc_env->msgbuf_idx];
+	msg = buf->addr;
+	printk("msg id:0x%x param_len:%d pt:0x%x\n", msg->id, msg->param_len, msg->pattern);
+	buf = rwnx_hw->ipc_env->msgbuf[rwnx_hw->ipc_env->msgbuf_idx == 0 ? (IPC_MSGE2A_BUF_CNT - 1) : (rwnx_hw->ipc_env->msgbuf_idx - 1)];
+	msg = buf->addr;
+	printk("last msg id:0x%x param_len:%d pt:0x%x\n", msg->id, msg->param_len, msg->pattern);
+	//aic debug end
+}
+
 int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 {
 #define PRIVATE_COMMAND_MAX_LEN 8192
@@ -1663,7 +1786,8 @@ int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 
 
 #if 1//Handle Android command
-	if(!strncasecmp(command, CMD_SET_COUNTRY, strlen(CMD_SET_COUNTRY))) {
+	if(!strncasecmp(command, CMD_SET_COUNTRY, strlen(CMD_SET_COUNTRY)) &&
+		strncasecmp(command, "country_set", strlen("country_set"))) {
 		skip = strlen(CMD_SET_COUNTRY) + 1;
 		country = command + skip;
 		if (!country || strlen(country) < RWNX_COUNTRY_CODE_LEN) {
@@ -1690,13 +1814,14 @@ int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #else
 		wiphy_apply_custom_regulatory(vif->rwnx_hw->wiphy, regdomain);
 #endif
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+		rwnx_radar_set_domain(&vif->rwnx_hw->radar, regdomain->dfs_region);
+#endif
+
 #ifdef CONFIG_POWER_LIMIT
-		if (vif->rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
-				rwnx_plat_powerlimit_load_8800d80(vif->rwnx_hw);
-		if (vif->rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80x2)
-			rwnx_plat_powerlimit_load_8800d80x2(vif->rwnx_hw);
 		if (!testmode){
-		    rwnx_send_me_chan_config_req(vif->rwnx_hw);
+			rwnx_send_me_chan_config_req(vif->rwnx_hw, country);
 		}
 #endif
 		ret = 0;
@@ -1724,6 +1849,11 @@ int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		goto exit;
     }
 #endif
+    else if(!strncasecmp(command, CMD_PCIE_DUMP, strlen(CMD_PCIE_DUMP))){
+		aicwf_pcie_dump(vif->rwnx_hw);
+		ret = 0;
+		goto exit;
+    }
 #endif//Handle Android command
 
 

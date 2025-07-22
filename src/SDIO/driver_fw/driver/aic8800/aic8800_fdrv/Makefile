@@ -110,6 +110,7 @@ CONFIG_TEMP_CONTROL = n
 CONFIG_EXT_FEM_8800DCDW = n
 CONFIG_SHUTDOWN_CALLBACK = y
 CONFIG_FOR_IPCAM = n
+CONFIG_SDIO_ADMA = n
 # CONFIG_MCC = n for sta and p2p concurrent in same channel.
 CONFIG_MCC = y
 CONFIG_APF = n
@@ -147,8 +148,9 @@ CONFIG_RWNX_RADAR ?= y
 CONFIG_RWNX_BCMC ?= y
 
 # Enable Monitor+Data interface support (need FW support)
-CONFIG_RWNX_MON_DATA =n
-CONFIG_RWNX_MON_XMIT ?= n
+CONFIG_RWNX_MON_DATA = n
+CONFIG_RWNX_MON_XMIT = n
+CONFIG_RWNX_MON_RXFILTER = n
 
 
 # extra DEBUG config
@@ -198,6 +200,7 @@ $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_txrxif.o
 $(MODULE_NAME)-$(CONFIG_SDIO_SUPPORT)     += aicwf_sdio.o
 $(MODULE_NAME)-$(CONFIG_FILTER_TCP_ACK)   += aicwf_tcp_ack.o
 $(MODULE_NAME)-$(CONFIG_SDIO_BT)   += aic_btsdio.o
+$(MODULE_NAME)-$(CONFIG_SDIO_BT)   += btsdio.o
 
 $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += usb_host.o
 $(MODULE_NAME)-$(CONFIG_USB_SUPPORT)     += aicwf_txrxif.o
@@ -249,6 +252,8 @@ ccflags-y += -DCONFIG_AIC_FW_PATH=\"$(CONFIG_AIC_FW_PATH)\"
 ccflags-$(CONFIG_RWNX_RADAR) += -DCONFIG_RWNX_RADAR
 ccflags-$(CONFIG_RWNX_MON_DATA) += -DCONFIG_RWNX_MON_DATA
 ccflags-$(CONFIG_RWNX_MON_XMIT) += -DCONFIG_RWNX_MON_XMIT
+ccflags-$(CONFIG_RWNX_MON_RXFILTER) += -DCONFIG_RWNX_MON_RXFILTER
+
 ccflags-$(CONFIG_RWNX_BFMER) += -DCONFIG_RWNX_BFMER
 ccflags-$(CONFIG_RWNX_SPLIT_TX_BUF) += -DCONFIG_RWNX_SPLIT_TX_BUF
 ifeq ($(CONFIG_RWNX_SPLIT_TX_BUF), y)
@@ -291,6 +296,7 @@ ccflags-$(CONFIG_EXT_FEM_8800DCDW) += -DCONFIG_EXT_FEM_8800DCDW
 ccflags-$(CONFIG_MCC) += -DCONFIG_MCC
 ccflags-$(CONFIG_SHUTDOWN_CALLBACK) += -DCONFIG_SHUTDOWN_CALLBACK
 ccflags-$(CONFIG_FOR_IPCAM) += -DCONFIG_FOR_IPCAM
+ccflags-$(CONFIG_SDIO_ADMA) += -DCONFIG_SDIO_ADMA
 
 
 ifeq ($(CONFIG_SDIO_SUPPORT), y)
@@ -383,6 +389,7 @@ ccflags-y += -DANDROID_PLATFORM
 endif
 
 ifeq ($(CONFIG_PLATFORM_UBUNTU), y)
+ccflags-$(CONFIG_PLATFORM_UBUNTU) += -DCONFIG_PLATFORM_UBUNTU
 KDIR  ?= /lib/modules/$(shell uname -r)/build
 PWD   ?= $(shell pwd)
 KVER ?= $(shell uname -r)

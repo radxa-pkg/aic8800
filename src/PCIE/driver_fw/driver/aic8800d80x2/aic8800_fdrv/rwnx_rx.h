@@ -406,6 +406,17 @@ void reord_timeout_handler (struct timer_list *t);
 #endif
 void rwnx_rxdata_process_amsdu(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, u8 vif_idx,
                                         struct sk_buff_head *list);
+void rwnx_rx_data_skb_resend(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif, struct sk_buff *skb);
+int reord_flush_tid(struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u8 tid);
+bool reord_rxframes_process(struct aicwf_rx_priv *rx_priv, struct reord_ctrl *preorder_ctrl, int bforced);
+void reord_rxframes_ind(struct aicwf_rx_priv *rx_priv,struct reord_ctrl *preorder_ctrl);
+int reord_process_unit(struct recv_msdu *pframe, struct aicwf_rx_priv *rx_priv, struct sk_buff *skb, u16 seq_num, u8 tid, u8 forward, u8 is_amsdu);
+void remove_sec_hdr_mgmt_frame(struct hw_rxhdr *hw_rxhdr, struct sk_buff *skb);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
+void defrag_timeout_cb(ulong data);
+#else
+void defrag_timeout_cb(struct timer_list *t);
+#endif
 
 #ifdef CONFIG_HE_FOR_OLD_KERNEL
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 197)

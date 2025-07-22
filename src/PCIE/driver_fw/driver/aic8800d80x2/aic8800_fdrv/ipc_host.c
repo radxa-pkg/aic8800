@@ -289,8 +289,8 @@ int ipc_host_rxbuf_push(struct ipc_host_env_tag *env, struct rwnx_ipc_buf *buf)
 
 #ifdef CONFIG_RWNX_FULLMAC
     shared_env->host_rxbuf[env->rxbuf_idx].hostid = RWNX_RXBUFF_HOSTID_GET(buf);
-    shared_env->host_rxbuf[env->rxbuf_idx].dma_addr = buf->dma_addr;
 	shared_env->host_rxbuf[env->rxbuf_idx].pattern = 0x0;
+    shared_env->host_rxbuf[env->rxbuf_idx].dma_addr = buf->dma_addr;
 	//printk("%s: idx=%d, hostid=%d, dma=%lx, skb=%p\n", __func__,env->rxbuf_idx, 
 	//		(void *)shared_env->host_rxbuf[env->rxbuf_idx].hostid, shared_env->host_rxbuf[env->rxbuf_idx].dma_addr, buf->addr);
 #else

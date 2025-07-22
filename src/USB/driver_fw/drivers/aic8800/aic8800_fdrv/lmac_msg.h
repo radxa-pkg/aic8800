@@ -410,6 +410,9 @@ enum mm_msg_tag
 	MM_GET_APF_PROG_REQ,
 	MM_GET_APF_PROG_CFM,
 
+	MM_SET_TXPWR_PER_STA_REQ,
+	MM_SET_TXPWR_PER_STA_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -1312,7 +1315,13 @@ struct mm_get_sta_info_cfm
 {
     u32_l rate_info;
     u32_l txfailed;
-	u8 rssi;
+    u8 rssi;
+    u8    reserved[3];
+    u32_l chan_time;
+    u32_l chan_busy_time;
+    u32_l ack_fail_stat;
+    u32_l ack_succ_stat;
+    u32_l chan_tx_busy_time;
 };
 
 typedef struct
@@ -2262,6 +2271,12 @@ struct mm_set_vendor_swconfig_cfm
     };
 };
 
+struct mm_set_txpwr_lvl_per_sta_req
+{
+	u8_l sta_idx;
+	s8_l tx_pwr_offset;
+};
+
 /// Structure containing the parameters of the @ref ME_RC_STATS_REQ message.
 struct me_rc_stats_req
 {
@@ -2629,13 +2644,13 @@ struct apm_stop_req
 struct apm_start_cac_req
 {
     /// Control channel on which we have to start the CAC
-    struct mac_chan_def chan;
+    struct mac_chan_op chan;
     /// Center frequency of the first segment
-    u32_l center_freq1;
+    //u32_l center_freq1;
     /// Center frequency of the second segment (only in 80+80 configuration)
-    u32_l center_freq2;
+    //u32_l center_freq2;
     /// Width of channel
-    u8_l ch_width;
+    //u8_l ch_width;
     /// Index of the VIF for which the CAC is started
     u8_l vif_idx;
 };
@@ -3085,7 +3100,7 @@ struct dbg_rftest_cmd_req
 
 struct dbg_rftest_cmd_cfm
 {
-    u32_l rftest_result[18];
+    u32_l rftest_result[32];
 };
 
 struct dbg_gpio_write_req {
@@ -3145,6 +3160,21 @@ struct dbg_mem_block_write_req
 struct dbg_mem_block_write_cfm
 {
     u32_l wstatus;
+};
+
+/// Structure containing the parameters of the @ref DBG_MEM_BLOCK_READ_REQ message.
+struct dbg_mem_block_read_req
+{
+    u32_l memaddr;
+    u32_l memsize;
+};
+
+/// Structure containing the parameters of the @ref DBG_MEM_BLOCK_READ_CFM message.
+struct dbg_mem_block_read_cfm
+{
+    u32_l memaddr;
+    u32_l memsize;
+    u32_l memdata[1024 / sizeof(u32_l)];
 };
 
 /// Structure containing the parameters of the @ref DBG_START_APP_REQ message.
@@ -3311,5 +3341,11 @@ struct tdls_peer_traffic_ind_cfm
     u8_l status;
 };
 
-
+struct mm_set_wakeup_info_req {
+	u32_l hwconfig_id;
+	u16_l code;
+	u16_l offset;
+	u16_l length;
+	u8_l mask_and_pattern[];
+    };
 #endif // LMAC_MSG_H_

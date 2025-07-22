@@ -1116,6 +1116,8 @@ static inline int rwnx_rx_sm_external_auth_required_ind(struct rwnx_hw *rwnx_hw,
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
+	memset((void*)&params, 0, sizeof(struct cfg80211_external_auth_params));
+
 	params.action = NL80211_EXTERNAL_AUTH_START;
 	memcpy(params.bssid, ind->bssid.array, ETH_ALEN);
 	params.ssid.ssid_len = ind->ssid.length;

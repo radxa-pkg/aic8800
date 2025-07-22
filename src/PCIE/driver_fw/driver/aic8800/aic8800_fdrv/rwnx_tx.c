@@ -107,7 +107,7 @@ void rwnx_ps_bh_enable(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta,
 		spin_unlock_bh(&rwnx_hw->tx_lock);
 
 		//if (sta->ps.pkt_ready[LEGACY_PS_ID])
-		//	rwnx_set_traffic_status(rwnx_hw, sta, true, LEGACY_PS_ID);
+			//rwnx_set_traffic_status(rwnx_hw, sta, true, LEGACY_PS_ID);
 
 		//if (sta->ps.pkt_ready[UAPSD_ID])
 		//	rwnx_set_traffic_status(rwnx_hw, sta, true, UAPSD_ID);
@@ -132,8 +132,8 @@ void rwnx_ps_bh_enable(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta,
 		rwnx_txq_sta_start(sta, RWNX_TXQ_STOP_STA_PS, rwnx_hw);
 		spin_unlock_bh(&rwnx_hw->tx_lock);
 
-		//if (sta->ps.pkt_ready[LEGACY_PS_ID])
-		//	rwnx_set_traffic_status(rwnx_hw, sta, false, LEGACY_PS_ID);
+		if (sta->ps.pkt_ready[LEGACY_PS_ID])
+			rwnx_set_traffic_status(rwnx_hw, sta, false, LEGACY_PS_ID);
 
 		//if (sta->ps.pkt_ready[UAPSD_ID])
 		//	rwnx_set_traffic_status(rwnx_hw, sta, false, UAPSD_ID);
@@ -1437,6 +1437,7 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 #ifdef CONFIG_FILTER_TCP_ACK
 	struct msg_buf *msgbuf;
 #endif
+	struct rwnx_vif *temp_vif;
 
 	//rwnx_data_dump("dhcp1", skb->data, 128);
 
@@ -1483,6 +1484,10 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     }*/
 
+    if (unlikely(rwnx_hw->fc)) {
+        printk("%s fc:%d txdata cnt:%d push:%d reserved:%d\n", __func__, rwnx_hw->fc, atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push), rwnx_hw->txdata_reserved);
+    }
+
 #ifdef CONFIG_ONE_TXQ
 	 skb->queue_mapping = rwnx_select_txq(rwnx_vif, skb);
 #endif
@@ -1521,22 +1526,26 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 #ifdef CONFIG_FILTER_TCP_ACK
 	if(cpu_to_le16(skb->len) <= MAX_TCP_ACK){
-	msgbuf=intf_tcp_alloc_msg(msgbuf);
-	msgbuf->rwnx_vif=rwnx_vif;
-	msgbuf->skb=skb;
-	if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
-		spin_lock_bh(&rwnx_hw->tx_lock);
-		if ((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) >= 150 && rwnx_hw->fc==0) {
-			netif_tx_stop_all_queues(txq->ndev);
-			rwnx_hw->fc = 1;
-			AICWFDBG(LOGINFO,"fc\n");
+		msgbuf=intf_tcp_alloc_msg(msgbuf);
+		msgbuf->rwnx_vif=rwnx_vif;
+		msgbuf->skb=skb;
+		if(filter_send_tcp_ack(rwnx_hw,msgbuf,skb->data,cpu_to_le16(skb->len))){
+			spin_lock_bh(&rwnx_hw->tx_lock);
+			if ((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) >= 150 && rwnx_hw->fc==0) {
+				list_for_each_entry(temp_vif, &rwnx_hw->vifs, list) {
+					if (!temp_vif || !temp_vif->ndev || !temp_vif->up)
+						continue;
+					netif_tx_stop_all_queues(temp_vif->ndev);
+				}
+				rwnx_hw->fc = 1;
+				AICWFDBG(LOGINFO,"fc\n");
+			}
+			spin_unlock_bh(&rwnx_hw->tx_lock);
+			return NETDEV_TX_OK;
+		}else{
+			move_tcpack_msg(rwnx_hw,msgbuf);
+			kfree(msgbuf);
 		}
-		spin_unlock_bh(&rwnx_hw->tx_lock);
-		return NETDEV_TX_OK;
-	}else{
-		move_tcpack_msg(rwnx_hw,msgbuf);
-		kfree(msgbuf);
-	}
 	}
 #endif
 
@@ -1711,8 +1720,8 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 	frame_len = len;	
 #endif
 
-	if(atomic_read(&rwnx_hw->txdata_cnt) >= 177){
-		printk("%s txq flow ctrl \n",__func__);
+	if((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) > 175){
+		printk("%s fc:%d txdata cnt:%d push:%d reserved:%d\n", __func__, rwnx_hw->fc, atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push), rwnx_hw->txdata_reserved);
 		return -EBUSY;
 	}
 

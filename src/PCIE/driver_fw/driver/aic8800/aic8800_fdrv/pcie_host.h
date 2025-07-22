@@ -11,6 +11,7 @@
 #define PCIE_RX_MSG_BIT      CO_BIT(0)
 #define PCIE_RX_DATA_BIT     CO_BIT(1)
 #define PCIE_TXC_DATA_BIT    CO_BIT(2)
+#define PCIE_FW_ERR_BIT      CO_BIT(3)
 
 #define AIC8800D80_PCIE_IRQ_OFFSET           0x35000
 #define AIC8800D80_PCIE_IRQ_STATUS_OFFSET    0x3521c

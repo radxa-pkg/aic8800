@@ -91,6 +91,9 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
 
 	init_completion(&bus_if->bustx_trgg);
 	init_completion(&bus_if->busrx_trgg);
+#ifndef CONFIG_RX_TASKLET
+	init_completion(&bus_if->rx_trgg);
+#endif
 #ifdef AICWF_SDIO_SUPPORT
 	spin_lock_init(&bus_if->bus_priv.sdio->wslock);//AIDEN test
 	atomic_set(&bus_if->bus_priv.sdio->irq_sdio_atomic, 0);//AIDEN test
@@ -103,7 +106,11 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
 #endif
 #ifdef AICWF_PCIE_SUPPORT
 	bus_if->busrx_thread = kthread_run(pcie_rxbuf_rep_thread, (void *)bus_if->bus_priv.pci->rx_priv, "pcie_rxbuf_rep_thread");
-	//bus_if->busrx_thread = kthread_run(pcie_rxbuf_rep_thread, (void *)bus_if, "pcie_rxbuf_rep_thread");
+#ifdef CONFIG_RX_SKBLIST
+#ifndef CONFIG_RX_TASKLET
+    bus_if->rx_thread = kthread_run(pcie_rxbuf_process_thread, (void *)bus_if->bus_priv.pci->rx_priv, "pcie_rxbuf_process_thread");
+#endif
+#endif
 #endif
 
 #if defined(AICWF_SDIO_SUPPORT) || defined(AICWF_USB_SUPPORT)
@@ -581,6 +588,7 @@ struct aicwf_rx_priv *aicwf_rx_init(void *arg)
 	aicwf_prealloc_init();
 	#endif
 	atomic_set(&rx_priv->rx_cnt, 0);
+	atomic_set(&rx_priv->rx_wait, 0);
 
 #ifdef AICWF_RX_REORDER
 	INIT_LIST_HEAD(&rx_priv->rxframes_freequeue);
@@ -624,6 +632,24 @@ void aicwf_rx_deinit(struct aicwf_rx_priv *rx_priv)
 	spin_unlock_bh(&rx_priv->stas_reord_lock);
 #endif
 
+#ifdef AICWF_PCIE_SUPPORT
+	AICWFDBG(LOGINFO, "pcie busrx rx thread\n");
+
+	if (rx_priv->pciedev->bus_if->busrx_thread) {
+		complete_all(&rx_priv->pciedev->bus_if->busrx_trgg);
+		kthread_stop(rx_priv->pciedev->bus_if->busrx_thread);
+		rx_priv->pciedev->bus_if->busrx_thread = NULL;
+	}
+
+#ifndef CONFIG_RX_TASKLET
+	if (rx_priv->pciedev->bus_if->rx_thread) {
+		complete_all(&rx_priv->pciedev->bus_if->rx_trgg);
+		kthread_stop(rx_priv->pciedev->bus_if->rx_thread);
+		rx_priv->pciedev->bus_if->rx_thread = NULL;
+	}
+#endif
+#endif
+
 #ifdef AICWF_SDIO_SUPPORT
 	AICWFDBG(LOGINFO, "sdio rx thread\n");
 	if (rx_priv->sdiodev->bus_if->busrx_thread) {
@@ -660,9 +686,9 @@ void aicwf_rx_deinit(struct aicwf_rx_priv *rx_priv)
 	AICWFDBG(LOGINFO, "%s exit \n", __func__);
 }
 
-bool aicwf_rxframe_enqueue(struct device *dev, struct frame_queue *q, struct sk_buff *pkt)
+bool aicwf_rxframe_enqueue(struct frame_queue *q, struct sk_buff *pkt)
 {
-	return aicwf_frame_enq(dev, q, pkt, 0);
+	return aicwf_frame_enq(q, pkt, 0);
 }
 
 
@@ -784,7 +810,7 @@ static struct sk_buff *aicwf_skb_dequeue_tail(struct frame_queue *pq, int prio)
 }
 #endif
 
-bool aicwf_frame_enq(struct device *dev, struct frame_queue *q, struct sk_buff *pkt, int prio)
+bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio)
 {
 	#if 0
 	struct sk_buff *p = NULL;
@@ -851,12 +877,12 @@ struct rx_buff *rxbuff_dequeue(struct rx_frame_queue *pq)
     struct rx_buff *p = NULL;
 
     if (pq->qcnt == 0) {
-        printk("%s %d, rxq is empty\n", __func__, __LINE__);
+        txrx_err("%s %d, rxq is empty\n", __func__, __LINE__);
         return NULL;
     }
 
     if(list_empty(&pq->queuelist)) {
-        printk("%s %d, rxq is empty\n", __func__, __LINE__);
+        txrx_err("%s %d, rxq is empty\n", __func__, __LINE__);
         return NULL;
     } else {
         p = list_first_entry(&pq->queuelist, struct rx_buff, queue);
@@ -872,7 +898,7 @@ bool aicwf_rxbuff_enqueue(struct device *dev, struct rx_frame_queue *rxq, struct
 //    struct rx_buff *p = NULL;
 
     if ((rxq == NULL) || (pkt == NULL)) {
-        printk("%s %d, rxq or pkt is NULL\n", __func__, __LINE__);
+        txrx_err("%s %d, rxq or pkt is NULL\n", __func__, __LINE__);
         return false;
     }
 
@@ -880,11 +906,11 @@ bool aicwf_rxbuff_enqueue(struct device *dev, struct rx_frame_queue *rxq, struct
         if (rxbuff_queue_penq(rxq, pkt)) {
             return true;
         } else {
-            printk("%s %d, rxbuff enqueue fail\n", __func__, __LINE__);
+            txrx_err("%s %d, rxbuff enqueue fail\n", __func__, __LINE__);
             return false;
         }
     } else {
-        printk("%s %d, rxq or pkt is full\n", __func__, __LINE__);
+        txrx_err("%s %d, rxq or pkt is full\n", __func__, __LINE__);
         return false;
     }
 }

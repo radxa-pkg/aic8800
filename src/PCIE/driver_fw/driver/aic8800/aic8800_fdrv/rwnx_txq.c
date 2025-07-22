@@ -898,6 +898,7 @@ void rwnx_txq_sta_switch_vif(struct rwnx_sta *sta, struct rwnx_vif *old_vif,
 int rwnx_txq_queue_skb(struct sk_buff *skb, struct rwnx_txq *txq,
 					   struct rwnx_hw *rwnx_hw,  bool retry)
 {
+	struct rwnx_vif *temp_vif;
 
 #ifdef CONFIG_RWNX_FULLMAC
 	if (unlikely(txq->sta && txq->sta->ps.active)) {
@@ -950,7 +951,12 @@ int rwnx_txq_queue_skb(struct sk_buff *skb, struct rwnx_txq *txq,
 	atomic_inc(&rwnx_hw->txdata_cnt_push);
 	//printk("a%d\n",atomic_read(&rwnx_hw->txdata_cnt));
     if ((atomic_read(&rwnx_hw->txdata_cnt) + rwnx_hw->txdata_reserved) >= 150 && rwnx_hw->fc==0) {
-	    netif_tx_stop_all_queues(txq->ndev);
+		list_for_each_entry(temp_vif, &rwnx_hw->vifs, list) {
+			if (!temp_vif || !temp_vif->ndev || !temp_vif->up)
+				continue;
+			netif_tx_stop_all_queues(temp_vif->ndev);
+		}
+
 	    rwnx_hw->fc = 1;
 	    AICWFDBG(LOGINFO,"fc:%d\n",rwnx_hw->txdata_reserved);
     }

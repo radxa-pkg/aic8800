@@ -1474,64 +1474,115 @@ int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev){
             wakeup_param->gpio_num[1] = 3;////default select gpiob2 for fw_wakeup_host
             wakeup_param->gpio_dft_lvl[1] = 1;////0:defalut pull down,  1:default pull up
             /********************************************************************/
-            //MAX_AD_FILTER_NUM=5 :num 0
-            {
-                const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
-                wakeup_param->ad_filter[0].ad_len = 12;
-                wakeup_param->ad_filter[0].ad_type = 0x09;
-                memcpy(wakeup_param->ad_filter[0].ad_data, data,wakeup_param->ad_filter[0].ad_len-1);// 1111 1111 1110 0000 0000 0000 0000 0000 //0xffe00000
-                wakeup_param->ad_filter[0].ad_data_mask = 0xffe00000;
-                wakeup_param->ad_filter[0].ad_role = ROLE_COMBO|(COMBO_0<<4);
-                wakeup_param->ad_filter[0].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
-            }
-            /********************************************************************/
-            //MAX_AD_FILTER_NUM=5 :num 1
-            {
-                const uint8_t data[2] = {0x12,0x18};
-                wakeup_param->ad_filter[1].ad_len = 3;
-                wakeup_param->ad_filter[1].ad_type = 0x3;
-                memcpy(wakeup_param->ad_filter[1].ad_data, data,wakeup_param->ad_filter[1].ad_len-1);// 1100 0000 0000 0000 0000 0000 0000 0000 //0xc0000000
-                wakeup_param->ad_filter[1].ad_data_mask = 0xc0000000;
-                wakeup_param->ad_filter[1].ad_role = ROLE_COMBO|(COMBO_0<<4);
-                wakeup_param->ad_filter[1].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
-            }
-            /********************************************************************/
-            //MAX_AD_FILTER_NUM=5 :num 2
-            {
-                //const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
-                wakeup_param->ad_filter[2].ad_len = 0;
-                wakeup_param->ad_filter[2].ad_type = 0;
-                //memcpy(wakeup_param->ad_filter[2].ad_data, data,wakeup_param->ad_filter[2].ad_len-1);// 1100 0000 0111 1111 1100 0000 0000 0000 //0xc07fc000
-                wakeup_param->ad_filter[2].ad_data_mask = 0;
-                wakeup_param->ad_filter[2].ad_role = ROLE_ONLY;
-                wakeup_param->ad_filter[2].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
-            }
-            /********************************************************************/
-            //MAX_AD_FILTER_NUM=5 :num 3
-            {
-                //const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
-                wakeup_param->ad_filter[3].ad_len = 0;
-                wakeup_param->ad_filter[3].ad_type = 0;
-                //memcpy(wakeup_param->ad_filter[2].ad_data, data,wakeup_param->ad_filter[2].ad_len-1);// 1100 0000 0111 1111 1100 0000 0000 0000 //0xc07fc000
-                wakeup_param->ad_filter[3].ad_data_mask = 0;
-                wakeup_param->ad_filter[3].ad_role = ROLE_COMBO|(COMBO_1<<4);
-                wakeup_param->ad_filter[3].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
-            }
-            /********************************************************************/
-            //MAX_AD_FILTER_NUM=5 :num 4
-            {
-                //const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
-                wakeup_param->ad_filter[4].ad_len = 0;
-                wakeup_param->ad_filter[4].ad_type = 0x09;
-                //memcpy(wakeup_param->ad_filter[4].ad_data, data,wakeup_param->ad_filter[4].ad_len-1);// 1111 1111 1110 0000 0000 0000 0000 0000 //0xffe00000
-                wakeup_param->ad_filter[4].ad_data_mask = 0xffe00000;
-                wakeup_param->ad_filter[4].ad_role = ROLE_COMBO|(COMBO_1<<4);
-                wakeup_param->ad_filter[4].gpio_trigger_idx = TG_IDX_0|TG_IDX_1;//0: match for wakeup_param->gpio_num[0]       1: match for wakeup_param->gpio_num[1]
-            }
+			/********************************************************************/
+			//MAX_AD_FILTER_NUM=5 :num 0
+			{
+				const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+				wakeup_param->ad_filter[0].ad_len = 12;
+				wakeup_param->ad_filter[0].ad_type = 0x09;
+				memcpy(wakeup_param->ad_filter[0].ad_data, data,wakeup_param->ad_filter[0].ad_len-1);// 1111 1111 1110 0000 0000 0000 0000 0000 //0xffe00000
+				wakeup_param->ad_filter[0].ad_data_mask = 0xffe00000;
+				wakeup_param->ad_filter[0].ad_role = ROLE_COMBO|(COMBO_0<<4);
+				wakeup_param->ad_filter[0].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0] 	  1: match for wakeup_param->gpio_num[1]
+				/********************************************************************/
+				/*enable white list addr for paired remote ble addr. if all 0: all addr will use ad filter
+														wl_addr have value xx: only remote addr in white_list_addr will use ad filter
+				********************************************************************/
+				wakeup_param->ad_filter[0].wl_addr.addr[0] = 0;
+				wakeup_param->ad_filter[0].wl_addr.addr[1] = 0;
+				wakeup_param->ad_filter[0].wl_addr.addr[2] = 0;
+				wakeup_param->ad_filter[0].wl_addr.addr[3] = 0;
+				wakeup_param->ad_filter[0].wl_addr.addr[4] = 0;
+				wakeup_param->ad_filter[0].wl_addr.addr[5] = 0;
+			}
+			/********************************************************************/
+			//MAX_AD_FILTER_NUM=5 :num 1
+			{
+				const uint8_t data[2] = {0x12,0x18};
+				wakeup_param->ad_filter[1].ad_len = 3;
+				wakeup_param->ad_filter[1].ad_type = 0x3;
+				memcpy(wakeup_param->ad_filter[1].ad_data, data,wakeup_param->ad_filter[1].ad_len-1);// 1100 0000 0000 0000 0000 0000 0000 0000 //0xc0000000
+				wakeup_param->ad_filter[1].ad_data_mask = 0xc0000000;
+				wakeup_param->ad_filter[1].ad_role = ROLE_COMBO|(COMBO_0<<4);
+				wakeup_param->ad_filter[1].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0] 	  1: match for wakeup_param->gpio_num[1]
+				/********************************************************************/
+				/*enable white list addr for paired remote ble addr. if all 0: all addr will use ad filter
+														wl_addr have value xx: only remote addr in white_list_addr will use ad filter
+				********************************************************************/
+				wakeup_param->ad_filter[1].wl_addr.addr[0] = 0;
+				wakeup_param->ad_filter[1].wl_addr.addr[1] = 0;
+				wakeup_param->ad_filter[1].wl_addr.addr[2] = 0;
+				wakeup_param->ad_filter[1].wl_addr.addr[3] = 0;
+				wakeup_param->ad_filter[1].wl_addr.addr[4] = 0;
+				wakeup_param->ad_filter[1].wl_addr.addr[5] = 0;
+			}
+			/********************************************************************/
+			//MAX_AD_FILTER_NUM=5 :num 2
+			{
+				//const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+				wakeup_param->ad_filter[2].ad_len = 0;
+				wakeup_param->ad_filter[2].ad_type = 0;
+				//memcpy(wakeup_param->ad_filter[2].ad_data, data,wakeup_param->ad_filter[2].ad_len-1);// 1100 0000 0111 1111 1100 0000 0000 0000 //0xc07fc000
+				wakeup_param->ad_filter[2].ad_data_mask = 0;
+				wakeup_param->ad_filter[2].ad_role = ROLE_ONLY;
+				wakeup_param->ad_filter[2].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0] 	  1: match for wakeup_param->gpio_num[1]
+				/********************************************************************/
+				/*enable white list addr for paired remote ble addr. if all 0: all addr will use ad filter
+														wl_addr have value xx: only remote addr in white_list_addr will use ad filter
+				********************************************************************/
+				wakeup_param->ad_filter[2].wl_addr.addr[0] = 0;
+				wakeup_param->ad_filter[2].wl_addr.addr[1] = 0;
+				wakeup_param->ad_filter[2].wl_addr.addr[2] = 0;
+				wakeup_param->ad_filter[2].wl_addr.addr[3] = 0;
+				wakeup_param->ad_filter[2].wl_addr.addr[4] = 0;
+				wakeup_param->ad_filter[2].wl_addr.addr[5] = 0;
+			}
+			/********************************************************************/
+			//MAX_AD_FILTER_NUM=5 :num 3
+			{
+				//const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+				wakeup_param->ad_filter[3].ad_len = 0;
+				wakeup_param->ad_filter[3].ad_type = 0;
+				//memcpy(wakeup_param->ad_filter[2].ad_data, data,wakeup_param->ad_filter[2].ad_len-1);// 1100 0000 0111 1111 1100 0000 0000 0000 //0xc07fc000
+				wakeup_param->ad_filter[3].ad_data_mask = 0;
+				wakeup_param->ad_filter[3].ad_role = ROLE_COMBO|(COMBO_1<<4);
+				wakeup_param->ad_filter[3].gpio_trigger_idx = TG_IDX_0;//0: match for wakeup_param->gpio_num[0] 	  1: match for wakeup_param->gpio_num[1]
+				/********************************************************************/
+				/*enable white list addr for paired remote ble addr. if all 0: all addr will use ad filter
+														wl_addr have value xx: only remote addr in white_list_addr will use ad filter
+				********************************************************************/
+				wakeup_param->ad_filter[3].wl_addr.addr[0] = 0;
+				wakeup_param->ad_filter[3].wl_addr.addr[1] = 0;
+				wakeup_param->ad_filter[3].wl_addr.addr[2] = 0;
+				wakeup_param->ad_filter[3].wl_addr.addr[3] = 0;
+				wakeup_param->ad_filter[3].wl_addr.addr[4] = 0;
+				wakeup_param->ad_filter[3].wl_addr.addr[5] = 0;
+			}
+			/********************************************************************/
+			//MAX_AD_FILTER_NUM=5 :num 4
+			{
+				//const uint8_t data[11] = {0x59,0x4B,0x32,0x42,0x41,0x5F,0x54,0x45,0x53,0x54,0x33};
+				wakeup_param->ad_filter[4].ad_len = 0;
+				wakeup_param->ad_filter[4].ad_type = 0x09;
+				//memcpy(wakeup_param->ad_filter[4].ad_data, data,wakeup_param->ad_filter[4].ad_len-1);// 1111 1111 1110 0000 0000 0000 0000 0000 //0xffe00000
+				wakeup_param->ad_filter[4].ad_data_mask = 0xffe00000;
+				wakeup_param->ad_filter[4].ad_role = ROLE_COMBO|(COMBO_1<<4);
+				wakeup_param->ad_filter[4].gpio_trigger_idx = TG_IDX_0|TG_IDX_1;//0: match for wakeup_param->gpio_num[0]	   1: match for wakeup_param->gpio_num[1]
+				/********************************************************************/
+				/*enable white list addr for paired remote ble addr. if all 0: all addr will use ad filter
+														wl_addr have value xx: only remote addr in white_list_addr will use ad filter
+				********************************************************************/
+				wakeup_param->ad_filter[4].wl_addr.addr[0] = 0;
+				wakeup_param->ad_filter[4].wl_addr.addr[1] = 0;
+				wakeup_param->ad_filter[4].wl_addr.addr[2] = 0;
+				wakeup_param->ad_filter[4].wl_addr.addr[3] = 0;
+				wakeup_param->ad_filter[4].wl_addr.addr[4] = 0;
+				wakeup_param->ad_filter[4].wl_addr.addr[5] = 0;
+			}
 
             for(i = 0; i < (sizeof(struct ble_wakeup_param_t)/4 +1); i++){
                 printk("write_blocks[%d]:0x%08X \r\n", i, write_blocks[i]);
-                rwnx_send_dbg_mem_write_req(usb_dev, 0x15FF00 + (4 * i), write_blocks[i]);
+                rwnx_send_dbg_mem_write_req(usb_dev, 0x15FE00 + (4 * i), write_blocks[i]);
             }
             rwnx_send_dbg_start_app_req(usb_dev, RAM_FW_BLE_SCAN_WAKEUP_ADDR, HOST_START_APP_AUTO);
             kfree(wakeup_param);

@@ -16,6 +16,7 @@
 
 extern uint8_t scanning;
 extern u8 dhcped;
+extern int testmode;
 
 #ifdef AICWF_PCIE_SUPPORT
 
@@ -786,6 +787,19 @@ static void aicwf_pcie_remove(struct pci_dev *pci_dev)
     bus_if->state = BUS_DOWN_ST;
     rwnx_cmd_mgr_deinit(&bus_if->bus_priv.pci->cmd_mgr);
 
+#if (defined(CONFIG_NO_FIRMWARE_RELOAD) || defined(CONFIG_LOWPOWER))
+    if(testmode == 1)
+        writel(0, pci->pci_bar1_vaddr + 0x500010);
+#endif
+#ifdef CONFIG_LOWPOWER
+    struct ipc_shared_env_tag *shared = (struct ipc_shared_env_tag *)(pci->pci_bar0_vaddr + 0x1DC000);
+    *(volatile uint32_t *)&shared->fw_init_done = 0;
+    //writel(4, pci->emb_tpci + 0x0ec); //generate an empty int
+    volatile unsigned int *dst_mail = (volatile unsigned int *)(pci->pci_bar2_vaddr + 0x800ec);
+    dst_mail[0] = 0x4;  //generate an empty int
+#endif
+
+
 #ifdef CONFIG_WS
 	unregister_ws();
 #endif
@@ -815,6 +829,8 @@ static void aicwf_pcie_remove(struct pci_dev *pci_dev)
 #endif
 
 	kfree(bus_if);
+    if(g_rwnx_plat)
+        kfree(g_rwnx_plat);
 	kfree(pci);
 }
 

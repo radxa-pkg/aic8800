@@ -68,7 +68,7 @@ int aicwf_pcie_platform_init(struct aic_pci_dev *pcidev)
 	
 	ret = rwnx_platform_init(rwnx_plat, &drvdata);
 	if(ret) {
-		printk("%s fail\n", __func__);
+		AICWFDBG(LOGERROR, "%s fail\n", __func__);
 	}
 	#if 0
 	pci_set_drvdata(pci_dev, drvdata);
@@ -142,8 +142,9 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 	sw_txhdr->idx = dma_idx;
 
     //printk("skb dma addr=%lx, len=%d\n", sw_txhdr->ipc_data.dma_addr, sw_txhdr->ipc_data.size);
-    if(txdesc_host->api.host.ethertype == 0x8e88 || txdesc_host->api.host.ethertype == 0x888e)
-        printk("eapol tx push\n");
+    if(txdesc_host->api.host.ethertype == 0x8e88 || txdesc_host->api.host.ethertype == 0x888e) {
+        AICWFDBG(LOGINFO, "eapol tx push\n");
+    }
 	wmb();
 
 #if 0
@@ -155,7 +156,11 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 		struct sk_buff *skb_tmp = sw_txhdr->skb;
 		rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
 		//dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
 		skb_pull(skb_tmp, RWNX_TX_HEADROOM);
 		consume_skb(skb_tmp);
 		atomic_dec(&rwnx_hw->txdata_cnt);
@@ -197,11 +202,11 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 
     //atomic_inc(&rwnx_hw->txdata_cnt);
 	dma_idx++;
-    if (dma_idx == IPC_TXDMA_DESC_CNT)
+    if (dma_idx == IPC_TXDMA_DESC_CNT) {
         rwnx_hw->ipc_env->txdmadesc_idx = 0;
-    else
+    } else {
         rwnx_hw->ipc_env->txdmadesc_idx = dma_idx;
-
+    }
 	atomic_dec(&rwnx_hw->txdata_cnt_push);
 	//printk("p%d,%d\n",atomic_read(&rwnx_hw->txdata_cnt), atomic_read(&rwnx_hw->txdata_cnt_push));
     //printk("t:%d,%x\n", total, ipc_hostdesc_buf->dma_addr);
@@ -258,21 +263,21 @@ void aicwf_pcie_host_tx_cfm_handler(struct ipc_host_env_tag *env, u32 *data, u8 
 
         // Reset the host id in the array
         env->tx_host_id[queue_idx][used_idx % PCIE_TXDESC_CNT] = 0;
-		printk("pcie cfm: data：%x, used_idx=%d, skb=%p\n", data[0], used_idx, (struct sk_buff *)(uint64_t)host_id);
+		AICWFDBG(LOGINFO, "pcie cfm: data：%x, used_idx=%d, skb=%p\n", data[0], used_idx, (struct sk_buff *)(uint64_t)host_id);
 		#if 1
         // call the external function to indicate that a TX packet is freed
         if (host_id == 0)
         {
             // No more confirmations, so put back the used index at its initial value
             env->txdesc_used_idx[queue_idx] = used_idx;
-            printk("pcie ERROR:No more confirmations\r\n");
+            AICWFDBG(LOGERROR, "pcie ERROR:No more confirmations\r\n");
             //break;
         }
         // set the cfm status
         skb = (struct sk_buff *)(uint64_t)host_id;
         txhdr = (struct rwnx_txhdr *)skb->data;
         txhdr->hw_hdr.cfm.status = (union rwnx_hw_txstatus)data[0];
-        printk("pcie host_tx_cfm_handler:used_idx=%d, 0x%p, status=%x\r\n",used_idx, skb, txhdr->hw_hdr.cfm.status.value);
+        AICWFDBG(LOGINFO, "pcie host_tx_cfm_handler:used_idx=%d, 0x%p, status=%x\r\n",used_idx, skb, txhdr->hw_hdr.cfm.status.value);
         //if (env->cb.send_data_cfm(env->pthis, host_id) != 0)
         if (rwnx_txdatacfm(env->pthis, (void *)host_id, free) != 0)
         {
@@ -280,7 +285,7 @@ void aicwf_pcie_host_tx_cfm_handler(struct ipc_host_env_tag *env, u32 *data, u8 
             env->txdesc_used_idx[queue_idx] = used_idx;
             env->tx_host_id[queue_idx][used_idx % PCIE_TXDESC_CNT] = host_id;
             // and exit the loop
-            printk("pcie ERROR:rwnx_txdatacfm,\r\n");
+            AICWFDBG(LOGERROR, "pcie ERROR:rwnx_txdatacfm,\r\n");
           //  break;
         }
 		#endif

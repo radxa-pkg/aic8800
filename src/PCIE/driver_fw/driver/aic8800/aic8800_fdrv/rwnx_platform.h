@@ -45,9 +45,16 @@
 #define FW_ADID_BASE_NAME_8800D80_U02       "fw_adid_8800d80_u02.bin"
 #define FW_PATCH_TABLE_NAME_8800D80_U02     "fw_patch_table_8800d80_u02.bin"
 
+#ifdef CONFIG_FOR_IPCAM
+#define RWNX_8800D80X2_PCIE_FW_NAME                   "fmacfw_8800D80X2_pcie_ipc.bin"
+#else
 #define RWNX_8800D80X2_PCIE_FW_NAME                   "fmacfw_8800D80X2_pcie.bin"
+#endif
 #define RWNX_8800D80X2_PCIE_FW_BT_NAME                "fmacfwbt_8800D80X2_pcie.bin"
 #define RWNX_8800D80X2_PCIE_RF_FW_NAME                "lmacfw_rf_8800D80X2_pcie.bin"
+
+#define POWER_LEVEL_INVALID_VAL     (127)
+
 
 /**
  * Type of memory to access (cf rwnx_plat.get_address)
@@ -62,6 +69,14 @@ enum rwnx_platform_addr {
 	RWNX_ADDR_SYSTEM,
 	RWNX_ADDR_MAX,
 };
+
+typedef enum {
+	REGIONS_SRRC,
+	REGIONS_FCC,
+	REGIONS_ETSI,
+	REGIONS_JP,
+	REGIONS_DEFAULT,
+} Regions_code;
 
 struct rwnx_hw;
 
@@ -265,7 +280,17 @@ int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_
 int rwnx_plat_bin_fw_patch_table_upload_android(struct rwnx_hw *rwnx_hw, char *filename);
 int patch_config(struct rwnx_hw *rwnx_hw);
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr);
-
 #endif
+
+uint8_t get_ccode_region(char * ccode);
+u8 get_region_index(char * name);
+
+#ifdef CONFIG_POWER_LIMIT
+int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name);
+void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
+int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx);
+int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw);
+#endif
+
 
 #endif /* _RWNX_PLATFORM_H_ */

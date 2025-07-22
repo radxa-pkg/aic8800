@@ -185,6 +185,7 @@ int rwnx_dbgfs_register(struct rwnx_hw *rwnx_hw, const char *name);
 void rwnx_dbgfs_unregister(struct rwnx_hw *rwnx_hw);
 int rwnx_um_helper(struct rwnx_debugfs *rwnx_debugfs, const char *cmd);
 int rwnx_trigger_um_helper(struct rwnx_debugfs *rwnx_debugfs);
+void _rwnx_dbgfs_rc_stat_write(struct rwnx_debugfs *rwnx_debugfs, uint8_t sta_idx);
 
 #ifdef CONFIG_RWNX_FULLMAC
 void rwnx_dbgfs_register_rc_stat(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta);

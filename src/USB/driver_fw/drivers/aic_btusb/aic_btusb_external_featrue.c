@@ -69,8 +69,12 @@ static int __init init_extenal_ioctl(void){
 	struct device *dev;
 
 	printk("%s enter\r\n", __func__);
-	
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+		ioctl_char_class = class_create(IOCTL_CHAR_DEVICE_NAME);
+#else
 		ioctl_char_class = class_create(THIS_MODULE, IOCTL_CHAR_DEVICE_NAME);
+#endif
 		if (IS_ERR(ioctl_char_class)) {
 			printk("Failed to create ioctl char class");
 		}

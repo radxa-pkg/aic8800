@@ -1231,7 +1231,11 @@ static int aicwf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
         sdio_err("bus_if stopped\n");
         txhdr = (struct rwnx_txhdr *)pkt->data;
         headroom = txhdr->sw_hdr->headroom;
+#ifdef CONFIG_CACHE_GUARD
         kmem_cache_free(txhdr->sw_hdr->rwnx_vif->rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+#else
+		kfree(txhdr->sw_hdr);
+#endif
         skb_pull(pkt, headroom);
         consume_skb(pkt);
         return -1;
@@ -1239,10 +1243,14 @@ static int aicwf_sdio_bus_txdata(struct device *dev, struct sk_buff *pkt)
 
     prio = (pkt->priority & 0x7);
     spin_lock_bh(&sdiodev->tx_priv->txqlock);
-    if (!aicwf_frame_enq(sdiodev->dev, &sdiodev->tx_priv->txq, pkt, prio)) {
+    if (!aicwf_frame_enq(&sdiodev->tx_priv->txq, pkt, prio)) {
         txhdr = (struct rwnx_txhdr *)pkt->data;
         headroom = txhdr->sw_hdr->headroom;
+#ifdef CONFIG_CACHE_GUARD
         kmem_cache_free(txhdr->sw_hdr->rwnx_vif->rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+#else
+		kfree(txhdr->sw_hdr);
+#endif
         skb_pull(pkt, headroom);
         consume_skb(pkt);
         spin_unlock_bh(&sdiodev->tx_priv->txqlock);
@@ -1389,7 +1397,11 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
 
 	if (!txhdr->sw_hdr->need_cfm) {
 		headroom = txhdr->sw_hdr->headroom;
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(txhdr->sw_hdr->rwnx_vif->rwnx_hw->sw_txhdr_cache, txhdr->sw_hdr);
+#else
+		kfree(txhdr->sw_hdr);
+#endif
 		skb_pull(pkt, headroom);
 		consume_skb(pkt);
 	}
@@ -1608,7 +1620,7 @@ static void aicwf_sdio_enq_rxpkt(struct aic_sdio_dev *sdiodev, struct sk_buff *p
 		return;
     }
 	#else
-	if (!aicwf_rxframe_enqueue(sdiodev->dev, &rx_priv->rxq, pkt)) {
+	if (!aicwf_rxframe_enqueue(&rx_priv->rxq, pkt)) {
 		spin_unlock_irqrestore(&rx_priv->rxqlock, flags);
 		aicwf_dev_skb_free(pkt);
 		return;
