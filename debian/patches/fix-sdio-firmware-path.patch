@@ -6,7 +6,7 @@ index 8701cdc..71685f0 100644
  CONFIG_SDIO_SUPPORT := y
  CONFIG_SDIO_PWRCTRL := y
 -CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"
--#CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800"
+-#CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800D80"
 +#CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"
 +CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800_fw/SDIO/aic8800D80"
  export CONFIG_AIC_FW_PATH
