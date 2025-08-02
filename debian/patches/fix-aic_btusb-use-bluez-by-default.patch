@@ -1,0 +1,13 @@
+diff --git a/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.h b/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.h
+index b0d7d0a..d1bf169 100644
+--- a/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.h
++++ b/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.h
+@@ -37,7 +37,7 @@
+ 
+ 
+ #ifdef CONFIG_PLATFORM_UBUNTU
+-#define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
++#define CONFIG_BLUEDROID        0 /* bleuz 0, bluedroid 1 */
+ #else
+ #define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
+ #endif
