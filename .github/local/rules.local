@@ -6,7 +6,8 @@ override_dh_install:
 		--exclude=*.a \
 		--exclude=*.swp \
 		--exclude=*.o \
-		--exclude=.gitignore
+		--exclude=.gitignore \
+		--exclude=.git
 
 override_dh_shlibdeps:
 	dh_shlibdeps -l/lib/aarch64-linux-gnu/
