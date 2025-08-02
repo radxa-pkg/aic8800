@@ -17,3 +17,4 @@ fix-aic_btusb-implicit-declare-compat_ptr.patch
 fix-allwinner-dkms.patch
 fix-linux-6.16-build.patch
 fix-usb-build.patch
+fix-aic_btusb-use-bluez-by-default.patch
