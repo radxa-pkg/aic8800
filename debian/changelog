@@ -1,3 +1,16 @@
+aic8800 (4.0+git20250410.b99ca8b6-1) noble; urgency=medium
+
+  [ ZHANG Yuntian ]
+  * feat: update to aic8800d_linux_sdk_V4.0_2025_0410_b99ca8b6
+  * feat: vendor Bluetooth firmware hotfix
+  * fix: update patches to the latest driver version
+  * fix: do not include VCS content
+
+  [ Stephen Chen ]
+  * fix: add fix-aic_btusb-use-bluez-by-default.patch
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 05 Aug 2025 10:17:13 +0000
+
 aic8800 (4.0+git20241119.06da8476-1) noble; urgency=medium
 
   [ ZHANG Yuntian ]
