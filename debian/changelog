@@ -1,3 +1,14 @@
+aic8800 (4.0+git20250410.b99ca8b6-2) noble; urgency=medium
+
+  [ dependabot[bot] ]
+  * chore(deps): bump actions/download-artifact from 4 to 5
+  * chore(deps): bump actions/checkout from 4 to 5
+
+  [ Jiali Chen ]
+  * fix: set CONFIG_USB_NO_TRANS_DMA_MAP=y when run on sun60iw2p1
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Sun, 24 Aug 2025 07:59:49 +0000
+
 aic8800 (4.0+git20250410.b99ca8b6-1) noble; urgency=medium
 
   [ ZHANG Yuntian ]
