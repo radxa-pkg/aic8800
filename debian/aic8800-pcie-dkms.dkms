@@ -9,4 +9,6 @@ DEST_MODULE_NAME[0]="${BUILT_MODULE_NAME[0]}_$PACKAGE_VARIANT"
 BUILT_MODULE_LOCATION[0]="PCIE/driver_fw/driver/aic8800/aic8800_fdrv"
 DEST_MODULE_LOCATION[0]="/updates/dkms"
 
+POST_BUILD[0]="scripts/recompress-modules.sh"
+
 AUTOINSTALL=yes

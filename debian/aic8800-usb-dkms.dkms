@@ -20,4 +20,6 @@ DEST_MODULE_NAME[2]="${BUILT_MODULE_NAME[2]}_$PACKAGE_VARIANT"
 BUILT_MODULE_LOCATION[2]="USB/driver_fw/drivers/aic_btusb"
 DEST_MODULE_LOCATION[2]="/updates/dkms"
 
+POST_BUILD[0]="scripts/recompress-modules.sh"
+
 AUTOINSTALL=yes
