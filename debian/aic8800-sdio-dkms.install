@@ -1,3 +1,4 @@
 #!/usr/bin/dh-exec
 
 src/SDIO usr/src/aic8800-sdio-${DEB_VERSION}/
+src/scripts usr/src/aic8800-sdio-${DEB_VERSION}/
