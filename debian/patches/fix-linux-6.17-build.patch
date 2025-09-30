@@ -1,0 +1,248 @@
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+index 7219a54..65f8266 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2202,7 +2202,11 @@ check_len_update:
+         hdr = (struct ieee80211_hdr *)(skb->data + msdu_offset);
+         rwnx_vif = rwnx_rx_get_vif(rwnx_hw, hw_rxhdr->flags_vif_idx);
+         if (rwnx_vif) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+             cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, GFP_ATOMIC);
++#else
++            cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, -1, GFP_ATOMIC);
++#endif
+         }
+         goto end;
+     }
+@@ -2449,7 +2453,11 @@ check_len_update:
+ 
+                 if (hw_rxhdr->flags_is_4addr && !rwnx_vif->use_4addr) {
+                     cfg80211_rx_unexpected_4addr_frame(rwnx_vif->ndev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+                                                        sta->mac_addr, GFP_ATOMIC);
++#else
++                                                       sta->mac_addr, -1, GFP_ATOMIC);
++#endif
+                 }
+             }
+ 
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+index ae0e4df..41d540c 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -4127,7 +4127,11 @@ void rwnx_cfg80211_mgmt_frame_register(struct wiphy *wiphy,
+  *	have changed. The actual parameter values are available in
+  *	struct wiphy. If returning an error, no value should be changed.
+  */
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(6,17,0))
+ static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
++#else
++static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed)
++#endif
+ {
+     return 0;
+ }
+@@ -4144,7 +4148,11 @@ static int rwnx_cfg80211_set_tx_power(struct wiphy *wiphy,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+  struct wireless_dev *wdev,
+ #endif
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+                                       enum nl80211_tx_power_setting type, int mbm)
++#else
++                                      int radio_idx, enum nl80211_tx_power_setting type, int mbm)
++#endif
+ {
+     #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+     struct wireless_dev *wdev = NULL;
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_gki.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_gki.c
+index ad6c52d..a61247f 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_gki.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_gki.c
+@@ -48,7 +48,11 @@ static bool __rwnx_cfg80211_unexpected_frame(struct net_device *dev, u8 cmd,
+ }
+ 
+ bool rwnx_cfg80211_rx_spurious_frame(struct net_device *dev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ 				const u8 *addr, gfp_t gfp)
++#else
++				const u8 *addr, int link_id, gfp_t gfp)
++#endif
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	bool ret;
+@@ -63,7 +67,11 @@ bool rwnx_cfg80211_rx_spurious_frame(struct net_device *dev,
+ }
+ 
+ bool rwnx_cfg80211_rx_unexpected_4addr_frame(struct net_device *dev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ 				const u8 *addr, gfp_t gfp)
++#else
++				const u8 *addr, int link_id, gfp_t gfp)
++#endif
+ {
+ 	struct wireless_dev *wdev = dev->ieee80211_ptr;
+ 	bool ret;
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index e370a59..a5ce83b 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1507,7 +1507,11 @@ check_len_update:
+         hdr = (struct ieee80211_hdr *)(skb->data + msdu_offset);
+         rwnx_vif = rwnx_rx_get_vif(rwnx_hw, hw_rxhdr->flags_vif_idx);
+         if (rwnx_vif) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+             cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, GFP_ATOMIC);
++#else
++            cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, -1, GFP_ATOMIC);
++#endif
+         }
+         rwnx_ipc_buf_e2a_sync_back(rwnx_hw, ipc_buf, sync_len);
+         rwnx_ipc_rxbuf_repush(rwnx_hw, ipc_buf);
+@@ -1555,7 +1559,11 @@ check_len_update:
+ 
+                 if (hw_rxhdr->flags_is_4addr && !rwnx_vif->use_4addr) {
+                     cfg80211_rx_unexpected_4addr_frame(rwnx_vif->ndev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+                                                        sta->mac_addr, GFP_ATOMIC);
++#else
++                                                       sta->mac_addr, -1, GFP_ATOMIC);
++#endif
+                 }
+             }
+ 
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 2a18e3d..177cd96 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3513,7 +3513,11 @@ void rwnx_cfg80211_mgmt_frame_register(struct wiphy *wiphy,
+  *	have changed. The actual parameter values are available in
+  *	struct wiphy. If returning an error, no value should be changed.
+  */
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
++#else
++static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed)
++#endif
+ {
+ 	return 0;
+ }
+@@ -3527,7 +3531,11 @@ static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
+  *	(as advertised by the nl80211 feature flag.)
+  */
+ static int rwnx_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ 									  enum nl80211_tx_power_setting type, int mbm)
++#else
++									  int radio_idx, enum nl80211_tx_power_setting type, int mbm)
++#endif
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+ 	struct rwnx_vif *vif;
+@@ -3558,7 +3566,11 @@ static int rwnx_cfg80211_get_tx_power(struct wiphy *wiphy,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+  struct wireless_dev *wdev,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 14, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+  unsigned int link_id,
++#else
++ int radio_idx, unsigned int link_id,
++#endif
+ #endif
+ #endif
+ 	int *mbm)
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index d5b2f63..52e8c0a 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2125,7 +2125,11 @@ check_len_update:
+ #ifdef CONFIG_GKI
+ 			rwnx_cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, GFP_ATOMIC);
+ #else
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+             cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, GFP_ATOMIC);
++#else
++            cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, -1, GFP_ATOMIC);
++#endif
+ #endif
+ 		}
+ 		goto end;
+@@ -2417,7 +2421,11 @@ check_len_update:
+ 													   sta->mac_addr, GFP_ATOMIC);
+ #else
+                     cfg80211_rx_unexpected_4addr_frame(rwnx_vif->ndev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+                                                        sta->mac_addr, GFP_ATOMIC);
++#else
++                                                       sta->mac_addr, -1, GFP_ATOMIC);
++#endif
+ #endif
+ 				}
+ 			}
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index b4b8177..906c43c 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -3495,7 +3495,11 @@ void rwnx_cfg80211_mgmt_frame_register(struct wiphy *wiphy,
+  *	have changed. The actual parameter values are available in
+  *	struct wiphy. If returning an error, no value should be changed.
+  */
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
++#else
++static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, int radio_idx, u32 changed)
++#endif
+ {
+ 	return 0;
+ }
+@@ -3509,7 +3513,11 @@ static int rwnx_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
+  *	(as advertised by the nl80211 feature flag.)
+  */
+ static int rwnx_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ 									  enum nl80211_tx_power_setting type, int mbm)
++#else
++									  int radio_idx, enum nl80211_tx_power_setting type, int mbm)
++#endif
+ {
+ 	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+ 	struct rwnx_vif *vif;
+@@ -3541,7 +3549,11 @@ static int rwnx_cfg80211_get_tx_power(struct wiphy *wiphy,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+  struct wireless_dev *wdev,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 14, 0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION (6, 17, 0)
+  unsigned int link_id,
++#else
++ int radio_idx, unsigned int link_id,
++#endif
+ #endif
+ #endif
+ 	int *mbm)
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index e370a59..0af1108 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2372,7 +2372,11 @@ check_len_update:
+ 		hdr = (struct ieee80211_hdr *)(skb->data + msdu_offset);
+ 		rwnx_vif = rwnx_rx_get_vif(rwnx_hw, hw_rxhdr->flags_vif_idx);
+ 		if (rwnx_vif) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ 			rwnx_cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, GFP_ATOMIC);
++#else
++			rwnx_cfg80211_rx_spurious_frame(rwnx_vif->ndev, hdr->addr2, -1, GFP_ATOMIC);
++#endif
+ 		}
+ 		goto end;
+ 	}
+@@ -2651,7 +2655,11 @@ check_len_update:
+ 
+ 				if (hw_rxhdr->flags_is_4addr && !rwnx_vif->use_4addr) {
+ 					rwnx_cfg80211_rx_unexpected_4addr_frame(rwnx_vif->ndev,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 17, 0)
+ 													   sta->mac_addr, GFP_ATOMIC);
++#else
++													   sta->mac_addr, -1, GFP_ATOMIC);
++#endif
+ 				}
+ 			}
+ 
