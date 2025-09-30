@@ -1,3 +1,13 @@
+aic8800 (4.0+git20250410.b99ca8b6-3) noble; urgency=medium
+
+  [ dependabot[bot] ]
+  * chore(deps): bump actions/upload-pages-artifact from 3 to 4
+
+  [ Jianfeng Liu ]
+  * fix build for linux 6.17
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 30 Sep 2025 06:02:28 +0000
+
 aic8800 (4.0+git20250410.b99ca8b6-2) noble; urgency=medium
 
   [ dependabot[bot] ]
