@@ -175,7 +175,7 @@ int aicbsp_set_subsys(int subsys, int state)
 	sdio_dbg("%s, subsys: %s, state to: %d\n", __func__, aicbsp_subsys_name(subsys), state);
 
 	if (cur_power_state != pre_power_state) {
-		sdio_dbg("%s, power state change to %d dure to %s\n", __func__, cur_power_state, aicbsp_subsys_name(subsys));
+		sdio_dbg("%s, power state change to %d due to %s\n", __func__, cur_power_state, aicbsp_subsys_name(subsys));
 		if (cur_power_state) {
 			if (aicbsp_platform_power_on() < 0)
 				goto err0;
