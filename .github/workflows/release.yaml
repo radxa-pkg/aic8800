@@ -71,7 +71,7 @@ jobs:
     - name: "Checkout"
       uses: "actions/checkout@v5"
     - name: "Download generated debs"
-      uses: "actions/download-artifact@v5"
+      uses: "actions/download-artifact@v6"
       with:
         name: "${{ github.event.repository.name }}"
         path: ".artifacts"
