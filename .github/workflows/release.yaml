@@ -44,7 +44,7 @@ jobs:
         echo "artifacts_path=$(realpath ..)" >> "$GITHUB_OUTPUT"
       shell: "bash"
     - name: "Upload artifacts"
-      uses: "actions/upload-artifact@v4"
+      uses: "actions/upload-artifact@v5"
       with:
         name: "${{ github.event.repository.name }}"
         path: |
