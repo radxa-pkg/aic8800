@@ -1,5 +1,5 @@
 CONFIG_SDIO_SUPPORT := y
-CONFIG_SDIO_PWRCTRL := y
+CONFIG_SDIO_PWRCTRL := n
 CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"
 #CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800D80"
 export CONFIG_AIC_FW_PATH
@@ -33,6 +33,8 @@ CONFIG_IRQ_FALL ?= n
 CONFIG_SDIO_BT = n
 CONFIG_RADAR_OR_IR_DETECT =n
 CONFIG_FOR_IPCAM = n
+CONFIG_BAND_STEERING = n
+CONFIG_PRBREQ_REPORT = n
 
 ifeq ($(CONFIG_EXT_FEM_8800DCDW), y)
 CONFIG_DPD = n
@@ -61,12 +63,15 @@ ccflags-$(CONFIG_IRQ_FALL) += -DCONFIG_IRQ_FALL
 ccflags-$(CONFIG_SDIO_BT) += -DCONFIG_SDIO_BT
 ccflags-$(CONFIG_RADAR_OR_IR_DETECT) += -DCONFIG_RADAR_OR_IR_DETECT
 ccflags-$(CONFIG_FOR_IPCAM) += -DCONFIG_FOR_IPCAM
+ccflags-$(CONFIG_BAND_STEERING) += -DCONFIG_BAND_STEERING
+ccflags-$(CONFIG_PRBREQ_REPORT) += -DCONFIG_PRBREQ_REPORT
 
 
 obj-m := $(MODULE_NAME).o
 $(MODULE_NAME)-y := \
 	aic8800dc_compat.o \
 	aic8800d80_compat.o \
+	aic8800d80x2_compat.o \
 	aic_bsp_main.o \
 	aic_bsp_driver.o \
 	aicsdio.o \

@@ -456,12 +456,12 @@ int parse_cmd_line(int argc, char **argv){
 					printf("wrong mac addr eg: 0a 1c 6b c6 96 7e\r\n");
 					return ERR;
 				}
-			bt_test_args.addr[5] = command_strtoul(argv[8], NULL, 16);
-			bt_test_args.addr[4] = command_strtoul(argv[9], NULL, 16);
-			bt_test_args.addr[3] = command_strtoul(argv[10], NULL, 16);
-			bt_test_args.addr[2] = command_strtoul(argv[11], NULL, 16);
-			bt_test_args.addr[1] = command_strtoul(argv[12], NULL, 16);
-			bt_test_args.addr[0] = command_strtoul(argv[13], NULL, 16);
+			bt_test_args.addr[0] = command_strtoul(argv[8], NULL, 16);
+			bt_test_args.addr[1] = command_strtoul(argv[9], NULL, 16);
+			bt_test_args.addr[2] = command_strtoul(argv[10], NULL, 16);
+			bt_test_args.addr[3] = command_strtoul(argv[11], NULL, 16);
+			bt_test_args.addr[4] = command_strtoul(argv[12], NULL, 16);
+			bt_test_args.addr[5] = command_strtoul(argv[13], NULL, 16);
 			}
 			return OK;
 		} else if (ARG_IS("bt_stop")){
@@ -519,7 +519,12 @@ int parse_cmd_line(int argc, char **argv){
 			} else if (OS_STRCMP(argv[4], "s8")){
 				bt_test_args.le_phy = 0x03;
 			} else if (OS_STRCMP(argv[4], "s2")){
-				bt_test_args.le_phy = 0x04;
+				if (bt_test_args.trx_mode == tx){
+						bt_test_args.le_phy = 0x04;
+				} else {
+						bt_test_args.le_phy = 0x03;
+				}
+
 			} else {
 				printf("wrong type\r\n");
 				return ERR;
@@ -629,8 +634,8 @@ int parse_cmd_line(int argc, char **argv){
 			bt_test_args.tx_pwr = 0x6f;
 			if (command_number > 2) {
 				bt_test_args.tx_pwr = command_strtoul(argv[2], NULL, 16);
-				if (bt_test_args.tx_pwr < 0 || bt_test_args.tx_pwr > 0x6f) {
-					printf("pwr limit 0~0x6f (default: 0x6f)\r\n");
+				if (bt_test_args.tx_pwr < 0 || bt_test_args.tx_pwr > 0x7f) {
+					printf("pwr limit 0~0x7f (default: 0x6f)\r\n");
 					bt_test_args.tx_pwr = 0x6f;
 				}
 			}

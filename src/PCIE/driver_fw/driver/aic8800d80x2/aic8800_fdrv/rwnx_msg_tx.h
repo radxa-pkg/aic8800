@@ -14,6 +14,11 @@
 #define _RWNX_MSG_TX_H_
 
 #include "rwnx_defs.h"
+
+#ifdef RF_WRITE_FILE
+#define	FW_RF_CALIB_FILE "aic_rf_calib.bin"
+#endif
+
 struct rwnx_cmd *rwnx_cmd_malloc(void);
 void rwnx_cmd_free(struct rwnx_cmd *cmd);
 int rwnx_init_cmd_array(void);
@@ -77,7 +82,7 @@ int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_sw
 
 #ifdef CONFIG_RWNX_FULLMAC
 int rwnx_send_me_config_req(struct rwnx_hw *rwnx_hw);
-int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw, char *ccode);
+int rwnx_send_me_chan_config_req(struct rwnx_hw *rwnx_hw, const char *ccode);
 int rwnx_send_me_set_control_port_req(struct rwnx_hw *rwnx_hw, bool opened,
 									  u8 sta_idx);
 int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *params,
@@ -195,7 +200,7 @@ int rwnx_send_txpwr_per_sta_req(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta);
 int rwnx_send_resume_restore(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,
 					u8_l fwtrace_redir_en, struct rwnx_vif *vif);
 int rwnx_prepare_resume_restore_req(struct rwnx_hw *rwnx_hw, lmac_msg_id_t const id, void *param, u16_l const param_len);
-
+int rwnx_send_get_statistic_req(struct rwnx_hw *rwnx_hw, struct mm_get_statistic_cfm *cfm);
 
 int rwnx_send_reboot(struct rwnx_hw *rwnx_hw);
 #ifdef CONFIG_RFKILL_POLL

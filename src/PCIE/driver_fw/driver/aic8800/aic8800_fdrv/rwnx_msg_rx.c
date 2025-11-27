@@ -1416,12 +1416,14 @@ void rwnx_rx_handle_print(struct rwnx_hw *rwnx_hw, u8 *msg, u32 len)
 	u8 *data_end = NULL;
 	(void)data_end;
 
+	msg[len-1] = '\0';
+
 	if (!rwnx_hw || !rwnx_hw->fwlog_en) {
 		pr_err("FWLOG-OVFL: %s", msg);
 		return;
 	}
 
-	printk("FWLOG: %s", msg);
+	AICWFDBG(LOGFW, "%s", msg);
 
 #ifdef CONFIG_RWNX_DEBUGFS
 	data_end = rwnx_hw->debugfs.fw_log.buf.dataend;

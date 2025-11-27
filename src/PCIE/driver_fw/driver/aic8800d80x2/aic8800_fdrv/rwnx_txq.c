@@ -921,7 +921,7 @@ int rwnx_txq_queue_skb(struct sk_buff *skb, struct rwnx_txq *txq,
 	if (!retry) {
 		/* add buffer in the sk_list */
 		skb_queue_tail(&txq->sk_list, skb);
-#ifdef CONFIG_RWNX_FULLMAC
+#if 0//def CONFIG_RWNX_FULLMAC
 			// to update for SOFTMAC
 			rwnx_ipc_sta_buffer(rwnx_hw, txq->sta, txq->tid,
 								((struct rwnx_txhdr *)skb->data)->sw_hdr->frame_len);
@@ -1334,6 +1334,12 @@ void rwnx_hwq_process(struct rwnx_hw *rwnx_hw, struct rwnx_hwq *hwq)
 #ifdef CREATE_TRACE_POINTS
 	trace_process_hw_queue(hwq);
 #endif
+
+	if(rwnx_hw->pci_suspending || rwnx_hw->pcidev->bus_if->state == BUS_DOWN_ST){
+		AICWFDBG(LOGINFO,"no tx in suspend / bus down \n");
+		goto end;
+	}
+
 	hwq->need_processing = false;
 
 	mu_enable = rwnx_txq_take_mu_lock(rwnx_hw);
@@ -1341,7 +1347,7 @@ void rwnx_hwq_process(struct rwnx_hw *rwnx_hw, struct rwnx_hwq *hwq)
 		credit_map = ALL_HWQ_MASK - 1;
 
 	list_for_each_entry_safe(txq, next, &hwq->list, sched_list) {
-		struct rwnx_txhdr *txhdr = NULL;
+		// struct rwnx_txhdr *txhdr = NULL;
 		struct sk_buff_head sk_list_push;
 		struct sk_buff *skb;
 		bool txq_empty;
@@ -1368,14 +1374,17 @@ void rwnx_hwq_process(struct rwnx_hw *rwnx_hw, struct rwnx_hwq *hwq)
 		txq_empty = rwnx_txq_get_skb_to_push(rwnx_hw, hwq, txq, user,
 											 &sk_list_push);
 		while ((skb = __skb_dequeue(&sk_list_push)) != NULL) {
-			txhdr = (struct rwnx_txhdr *)skb->data;
-			rwnx_tx_push(rwnx_hw, txhdr, 0);
+			// txhdr = (struct rwnx_txhdr *)skb->data;
+			// rwnx_tx_push(rwnx_hw, txhdr, 0);
+			rwnx_tx_push(rwnx_hw, skb, 0);
 		}
 
 		if (txq_empty) {
+#if 0
 			if(atomic_read(&rwnx_hw->txdata_cnt_push)!=0){
 				AICWFDBG(LOGDEBUG,"t%d d %d \n",atomic_read(&rwnx_hw->txdata_cnt_push), atomic_read(&rwnx_hw->txdata_cnt));
 			}
+#endif
 			rwnx_txq_del_from_hw_list(txq);
 			txq->pkt_sent = 0;
 		} else if (rwnx_txq_is_scheduled(txq)) {
@@ -1426,6 +1435,9 @@ void rwnx_hwq_process(struct rwnx_hw *rwnx_hw, struct rwnx_hwq *hwq)
 
 	if (mu_enable)
 		rwnx_txq_release_mu_lock(rwnx_hw);
+
+end:
+	return;
 }
 
 /**

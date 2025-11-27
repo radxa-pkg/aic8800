@@ -2001,6 +2001,11 @@ void set_irq_handler(void *fn){
     aicbsp_sdiodev->sdio_hal_irqhandler = (sdio_irq_handler_t *)fn;
 }
 
+extern int adap_test;
+int get_adap_test(void){
+    return adap_test;
+}
+
 uint8_t crc8_ponl_107(uint8_t *p_buffer, uint16_t cal_size)
 {
     uint8_t i;
@@ -2029,4 +2034,5 @@ EXPORT_SYMBOL(get_fw_path);
 EXPORT_SYMBOL(get_testmode);
 EXPORT_SYMBOL(get_sdio_func);
 EXPORT_SYMBOL(set_irq_handler);
+EXPORT_SYMBOL(get_adap_test);
 

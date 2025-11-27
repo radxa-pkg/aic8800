@@ -829,8 +829,8 @@ static void aicwf_pcie_remove(struct pci_dev *pci_dev)
 #endif
 
 	kfree(bus_if);
-    if(g_rwnx_plat)
-        kfree(g_rwnx_plat);
+	if(g_rwnx_plat)
+		kfree(g_rwnx_plat);
 	kfree(pci);
 }
 

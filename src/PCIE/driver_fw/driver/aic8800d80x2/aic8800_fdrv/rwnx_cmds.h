@@ -116,7 +116,7 @@ struct rwnx_cmd_mgr {
 		queue_work((cmd_mgr)->cmd_wq, &cmd_mgr->cmdWork); \
 	} while (0)
 
-void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr);
+bool rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr);
 void rwnx_cmd_mgr_deinit(struct rwnx_cmd_mgr *cmd_mgr);
 int cmd_mgr_queue_force_defer(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd);
 void aicwf_set_cmd_tx(void *dev, struct lmac_msg *msg, uint len);

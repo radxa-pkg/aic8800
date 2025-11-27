@@ -399,13 +399,23 @@ enum mm_msg_tag {
     MM_SET_TXPWR_LVL_ADJ_REQ,
     MM_SET_TXPWR_LVL_ADJ_CFM,
 
-	MM_RADAR_DETECT_IND,
+    MM_RADAR_DETECT_IND,
 
-	MM_SET_APF_PROG_REQ,
-	MM_SET_APF_PROG_CFM,
+    MM_SET_APF_PROG_REQ,
+    MM_SET_APF_PROG_CFM,
 
-	MM_GET_APF_PROG_REQ,
-	MM_GET_APF_PROG_CFM,
+    MM_GET_APF_PROG_REQ,
+    MM_GET_APF_PROG_CFM,
+
+    MM_SET_TXPWR_PER_STA_REQ,
+    MM_SET_TXPWR_PER_STA_CFM,
+
+    MM_GET_STATISTIC_REQ,
+    MM_GET_STATISTIC_CFM,
+
+    MM_VENDOR_SWCONFIG_IND,
+    MM_FW_PANIC_IND,
+    MM_FW_ASSERT_IND,
 
     /// MAX number of messages
     MM_MAX,
@@ -827,6 +837,7 @@ struct mm_key_add_cfm {
 	u8_l status;
 	/// HW index of the key just added
 	u8_l hw_key_idx;
+	u8_l alligned[2];
 };
 
 /// Structure containing the parameters of the @ref MM_KEY_DEL_REQ message.
@@ -1205,6 +1216,18 @@ struct mm_set_rf_config_req
     u32_l data[64];
 };
 
+typedef struct
+{ 
+	u32_l magic_num; /*“GWCR” or ’SWCR”*/
+	u32_l info_flag; 
+	u32_l calib_flag; 
+	u32_l reserved0; 	
+	u32_l res_data[536/sizeof(u32_l)];
+}wf_rf_calib_res_drv_t;
+
+#define DRIVER_GET_WIFI_CALRES_MAGIC_NUM 0x52435747
+#define DRIVER_SET_WIFI_CALRES_MAGIC_NUM 0x52435753
+
 struct mm_set_rf_calib_req {
 	u32_l cal_cfg_24g;
 	u32_l cal_cfg_5g;
@@ -1215,11 +1238,34 @@ struct mm_set_rf_calib_req {
 	u8_l xtal_cap_fine;
 };
 
+struct mm_set_rf_calib_req_v2
+{
+	u32_l cal_cfg_24g;
+	u32_l cal_cfg_5g;
+	u32_l param_alpha;
+	u32_l bt_calib_en;
+	u32_l bt_calib_param;
+    u8_l xtal_cap;
+	u8_l xtal_cap_fine;
+	u8_l reserved0[2];
+	wf_rf_calib_res_drv_t cal_res;
+
+};
+
 struct mm_set_rf_calib_cfm {
 	u32_l rxgain_24g_addr;
 	u32_l rxgain_5g_addr;
 	u32_l txgain_24g_addr;
 	u32_l txgain_5g_addr;
+};
+
+struct mm_set_rf_calib_cfm_v2
+{
+	u32_l rxgain_24g_addr;
+	u32_l rxgain_5g_addr;
+	u32_l txgain_24g_addr;
+	u32_l txgain_5g_addr;
+	wf_rf_calib_res_drv_t cal_res;
 };
 
 struct mm_get_mac_addr_req {
@@ -1234,11 +1280,16 @@ struct mm_get_sta_info_req {
 	u8_l sta_idx;
 };
 
+struct mm_get_sta_info_compat_req {
+    u8_l sta_idx;
+    char pattern[3];
+};
 struct mm_get_sta_info_cfm {
 	u32_l rate_info;
 	u32_l txfailed;
 	u8    rssi;
     u8    reserved[3];
+    u32_l chan_time;
     u32_l chan_busy_time;
     u32_l ack_fail_stat;
     u32_l ack_succ_stat;
@@ -1891,6 +1942,7 @@ struct me_sta_add_cfm {
 	u8_l status;
 	/// PM state of the station
 	u8_l pm_state;
+	u8_l alligned;
 };
 
 /// Structure containing the parameters of the @ref ME_STA_DEL_REQ message.
@@ -1926,6 +1978,18 @@ struct mm_apm_staloss_ind
 	u8_l sta_idx;
 	u8_l vif_idx;
 	u8_l mac_addr[6];
+};
+
+struct fw_panic_info_ind
+{
+    uint32_t len;
+    uint8_t info[384];
+};
+
+struct fw_assert_info_ind
+{
+    uint32_t len;
+    uint8_t info[384];
 };
 
 #ifdef CONFIG_SDIO_BT
@@ -2968,7 +3032,7 @@ struct dbg_mem_mask_write_cfm {
 struct dbg_rftest_cmd_req {
 	u32_l cmd;
 	u32_l argc;
-	u8_l argv[10];
+	u8_l argv[30];
 };
 
 struct dbg_rftest_cmd_cfm {

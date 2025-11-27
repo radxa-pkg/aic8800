@@ -915,11 +915,7 @@ int rwnx_txq_queue_skb(struct sk_buff *skb, struct rwnx_txq *txq,
 	if (!retry) {
 		/* add buffer in the sk_list */
 		skb_queue_tail(&txq->sk_list, skb);
-#ifdef CONFIG_RWNX_FULLMAC
-			// to update for SOFTMAC
-			rwnx_ipc_sta_buffer(rwnx_hw, txq->sta, txq->tid,
-								((struct rwnx_txhdr *)skb->data)->sw_hdr->frame_len);
-#endif
+
 	} else {
 		if (txq->last_retry_skb)
 			rwnx_skb_append(txq->last_retry_skb, skb, &txq->sk_list);

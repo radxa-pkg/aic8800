@@ -38,8 +38,7 @@ struct pcie_host_env_tag
 extern int aicwf_pcie_platform_init(struct aic_pci_dev *pcidev);
 extern void aicwf_hostif_ready(void);
 extern int pcie_host_msg_push(struct ipc_host_env_tag *env, void *msg_buf, uint16_t len);
-extern void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
-                          struct sk_buff *skb, int hw_queue);
+extern void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr, struct sk_buff *skb);
 extern void aicwf_pcie_host_txdesc_push(struct ipc_host_env_tag *env, const int queue_idx, const uint64_t host_id);
 extern void aicwf_pcie_host_tx_cfm_handler(struct ipc_host_env_tag *env, u32 *data, u8 free);
 void aicwf_pcie_host_init(struct ipc_host_env_tag *env, void *cb,  struct ipc_shared_env_tag *shared_env_ptr, void *pthis);

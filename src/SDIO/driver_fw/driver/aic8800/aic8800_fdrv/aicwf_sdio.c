@@ -367,9 +367,9 @@ int aicwf_sdio_flow_ctrl(struct aic_sdio_dev *sdiodev)
 
         if (fc_reg > DATA_FLOW_CTRL_THRESH) {
             ret = fc_reg;
-            if(ret > tx_aggr_counter){
-				ret = tx_aggr_counter;
-			}
+            //if(ret > tx_aggr_counter){
+			//	ret = tx_aggr_counter;
+			//}
             return ret;
         } else {
             if (count >= FLOW_CTRL_RETRY_COUNT) {
@@ -2092,7 +2092,8 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
 		return 0;
 	}
 
-	if (atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH)) {
+	if (atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH) || 
+		atomic_read(&tx_priv->aggr_count) >= tx_aggr_counter) {
 		if (atomic_read(&tx_priv->aggr_count) > 0) {
 			tx_priv->fw_avail_bufcnt -= atomic_read(&tx_priv->aggr_count);
 			aicwf_sdio_aggr_send(tx_priv); //send and check the next pkt;
@@ -2134,7 +2135,9 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
 		}
 
 		//when aggr finish or there is cmd to send, just send this aggr pkt to fw
-		if ((int)atomic_read(&sdiodev->tx_priv->tx_pktcnt) == 1 || txnow || (atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH))) {
+		if ((int)atomic_read(&sdiodev->tx_priv->tx_pktcnt) == 1 || txnow || 
+			atomic_read(&tx_priv->aggr_count) >= tx_aggr_counter ||
+			(atomic_read(&tx_priv->aggr_count) == (tx_priv->fw_avail_bufcnt - DATA_FLOW_CTRL_THRESH))) {
 			tx_priv->fw_avail_bufcnt -= atomic_read(&tx_priv->aggr_count);
 			aicwf_sdio_aggr_send(tx_priv);
 			atomic_dec(&sdiodev->tx_priv->tx_pktcnt);
@@ -3427,10 +3430,17 @@ static ssize_t rwnx_wifi_suspend_write_proc(struct file *file,
 	return count;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
+static const struct proc_ops wifi_suspend_fops = {
+	//.owner		= THIS_MODULE,
+	.proc_write 	= rwnx_wifi_suspend_write_proc,
+};
+#else
 static const struct file_operations wifi_suspend_fops = {
 	.owner		= THIS_MODULE,
 	.write		= rwnx_wifi_suspend_write_proc,
 };
+#endif
 
 void rwnx_init_wifi_suspend_node(void){
 	struct proc_dir_entry *ent;

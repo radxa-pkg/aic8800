@@ -27,6 +27,7 @@
 #include "md5.h"
 #include "aic8800dc_compat.h"
 #include "aic8800d80_compat.h"
+#include "aic8800d80x2_compat.h"
 #include "aicwf_firmware_array.h"
 #define FW_PATH_MAX 200
 
@@ -1409,6 +1410,7 @@ int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_
             patch_info->info_len = head_t->len;
             memcpy_len = patch_info->info_len;
         }
+	head_t->len = patch_info->info_len;
         AICWFDBG(LOGDEBUG, "%s memcpy_len:%d \r\n", __func__, memcpy_len);   
 
         if (patch_info->info_len == 0)
@@ -1452,6 +1454,9 @@ int aicbt_ext_patch_data_load(struct aic_sdio_dev *sdiodev, struct aicbt_patch_i
 			ret = rwnx_send_dbg_mem_write_req(sdiodev, 0x40506004, 0x04318000);
 			AICWFDBG(LOGDEBUG, "[0x40506004]: 0x04338000\n");
 			ret = rwnx_send_dbg_mem_write_req(sdiodev, 0x40506004, 0x04338000);
+        } else if (sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
+			AICWFDBG(LOGDEBUG, "[0x40580000]: 0x00040220\n");
+			ret = rwnx_send_dbg_mem_write_req(sdiodev, 0x40580000, 0x00040220);
         }
         for (index = 0; index < patch_info->ext_patch_nb; index++){
             id = *(patch_info->ext_patch_param + (index * 2));
@@ -1927,6 +1932,12 @@ int aicwifi_init(struct aic_sdio_dev *sdiodev)
 			printk("8800d80x2 download wifi fw fail\n");
 			return -1;
 		}
+
+		if (aicwifi_patch_config_8800d80x2(sdiodev)) {
+			printk("aicwifi_patch_config_8800d80x2 fail\n");
+			return -1;
+		}
+
 		if (aicwifi_start_from_bootrom(sdiodev)) {
 			printk("8800d80x2 wifi start fail\n");
 			return -1;

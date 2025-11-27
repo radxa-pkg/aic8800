@@ -405,6 +405,9 @@ enum mm_msg_tag {
 	MM_GET_APF_PROG_REQ,
 	MM_GET_APF_PROG_CFM,
 
+	MM_SET_TXPWR_PER_STA_REQ,
+	MM_SET_TXPWR_PER_STA_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -2061,6 +2064,12 @@ struct mm_set_vendor_swconfig_cfm
         struct mm_get_ext_flags_cfm ext_flags_get_cfm;
         struct mm_mask_set_ext_flags_cfm ext_flags_mask_set_cfm;
     };
+};
+
+struct mm_set_txpwr_lvl_per_sta_req
+{
+	u8_l sta_idx;
+	s8_l tx_pwr_offset;
 };
 
 /// Structure containing the parameters of the @ref ME_RC_STATS_REQ message.

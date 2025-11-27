@@ -4,6 +4,7 @@
 #define USB_DEVICE_ID_AIC_8800D80X2       0x8D90
 #define USB_DEVICE_ID_AIC_8800D81X2       0x8D91
 #define USB_DEVICE_ID_AIC_8800D89X2       0x8D99
+#define USB_DEVICE_ID_AIC_8800D40X2       0x8D92
 
 #ifdef CONFIG_FOR_IPCAM
 #define FW_BASE_NAME_8800D80X2                "fmacfw_8800d80x2_ipc.bin"
@@ -21,6 +22,8 @@
 #define FW_PATCH_BASE_NAME_8800D80X2_U05_EXT  "fw_patch_8800d80x2_u05_ext"
 #define FW_ADID_BASE_NAME_8800D80X2_U05       "fw_adid_8800d80x2_u05.bin"
 #define FW_PATCH_TABLE_NAME_8800D80X2_U05     "fw_patch_table_8800d80x2_u05.bin"
+
+#define FW_BT_CONF_NAME_8800D80X2             "aicbt.conf"
 
 #define FLASH_BIN_8800M80X2                   "host_wb_8800m80x2.bin"
 

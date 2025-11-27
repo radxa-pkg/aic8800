@@ -30,6 +30,9 @@ int8_t rwnx_atoi(char *value);
 uint32_t rwnx_atoli(char *value);
 int aicbt_patch_table_free(struct aicbt_patch_table *head);
 struct aicbt_patch_table *aicbt_patch_table_alloc(struct aic_usb_dev *usbdev, const char *filename);
+#ifdef CONFIG_LOAD_BT_CONF
+void aicbt_parse_config(struct aic_usb_dev *usbdev, const char *filename);
+#endif
 int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_patch_table *head_t);
 int aicbt_patch_table_load(struct aic_usb_dev *usbdev, struct aicbt_patch_table *_head);
 

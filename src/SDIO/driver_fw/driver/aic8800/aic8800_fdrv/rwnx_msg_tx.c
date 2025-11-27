@@ -195,6 +195,7 @@ void rwnx_cmd_free(struct rwnx_cmd *cmd){
 
 	spin_lock_irqsave(&cmd_array_lock, flags);
 	cmd->used = 0;
+	cmd->flags = 0;
 	AICWFDBG(LOGTRACE, "%s cmd_array[%d]:%p \r\n", __func__, cmd->array_id, cmd);
 	spin_unlock_irqrestore(&cmd_array_lock, flags);
 }
@@ -404,7 +405,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
 	return 0;
 }
 
-
+#if 0
 static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
 						 int reqcfm, lmac_msg_id_t reqid, void *cfm, bool defer)
 {
@@ -451,7 +452,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
 	//return ret;
 	return 0;
 }
-
+#endif
 /******************************************************************************
  *    Control messages handling functions (FULLMAC)
  *****************************************************************************/
@@ -576,7 +577,7 @@ int rwnx_send_remove_if (struct rwnx_hw *rwnx_hw, u8 vif_index, bool defer)
 	remove_if_req->inst_nbr = vif_index;
 
 	/* Send the MM_REMOVE_IF_REQ message to LMAC FW */
-	return rwnx_send_msg1(rwnx_hw, remove_if_req, 1, MM_REMOVE_IF_CFM, NULL, defer);
+	return rwnx_send_msg(rwnx_hw, remove_if_req, 1, MM_REMOVE_IF_CFM, NULL);
 }
 
 int rwnx_send_set_channel(struct rwnx_hw *rwnx_hw, int phy_idx,
@@ -1024,51 +1025,308 @@ int rwnx_send_rf_config_req(struct rwnx_hw *rwnx_hw, u8_l ofst, u8_l sel, u8_l *
 
 }
 
-int rwnx_send_rf_calib_req(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *cfm)
-{
-	struct mm_set_rf_calib_req *rf_calib_req;
-	xtal_cap_conf_t xtal_cap = {0,};
-	int error;
+#ifdef RF_WRITE_FILE
 
-	RWNX_DBG(RWNX_FN_ENTRY_STR);
+#define FW_PATH_MAX_LEN_RF 200
+extern char aic_fw_path[FW_PATH_MAX_LEN_RF];
 
-	/* Build the MM_SET_P2P_NOA_REQ message */
-	rf_calib_req = rwnx_msg_zalloc(MM_SET_RF_CALIB_REQ, TASK_MM, DRV_TASK_ID,
-								  sizeof(struct mm_set_rf_calib_req));
-
-	if (!rf_calib_req) {
-		return -ENOMEM;
-	}
-
-	if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801){
-    	rf_calib_req->cal_cfg_24g = 0xbf;
-    	rf_calib_req->cal_cfg_5g = 0x3f;
-    } else if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
-        rf_calib_req->cal_cfg_24g = 0x0f8f;
-        rf_calib_req->cal_cfg_5g = 0;
-    } else if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
-    	rf_calib_req->cal_cfg_24g = 0x0f8f;
-    	rf_calib_req->cal_cfg_5g = 0x0f0f;
+int rwnx_rf_write_file(void *buf, int buf_len)
+{	
+	int sum = 0, len = 0;
+    char *path = NULL;
+    struct file *fp = NULL;
+    loff_t pos = 0;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 0)
+	mm_segment_t fs;
+#endif
+	
+	AICWFDBG(LOGINFO, "%s\n", __func__);
+    path = __getname();
+    if (!path) {
+        AICWFDBG(LOGINFO, "get path fail\n");
+        return -1;
     }
 
-	rf_calib_req->param_alpha = 0x0c34c008;
-	rf_calib_req->bt_calib_en = 0;
-	rf_calib_req->bt_calib_param = 0x264203;
-
-	get_userconfig_xtal_cap(&xtal_cap);
-
-	if (xtal_cap.enable) {
-		printk("user xtal cap: %d, cap_fine: %d\n", xtal_cap.xtal_cap, xtal_cap.xtal_cap_fine);
-		rf_calib_req->xtal_cap = xtal_cap.xtal_cap;
-		rf_calib_req->xtal_cap_fine = xtal_cap.xtal_cap_fine;
-	} else {
-		rf_calib_req->xtal_cap = 0;
-		rf_calib_req->xtal_cap_fine = 0;
+	len = snprintf(path, FW_PATH_MAX_LEN_RF, "%s/%s", aic_fw_path, FW_RF_CALIB_FILE);
+	AICWFDBG(LOGINFO, "%s: path=%s\n", __func__,path);
+	
+	fp = filp_open(path, O_RDWR | O_CREAT, 0644);
+	if (IS_ERR(fp)) {
+	  AICWFDBG(LOGINFO, "fp open fial\n");
+	  __putname(path);
+	  fp = NULL;
+	  return -2;
 	}
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 0)
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+#endif
+	  
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
+	sum = kernel_write(fp, buf, buf_len, &pos);
+#else LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
+	sum = kernel_write(fp, (char *)buf, buf_len, pos);
+#endif
+	  
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 0)
+	set_fs(fs);
+#endif
 
-	/* Send the MM_SET_RF_CALIB_REQ message to UMAC FW */
-	error = rwnx_send_msg(rwnx_hw, rf_calib_req, 1, MM_SET_RF_CALIB_CFM, cfm);
+	__putname(path);
+    filp_close(fp, NULL);
+	fp = NULL;
+
+    return 0;
+	  
+}
+
+int is_file_exist_rf(char* name)
+{
+    char *path = NULL;
+    struct file *fp = NULL;
+    int len;
+
+    path = __getname();
+    if (!path) {
+        AICWFDBG(LOGINFO, "%s getname fail\n", __func__);
+        return -1;
+    }
+
+    len = snprintf(path, FW_PATH_MAX_LEN_RF, "%s/%s", aic_fw_path, name);
+
+    fp = filp_open(path, O_RDONLY, 0);
+    if (IS_ERR(fp)) {
+        __putname(path);
+        fp = NULL;
+        return 0;
+    } else {
+        __putname(path);
+        filp_close(fp, NULL);
+		fp = NULL;
+        return 1;
+    }
+}
+#endif
+
+int rwnx_send_rf_calib_req(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *cfm)
+{
+	xtal_cap_conf_t xtal_cap = {0,};
+	int error;
+	
+	RWNX_DBG(RWNX_FN_ENTRY_STR);
+	
+	if((rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2))
+	{
+		struct mm_set_rf_calib_req_v2 *rf_calib_req;
+		struct mm_set_rf_calib_cfm_v2 cfm2;
+
+		 /* Build the MM_SET_RF_CALIB_REQ message */
+	    rf_calib_req = rwnx_msg_zalloc(MM_SET_RF_CALIB_REQ, TASK_MM, DRV_TASK_ID,
+	                                  sizeof(struct mm_set_rf_calib_req_v2));
+
+	    if (!rf_calib_req) {
+	        return -ENOMEM;
+	    }
+
+	    if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801){
+	    	rf_calib_req->cal_cfg_24g = 0xbf;
+	    	rf_calib_req->cal_cfg_5g = 0x3f;
+	    } else if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
+	        rf_calib_req->cal_cfg_24g = 0x0f8f;
+	        rf_calib_req->cal_cfg_5g = 0;
+	    } else if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
+	    	rf_calib_req->cal_cfg_24g = 0x0f8f;
+	    	rf_calib_req->cal_cfg_5g = 0x0f0f;
+	    }
+
+	    rf_calib_req->param_alpha = 0x0c34c008;
+	    rf_calib_req->bt_calib_en = 0;
+	    rf_calib_req->bt_calib_param = 0x264203;
+
+	    get_userconfig_xtal_cap(&xtal_cap);
+
+	    if (xtal_cap.enable) {
+	        AICWFDBG(LOGINFO, "user xtal cap: %d, cap_fine: %d\n", xtal_cap.xtal_cap, xtal_cap.xtal_cap_fine);
+	        rf_calib_req->xtal_cap = xtal_cap.xtal_cap;
+	        rf_calib_req->xtal_cap_fine = xtal_cap.xtal_cap_fine;
+	    } else {
+	        rf_calib_req->xtal_cap = 0;
+	        rf_calib_req->xtal_cap_fine = 0;
+	    }
+		
+#ifdef RF_WRITE_FILE
+		if(is_file_exist_rf(FW_RF_CALIB_FILE) == 1)
+		{
+			void *buffer = NULL;
+			char *path = NULL;
+			struct file *fp = NULL;
+			int size = 0, len = 0;// i = 0;
+			ssize_t rdlen = 0;
+			unsigned char decrypt[16];
+			//u32 **fw_buf =NULL; 
+			//struct kstat stat;
+		
+		
+			AICWFDBG(LOGINFO, "%s: file exist in\n", __func__);
+			path = __getname();
+			if (!path) 
+			{
+				return -1;
+			}
+			len = snprintf(path, FW_PATH_MAX_LEN_RF, "%s/%s", aic_fw_path, FW_RF_CALIB_FILE);
+			AICWFDBG(LOGINFO, "%s: path=%s\n", __func__,path);
+
+			if (len >= FW_PATH_MAX_LEN_RF) 
+			{
+				AICWFDBG(LOGERROR, "%s: %s file's path too long\n", __func__, FW_RF_CALIB_FILE);
+				__putname(path);
+				return -2;
+			}
+
+			fp = filp_open(path, O_RDONLY, 0);
+			if (IS_ERR_OR_NULL(fp)) 
+			{
+				AICWFDBG(LOGERROR, "%s: %s file failed to open\n", __func__, FW_RF_CALIB_FILE);
+				__putname(path);
+				fp = NULL;
+				return -3;
+			}
+
+			//vfs_stat(path, &stat);
+			size =(int)fp->f_inode->i_size;
+			AICWFDBG(LOGINFO, "%s: file is %d bytes\n", __func__,size);
+			buffer = vmalloc(size);
+			if (!buffer) 
+			{
+				__putname(path);
+				filp_close(fp, NULL);
+				fp = NULL;
+				return -4;
+			}
+
+		#if LINUX_VERSION_CODE > KERNEL_VERSION(4, 13, 16)
+			rdlen = kernel_read(fp, buffer, size, &fp->f_pos);
+		#else
+			rdlen = kernel_read(fp, fp->f_pos, buffer, size);
+		#endif
+			//rwnx_data_dump("cal_res.res_data",buffer,size);
+			
+			if (size != rdlen) 
+			{
+			   AICWFDBG(LOGERROR, "%s: %s file rdlen invalid %d\n", __func__, FW_RF_CALIB_FILE, (int)rdlen);
+			   __putname(path);
+			   filp_close(fp, NULL);
+			   fp = NULL;
+			   vfree(buffer);
+			   buffer = NULL;
+			   return -5;
+			}
+			
+			if (rdlen > 0) 
+			{
+			   fp->f_pos += rdlen;
+			}
+			
+			__putname(path);
+			filp_close(fp, NULL);
+			fp = NULL;
+
+			if(rdlen == sizeof(rf_calib_req->cal_res.res_data))
+			{
+				memcpy((u8 *)rf_calib_req->cal_res.res_data,buffer,rdlen);
+				//SET Demo
+				rf_calib_req->cal_res.magic_num = DRIVER_SET_WIFI_CALRES_MAGIC_NUM;
+				rf_calib_req->cal_res.info_flag = 0x4F;
+				rf_calib_req->cal_res.calib_flag = 0x00;
+				// before req, write testmode rf calib reg->cal res.res_data[], data read from file 	
+			}
+			else
+			{
+				AICWFDBG(LOGERROR, "%s: %s file rdlen %d is not equal rf_calib_req \n", __func__, FW_RF_CALIB_FILE, (int)rdlen);
+				vfree(buffer);
+				return -6;
+			}
+			vfree(buffer);
+		}
+		else
+#endif
+		{
+			AICWFDBG(LOGINFO, "%s: file not exist in\n", __func__);
+			//GET Demo
+			rf_calib_req->cal_res.magic_num = DRIVER_GET_WIFI_CALRES_MAGIC_NUM;
+			rf_calib_req->cal_res.info_flag = 0x00;
+			rf_calib_req->cal_res.calib_flag = 0x4F;
+			// after req, read mm_set_rf_calib_cfm.cal_res.res data[]
+			// save the data into file		
+		}
+		/* Send the MM_SET_RF_CALIB_REQ message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, rf_calib_req, 1, MM_SET_RF_CALIB_CFM, &cfm2);
+
+#ifdef RF_WRITE_FILE
+		if(is_file_exist_rf(FW_RF_CALIB_FILE) != 1)
+		{	
+			void *buffer = NULL;
+			int buf_len = sizeof(cfm2.cal_res.res_data);
+			
+			AICWFDBG(LOGINFO, "%s: file not exist in2,buf_len=%d\n", __func__,buf_len);
+			buffer = vmalloc(buf_len);
+			if (!buffer) 
+			{
+				return -4;
+			}
+			memcpy(buffer,cfm2.cal_res.res_data,buf_len);
+			//rwnx_data_dump("cal_res.res_data",buffer,buf_len);
+			rwnx_rf_write_file(buffer,buf_len);
+			vfree(buffer);
+		}
+#endif
+		cfm->rxgain_24g_addr	= 	cfm2.rxgain_24g_addr;
+    	cfm->rxgain_5g_addr 	= 	cfm2.rxgain_5g_addr;
+    	cfm->txgain_24g_addr 	= 	cfm2.txgain_24g_addr;
+    	cfm->txgain_5g_addr		=	cfm2.txgain_5g_addr;	
+	}
+	else
+	{		
+		struct mm_set_rf_calib_req *rf_calib_req;
+		/* Build the MM_SET_P2P_NOA_REQ message */
+		rf_calib_req = rwnx_msg_zalloc(MM_SET_RF_CALIB_REQ, TASK_MM, DRV_TASK_ID,
+									  sizeof(struct mm_set_rf_calib_req));
+
+		if (!rf_calib_req) {
+			return -ENOMEM;
+		}
+
+		if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8801){
+	    	rf_calib_req->cal_cfg_24g = 0xbf;
+	    	rf_calib_req->cal_cfg_5g = 0x3f;
+	    } else if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DC || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800DW) {
+	        rf_calib_req->cal_cfg_24g = 0x0f8f;
+	        rf_calib_req->cal_cfg_5g = 0;
+	    } else if (rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2) {
+	    	rf_calib_req->cal_cfg_24g = 0x0f8f;
+	    	rf_calib_req->cal_cfg_5g = 0x0f0f;
+	    }
+
+		rf_calib_req->param_alpha = 0x0c34c008;
+		rf_calib_req->bt_calib_en = 0;
+		rf_calib_req->bt_calib_param = 0x264203;
+
+		get_userconfig_xtal_cap(&xtal_cap);
+
+		if (xtal_cap.enable) {
+			printk("user xtal cap: %d, cap_fine: %d\n", xtal_cap.xtal_cap, xtal_cap.xtal_cap_fine);
+			rf_calib_req->xtal_cap = xtal_cap.xtal_cap;
+			rf_calib_req->xtal_cap_fine = xtal_cap.xtal_cap_fine;
+		} else {
+			rf_calib_req->xtal_cap = 0;
+			rf_calib_req->xtal_cap_fine = 0;
+		}
+
+
+		/* Send the MM_SET_RF_CALIB_REQ message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, rf_calib_req, 1, MM_SET_RF_CALIB_CFM, cfm);
+	}
 
 	return error;
 };
@@ -1099,22 +1357,36 @@ int rwnx_send_get_macaddr_req(struct rwnx_hw *rwnx_hw, struct mm_get_mac_addr_cf
 int rwnx_send_get_sta_info_req(struct rwnx_hw *rwnx_hw, u8_l sta_idx, struct mm_get_sta_info_cfm *cfm)
 {
 	struct mm_get_sta_info_req *get_info_req;
+	struct mm_get_sta_info_compat_req *get_info_compat_req;
 	int error;
 
+	if(rwnx_hw->sdiodev->chipid < PRODUCT_ID_AIC8800D80X2) {
+		/* Build the MM_GET_STA_INFO_REQ message */
+		get_info_compat_req = rwnx_msg_zalloc(MM_GET_STA_INFO_REQ, TASK_MM, DRV_TASK_ID,
+							sizeof(struct mm_get_sta_info_compat_req));
+		if (!get_info_compat_req) {
+			return -ENOMEM;
+		}
 
-	/* Build the MM_GET_STA_INFO_REQ message */
-	get_info_req = rwnx_msg_zalloc(MM_GET_STA_INFO_REQ, TASK_MM, DRV_TASK_ID,
-						sizeof(struct mm_get_sta_info_req));
+		get_info_compat_req->sta_idx = sta_idx;
+		memcpy(get_info_compat_req->pattern, "sta", 3);
+		/* Send the MM_GET_STA_INFO_REQ  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, get_info_compat_req, 1, MM_GET_STA_INFO_CFM, cfm);
 
-	if (!get_info_req) {
-		return -ENOMEM;
+	} else {
+		/* Build the MM_GET_STA_INFO_REQ message */
+		get_info_req = rwnx_msg_zalloc(MM_GET_STA_INFO_REQ, TASK_MM, DRV_TASK_ID,
+							sizeof(struct mm_get_sta_info_req));
+
+		if (!get_info_req) {
+			return -ENOMEM;
+		}
+
+		get_info_req->sta_idx = sta_idx;
+
+		/* Send the MM_GET_STA_INFO_REQ  message to UMAC FW */
+		error = rwnx_send_msg(rwnx_hw, get_info_req, 1, MM_GET_STA_INFO_CFM, cfm);
 	}
-
-	get_info_req->sta_idx = sta_idx;
-
-	/* Send the MM_GET_STA_INFO_REQ  message to UMAC FW */
-	error = rwnx_send_msg(rwnx_hw, get_info_req, 1, MM_GET_STA_INFO_CFM, cfm);
-
 	return error;
 };
 
@@ -1140,8 +1412,6 @@ int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_v
 
 	return error;
 }
-
-#ifdef CONFIG_TEMP_COMP
 
 int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm)
 {
@@ -1172,6 +1442,7 @@ int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfi
 }
 
 
+#ifdef CONFIG_TEMP_COMP
 int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm)
 {
 	struct mm_set_vendor_swconfig_req *req;
@@ -2551,11 +2822,20 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
     printk("assoc_req idx %d, he: %d, vht: %d\n ", rwnx_vif->ap.aic_index, sta->he, sta->vht);
-    if (rwnx_vif->ap.aic_index < NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX)
+    if (rwnx_vif->ap.aic_index < (NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX - 1))
         rwnx_vif->ap.aic_index++;
     else
         rwnx_vif->ap.aic_index = 0;
     #endif
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	if((rwnx_hw->radar.sta_num == 0) && (rwnx_hw->radar.status != RWNX_RADAR_INSERVICE_BUSY))
+		rwnx_hw->radar.status = RWNX_RADAR_INSERVICE_BUSY;
+
+	AICWFDBG(LOGINFO, "DFS: assoc add num %d, %d\n", rwnx_hw->radar.sta_num, rwnx_hw->radar.status);
+	if(rwnx_hw->radar.sta_num < 0x0FFF)
+		rwnx_hw->radar.sta_num++;
+#endif
 
     /* Build the MM_STA_ADD_REQ message */
     req = rwnx_msg_zalloc(ME_STA_ADD_REQ, TASK_ME, DRV_TASK_ID,
@@ -2568,7 +2848,7 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 	memcpy(&(req->mac_addr.array[0]), mac, ETH_ALEN);
 
 	req->rate_set.length = link_sta_params->supported_rates_len;
-	for (i = 0; i < link_sta_params->supported_rates_len; i++)
+	for (i = 0; (i < link_sta_params->supported_rates_len && i < MAC_RATESET_LEN); i++)
 		req->rate_set.array[i] = link_sta_params->supported_rates[i];
 
 	req->flags = 0;
@@ -2668,9 +2948,14 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 		req->flags |= STA_MFP_CAPA;
 
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
-	if (link_sta_params->opmode_notif_used) {
+#if LINUX_VERSION_CODE < HIGH_KERNEL_VERSION
+	if (params->opmode_notif_used) {
+		req->opmode = params->opmode_notif;
+#else
+	if (params->link_sta_params.opmode_notif_used) {
+		req->opmode = params->link_sta_params.opmode_notif;
+#endif//LINUX_VERSION_CODE < HIGH_KERNEL_VERSION
 		req->flags |= STA_OPMOD_NOTIF;
-		req->opmode = link_sta_params->opmode_notif_used;
 	}
 	#endif
 
@@ -2708,6 +2993,15 @@ int rwnx_send_me_sta_del(struct rwnx_hw *rwnx_hw, u8 sta_idx, bool tdls_sta)
 	/* Set parameters for the MM_STA_DEL_REQ message */
 	req->sta_idx = sta_idx;
 	req->tdls_sta = tdls_sta;
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	if((rwnx_hw->radar.sta_num == 1) && (rwnx_hw->radar.status == RWNX_RADAR_INSERVICE_BUSY))
+		rwnx_hw->radar.status = RWNX_RADAR_INSERVICE_DONE;
+
+	AICWFDBG(LOGINFO, "DFS: assoc del num %d, %d\n", rwnx_hw->radar.sta_num, rwnx_hw->radar.status);
+	if(rwnx_hw->radar.sta_num > 0)
+		rwnx_hw->radar.sta_num--;
+#endif
 
 	/* Send the ME_STA_DEL_REQ message to LMAC FW */
 	return rwnx_send_msg(rwnx_hw, req, 1, ME_STA_DEL_CFM, NULL);
@@ -3342,7 +3636,10 @@ int rwnx_send_apm_start_cac_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *vif,
         req->chan.center2_freq = chandef->center_freq2;
         req->chan.tx_power = 20;
         req->chan.flags = get_chan_flags(chandef->chan->flags);
-
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	rwnx_hw->radar.status = RWNX_RADAR_CAC_BUSY;
+	AICWFDBG(LOGINFO, "DFS: radar st = %d\n", rwnx_hw->radar.status);
+#endif
 	/* Send the APM_START_CAC_REQ message to LMAC FW */
 	return rwnx_send_msg(rwnx_hw, req, 1, APM_START_CAC_CFM, cfm);
 }
@@ -3363,6 +3660,10 @@ int rwnx_send_apm_stop_cac_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *vif)
 	req->vif_idx = vif->vif_index;
 
 	/* Send the APM_STOP_CAC_REQ message to LMAC FW */
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	rwnx_hw->radar.status = RWNX_RADAR_CAC_DONE;
+	AICWFDBG(LOGINFO, "DFS: radar st = %d\n", rwnx_hw->radar.status);
+#endif
 	return rwnx_send_msg(rwnx_hw, req, 1, APM_STOP_CAC_CFM, NULL);
 }
 

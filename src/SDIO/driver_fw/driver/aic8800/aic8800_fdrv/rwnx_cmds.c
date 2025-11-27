@@ -141,9 +141,13 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 #endif
 	if(cmd->e2a_msg != NULL) {
 		do {
-			if(cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED)
-				break;
 			spin_lock_bh(&cmd_mgr->lock);
+			if(cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
+				AICWFDBG(LOGERROR, "cmd queue crashed\n");
+				cmd->result = -EPIPE;
+				spin_unlock_bh(&cmd_mgr->lock);
+				return -EPIPE;
+			}
 			empty = list_empty(&cmd_mgr->cmds);
 			if(!empty) {
 				spin_unlock_bh(&cmd_mgr->lock);
@@ -158,13 +162,12 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 		} while(!empty);//wait for cmd queue empty
 	} else {
 		spin_lock_bh(&cmd_mgr->lock);
-	}
-
-	if (cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
-		printk(KERN_CRIT"cmd queue crashed\n");
-		cmd->result = -EPIPE;
-		spin_unlock_bh(&cmd_mgr->lock);
-		return -EPIPE;
+		if (cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
+			printk(KERN_CRIT"cmd queue crashed\n");
+			cmd->result = -EPIPE;
+			spin_unlock_bh(&cmd_mgr->lock);
+			return -EPIPE;
+		}
 	}
 
 	#ifndef CONFIG_RWNX_FHOST
@@ -219,8 +222,9 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 		//printk("defer push: tkn=%d\r\n", cmd->tkn);
 	}
 
-	spin_unlock_bh(&cmd_mgr->lock);
+	//spin_unlock_bh(&cmd_mgr->lock);
 	if (!defer_push) {
+		spin_unlock_bh(&cmd_mgr->lock);
 		//printk("queue:id=%x, param_len=%u\n",cmd->a2e_msg->id, cmd->a2e_msg->param_len);
 		#ifdef AICWF_SDIO_SUPPORT
 		aicwf_set_cmd_tx((void *)(sdiodev), cmd->a2e_msg, sizeof(struct lmac_msg) + cmd->a2e_msg->param_len);
@@ -231,9 +235,12 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 
 		kfree(cmd->a2e_msg);
 	} else {
-        if(cmd_mgr->queue_sz <= 1){
-		    WAKE_CMD_WORK(cmd_mgr);
-        }
+        if(cmd_mgr->queue_sz <= 1) {
+			spin_unlock_bh(&cmd_mgr->lock);
+			WAKE_CMD_WORK(cmd_mgr);
+		} else {
+			spin_unlock_bh(&cmd_mgr->lock);
+		}
 		return 0;
 	}
 

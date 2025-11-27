@@ -27,6 +27,8 @@
 #define FULLMAC_PARAM(name, default) .name = default,
 #endif /* CONFIG_RWNX_FULLMAC */
 
+extern int reg_regdb_size;
+
 struct rwnx_mod_params rwnx_mod_params = {
 	/* common parameters */
 	COMMON_PARAM(ht_on, true, true)
@@ -53,6 +55,7 @@ struct rwnx_mod_params rwnx_mod_params = {
 	COMMON_PARAM(mutx, true, true)
 	COMMON_PARAM(mutx_on, true, true)
 	COMMON_PARAM(use_80, true, true)
+	/* false: use crda(iw reg set CN); true: drive self-management(wifi_test wlan0 country_set CN) */
 	COMMON_PARAM(custregd, true, true)
 	COMMON_PARAM(custchan, false, false)
 	COMMON_PARAM(roc_dur_max, 500, 500)
@@ -365,7 +368,7 @@ struct ieee80211_regdomain *getRegdomainFromRwnxDB(struct wiphy *wiphy,
 	AICWFDBG(LOGINFO, "%s set ccode:%s \r\n", __func__, alpha2);
 	idx = 0;
 
-	while (reg_regdb[idx]){
+	while (reg_regdb[idx] && idx < reg_regdb_size){
 		if((reg_regdb[idx]->alpha2[0] == alpha2[0]) &&
 			(reg_regdb[idx]->alpha2[1] == alpha2[1])){
 			memcpy(country_code, alpha2, 2);
@@ -1240,9 +1243,17 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	if (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2 && rwnx_hw->mod_params->stbc_on == true){
 		he_cap->he_cap_elem.phy_cap_info[2] |= IEEE80211_HE_PHY_CAP2_STBC_TX_UNDER_80MHZ;
 	}
-	he_cap->he_cap_elem.phy_cap_info[3] |= IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
-										   IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
-										   IEEE80211_HE_PHY_CAP3_RX_HE_MU_PPDU_FROM_NON_AP_STA;
+	he_cap->he_cap_elem.phy_cap_info[3] |=
+	                                        #if 0
+	                                        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+	                                        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_16_QAM |
+	                                        #else
+	                                        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_BPSK |
+	                                        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_BPSK |
+                                            #endif
+		                                    IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
+                                            IEEE80211_HE_PHY_CAP3_DCM_MAX_TX_NSS_1 |
+                                            IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU
 	if (rwnx_hw->mod_params->bfmee) {
 		he_cap->he_cap_elem.phy_cap_info[4] |= IEEE80211_HE_PHY_CAP4_SU_BEAMFORMEE;
 		he_cap->he_cap_elem.phy_cap_info[4] |=
@@ -1373,13 +1384,29 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 	}
 
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
-	he_cap->he_cap_elem.phy_cap_info[3] |= IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+	he_cap->he_cap_elem.phy_cap_info[3] |=
+	    #if 0
+	    IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+	    IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_16_QAM |
+        #else
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_BPSK |
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_BPSK |
+        #endif
 		IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
-		IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU;
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_TX_NSS_1 |
+        IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU;
 	#else
-	he_cap->he_cap_elem.phy_cap_info[3] |= IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+	he_cap->he_cap_elem.phy_cap_info[3] |=
+        #if 0
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_16_QAM |
+        #else
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_BPSK |
+        IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_BPSK |
+        #endif
 		IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
-		IEEE80211_HE_PHY_CAP3_RX_HE_MU_PPDU_FROM_NON_AP_STA;
+		IEEE80211_HE_PHY_CAP3_DCM_MAX_TX_NSS_1 |
+        IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU;
 	#endif
 	
 
@@ -1504,13 +1531,29 @@ static void rwnx_set_he_capa(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 			he_cap->he_cap_elem.phy_cap_info[2] |= IEEE80211_HE_PHY_CAP2_STBC_TX_UNDER_80MHZ;
 		}
 		#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
-			he_cap->he_cap_elem.phy_cap_info[3] |= IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
-				IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
-				IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU;
+			he_cap->he_cap_elem.phy_cap_info[3] |=
+			                                        #if 0
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_16_QAM |
+	                                                #else
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_BPSK |
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_BPSK |
+                                                    #endif
+		                                            IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
+                                                    IEEE80211_HE_PHY_CAP3_DCM_MAX_TX_NSS_1 |
+                                                    IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU;
 		#else
-			he_cap->he_cap_elem.phy_cap_info[3] |= IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
-				IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
-				IEEE80211_HE_PHY_CAP3_RX_HE_MU_PPDU_FROM_NON_AP_STA;
+			he_cap->he_cap_elem.phy_cap_info[3] |=
+			                                        #if 0
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_16_QAM |
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_16_QAM |
+	                                                #else
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_RX_BPSK |
+	                                                IEEE80211_HE_PHY_CAP3_DCM_MAX_CONST_TX_BPSK |
+                                                    #endif
+		                                            IEEE80211_HE_PHY_CAP3_DCM_MAX_RX_NSS_1 |
+                                                    IEEE80211_HE_PHY_CAP3_DCM_MAX_TX_NSS_1 |
+                                                    IEEE80211_HE_PHY_CAP3_RX_PARTIAL_BW_SU_IN_20MHZ_MU;
 		#endif
 
 		if (rwnx_hw->mod_params->bfmee) {
@@ -1797,11 +1840,14 @@ void rwnx_custregd(struct rwnx_hw *rwnx_hw, struct wiphy *wiphy)
 {
 // For older kernel version, the custom regulatory is applied before the wiphy
 // registration (in rwnx_set_wiphy_params()), so nothing has to be done here
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
-    if (!rwnx_hw->mod_params->custregd)
-        return;
 
-    wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
+	wiphy->regulatory_flags |= REGULATORY_IGNORE_STALE_KICKOFF;
+#endif
+	if (!rwnx_hw->mod_params->custregd)
+		return;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0)
     wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
 
     rtnl_lock();

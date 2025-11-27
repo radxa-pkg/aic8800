@@ -55,6 +55,7 @@ extern char aic_fw_path_8800d80x2[FW_PATH_MAX_LEN];
 
 extern int testmode;
 extern int fw_flsupg;
+extern int fw_flggen1;
 extern int fw_flggen2;
 
 struct rwnx_plat *g_rwnx_plat;
@@ -251,6 +252,7 @@ reg_table reg_tables[] = {
 	{.ccode = "CL", .region = REGIONS_ETSI},
 	{.ccode = "CO", .region = REGIONS_FCC},
 	{.ccode = "CR", .region = REGIONS_FCC},
+	{.ccode = "CU", .region = REGIONS_FCC},
 	{.ccode = "CX", .region = REGIONS_FCC},
 	{.ccode = "CY", .region = REGIONS_ETSI},
 	{.ccode = "CZ", .region = REGIONS_ETSI},
@@ -275,7 +277,7 @@ reg_table reg_tables[] = {
 	{.ccode = "GL", .region = REGIONS_ETSI},
 	{.ccode = "GP", .region = REGIONS_ETSI},
 	{.ccode = "GR", .region = REGIONS_ETSI},
-	{.ccode = "GT", .region = REGIONS_FCC},
+	{.ccode = "GT", .region = REGIONS_DEFAULT},
 	{.ccode = "GU", .region = REGIONS_FCC},
 	{.ccode = "GY", .region = REGIONS_DEFAULT},
 	{.ccode = "HK", .region = REGIONS_ETSI},
@@ -288,7 +290,7 @@ reg_table reg_tables[] = {
 	{.ccode = "IL", .region = REGIONS_ETSI},
 	{.ccode = "IN", .region = REGIONS_ETSI},
 	{.ccode = "IQ", .region = REGIONS_ETSI},
-	{.ccode = "IR", .region = REGIONS_JP},
+	{.ccode = "IR", .region = REGIONS_ETSI},
 	{.ccode = "IS", .region = REGIONS_ETSI},
 	{.ccode = "IT", .region = REGIONS_ETSI},
 	{.ccode = "JM", .region = REGIONS_FCC},
@@ -298,7 +300,7 @@ reg_table reg_tables[] = {
 	{.ccode = "KH", .region = REGIONS_ETSI},
 	{.ccode = "KN", .region = REGIONS_ETSI},
 	{.ccode = "KP", .region = REGIONS_JP},
-	{.ccode = "KR", .region = REGIONS_ETSI},
+	{.ccode = "KR", .region = REGIONS_KCC},
 	{.ccode = "KW", .region = REGIONS_ETSI},
 	{.ccode = "KY", .region = REGIONS_FCC},
 	{.ccode = "KZ", .region = REGIONS_DEFAULT},
@@ -342,7 +344,7 @@ reg_table reg_tables[] = {
 	{.ccode = "PF", .region = REGIONS_ETSI},
 	{.ccode = "PG", .region = REGIONS_FCC},
 	{.ccode = "PH", .region = REGIONS_FCC},
-	{.ccode = "PK", .region = REGIONS_ETSI},
+	{.ccode = "PK", .region = REGIONS_DEFAULT},
 	{.ccode = "PL", .region = REGIONS_ETSI},
 	{.ccode = "PM", .region = REGIONS_ETSI},
 	{.ccode = "PR", .region = REGIONS_FCC},
@@ -364,7 +366,7 @@ reg_table reg_tables[] = {
 	{.ccode = "SN", .region = REGIONS_FCC},
 	{.ccode = "SR", .region = REGIONS_ETSI},
 	{.ccode = "SV", .region = REGIONS_FCC},
-	{.ccode = "SY", .region = REGIONS_DEFAULT},
+	{.ccode = "SY", .region = REGIONS_ETSI},
 	{.ccode = "TC", .region = REGIONS_FCC},
 	{.ccode = "TD", .region = REGIONS_ETSI},
 	{.ccode = "TG", .region = REGIONS_ETSI},
@@ -375,6 +377,7 @@ reg_table reg_tables[] = {
 	{.ccode = "TR", .region = REGIONS_ETSI},
 	{.ccode = "TT", .region = REGIONS_FCC},
 	{.ccode = "TW", .region = REGIONS_FCC},
+	{.ccode = "TZ", .region = REGIONS_ETSI},
 	{.ccode = "UA", .region = REGIONS_ETSI},
 	{.ccode = "UG", .region = REGIONS_FCC},
 	{.ccode = "UY", .region = REGIONS_FCC},
@@ -385,24 +388,25 @@ reg_table reg_tables[] = {
 	{.ccode = "VN", .region = REGIONS_JP},
 	{.ccode = "VU", .region = REGIONS_FCC},
 	{.ccode = "WF", .region = REGIONS_ETSI},
+	{.ccode = "WS", .region = REGIONS_ETSI},
 	{.ccode = "YE", .region = REGIONS_DEFAULT},
 	{.ccode = "YT", .region = REGIONS_ETSI},
 	{.ccode = "ZA", .region = REGIONS_ETSI},
 	{.ccode = "ZM", .region = REGIONS_ETSI},
+	{.ccode = "FO", .region = REGIONS_ETSI},
+	{.ccode = "FK", .region = REGIONS_ETSI},
 	{.ccode = "ZW", .region = REGIONS_ETSI},
 };
 
-uint8_t get_ccode_region(char * ccode)
+uint8_t get_ccode_region(const char * ccode)
 {
 	int i, cnt;
-	AICWFDBG(LOGDEBUG, "%s ccode:%s\r\n", __func__, ccode);
 
 	cnt = sizeof(reg_tables) / sizeof(reg_tables[0]);
 
 	for (i = 0; i < cnt; i++) {
 		if (reg_tables[i].ccode[0] == ccode[0] &&
 			reg_tables[i].ccode[1] == ccode[1]) {
-			AICWFDBG(LOGDEBUG, "region: %d\r\n", reg_tables[i].region);
 			return reg_tables[i].region;
 		}
 	}
@@ -420,6 +424,8 @@ u8 get_region_index(char * name)
 		return REGIONS_ETSI;
 	else if (strncmp(name, "JP", 2) == 0)
 		return REGIONS_JP;
+	else if (strncmp(name, "KCC", 3) == 0)
+		return REGIONS_KCC;
 	else if (strncmp(name, "UNSET", 5) == 0)
 		return REGIONS_DEFAULT;
 
@@ -434,7 +440,7 @@ u8 get_region_index(char * name)
 
 #define MAX_2_4G_BW_NUM    2
 #define MAX_5G_BW_NUM      3
-#define MAX_REGION_NUM            5
+#define MAX_REGION_NUM     6
 
 
 typedef struct
@@ -488,7 +494,11 @@ typedef struct {
 #define CFG_USER_CHAN_MAX_TXPWR_EN  0
 #endif
 #define CFG_USER_TX_USE_ANA_F       0
+#ifdef CONFIG_PRBREQ_REPORT
+#define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE 1
+#else
 #define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE 0
+#endif
 
 #define CFG_USER_EXT_FLAGS_EN   (CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F)
 
@@ -543,8 +553,11 @@ u32 patch_tbl_8800d80x2[][2] = {
     #endif
 
 	#ifdef CONFIG_RADAR_OR_IR_DETECT
-    {0x0204, 0x01010100},//radar
+    {0x0204, 0x01010500},//radar 5->9/B
 	#endif
+    #ifdef CONFIG_AP_LOWPOWER
+    {0x0238, 0x0100000F},
+    #endif
 };
 
 #ifdef CONFIG_RWNX_TL4
@@ -666,6 +679,11 @@ static int rwnx_plat_bin_fw_upload(struct rwnx_plat *rwnx_plat, u8 *fw_addr,
 
 	return err;
 }
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 #endif
 
 #define MD5(x) x[0],x[1],x[2],x[3],x[4],x[5],x[6],x[7],x[8],x[9],x[10],x[11],x[12],x[13],x[14],x[15]
@@ -948,6 +966,7 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr,
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr)
 {
 	int err = 0;
+	u16_l cnt = 0;
     if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
         volatile unsigned int *reset_addr = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500044);
         volatile unsigned int *reset_bit = (volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + 0x500128);
@@ -962,15 +981,24 @@ int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr)
         writel((1<<5),  rwnx_hw->pcidev->emb_sctl + 0x12c);
     }
 
-	if (testmode == 0 && !fw_flsupg && !fw_flggen2) {
-		mdelay(300);
+	if (testmode == 0 && !fw_flsupg && !fw_flggen2 && !fw_flggen1) {
+		//mdelay(300);
         while(*(volatile uint32_t *)&rwnx_hw->ipc_env->shared->fw_init_done != 1) {
-            AICWFDBG(LOGINFO, "fw init done=%d\n", *(volatile uint32_t *)&rwnx_hw->ipc_env->shared->fw_init_done);
+            AICWFDBG(LOGVERBOS, "fw init done=%d\n", *(volatile uint32_t *)&rwnx_hw->ipc_env->shared->fw_init_done);
             msleep(5);
+            cnt++;
+            if(!fw_flsupg && !fw_flggen2 && !fw_flggen1) {
+                if(cnt > 800) {//4s
+                    AICWFDBG(LOGERROR, "fw run err: %d\n", cnt);
+                    return -1;
+                }
+            }
         }
     }
 	else
 		mdelay(5000);
+
+    AICWFDBG(LOGINFO, "fw init done\n");
 
 	return err;
 }
@@ -3087,7 +3115,7 @@ static int rwnx_plat_userconfig_load(struct rwnx_hw *rwnx_hw) {
 #ifdef CONFIG_POWER_LIMIT
 #define GetLineFromBuffer(buffer)   strsep(&buffer, "\n")
 
-int isAllSpaceOrTab(uint8_t *data, uint8_t size)
+static int isAllSpaceOrTab(uint8_t *data, uint8_t size)
 {
     uint8_t cnt = 0, NumOfSpaceAndTab = 0;
     while (size > cnt) {
@@ -3098,7 +3126,7 @@ int isAllSpaceOrTab(uint8_t *data, uint8_t size)
     return size == NumOfSpaceAndTab;
 }
 
-int IsCommentString(char *szStr)
+static int IsCommentString(char *szStr)
 {
     if (*szStr == '#' && *(szStr + 1) == ' ')
         return 1;
@@ -3106,7 +3134,7 @@ int IsCommentString(char *szStr)
         return 0;
 }
 
-int ParseQualifiedString(char *In, u32 *Start, char *Out, char LeftQualifier, char RightQualifier)
+static int ParseQualifiedString(char *In, u32 *Start, char *Out, char LeftQualifier, char RightQualifier)
 {
     u32 i = 0, j = 0;
     char c = In[(*Start)++];
@@ -3123,7 +3151,7 @@ int ParseQualifiedString(char *In, u32 *Start, char *Out, char LeftQualifier, ch
     return 1;
 }
 
-int GetU1ByteIntegerFromStringInDecimal(char *Str, u8 *pInt)
+static int GetU1ByteIntegerFromStringInDecimal(char *Str, u8 *pInt)
 {
     u16 i = 0;
     *pInt = 0;
@@ -3137,7 +3165,7 @@ int GetU1ByteIntegerFromStringInDecimal(char *Str, u8 *pInt)
     }
     return 1;
 }
-int GetS1ByteIntegerFromStringInDecimal(char *str, s8 *val)
+static int GetS1ByteIntegerFromStringInDecimal(char *str, s8 *val)
 {
     u8 negative = 0;
     u16 i = 0;
@@ -3200,7 +3228,7 @@ int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit,
 }
 
 
-void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
+void rwnx_plat_powerlimit_parsing(char *buffer, int size)
 {
 #define LD_STAGE_EXC_MAPPING    0
 #define LD_STAGE_TAB_DEFINE     1
@@ -3441,7 +3469,7 @@ exit:
 /// 5G lower bound freq
 #define PHY_FREQ_5G 5000
 
-uint16_t phy_channel_to_freq(uint8_t band, int channel)
+static uint16_t phy_channel_to_freq(uint8_t band, int channel)
 {
     if ((band == PHY_BAND_2G4) && (channel >= 1) && (channel <= 14)) {
         if (channel == 14)
@@ -3768,14 +3796,10 @@ void aicbt_parse_config(struct rwnx_hw *rwnx_hw)
     } else {
         aicbt_info.lpm_enable = AICBT_LPM_ENABLE_DEFAULT;
     }
-    tag_ptr = aicbt_find_tag((char*)dst, size, "TXPWR_LVL=", strlen("0x6F2F"));
+    tag_ptr = aicbt_find_tag((char*)dst, size, "TXPWR_LVL=", strlen("0xFFFFFFFF"));
     if (tag_ptr) {
         if (sscanf(tag_ptr, "%08x", &tmp_val) == 1) {
-            if (tmp_val >= 0 || tmp_val <= 0X7F7F) {
                 aicbt_info.txpwr_lvl = tmp_val;
-            } else {
-                aicbt_info.txpwr_lvl = AICBT_TXPWR_LVL_DEFAULT;
-            }
         } else {
             aicbt_info.txpwr_lvl = AICBT_TXPWR_LVL_DEFAULT;
         }
@@ -3892,6 +3916,7 @@ int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_
             patch_info->info_len = head_t->len;
             memcpy_len = patch_info->info_len;
         }
+	head_t->len = patch_info->info_len;
         AICWFDBG(LOGDEBUG, "%s memcpy_len:%d \r\n", __func__, memcpy_len);
 
         if (patch_info->info_len == 0)
@@ -4001,6 +4026,81 @@ err:
 }
 #endif
 
+void rwnx_update_flash(struct rwnx_hw *rwnx_hw)
+{
+#ifdef CONFIG_UPG_FLASH
+	u32 otad_base;
+	u32 gen2_base;
+	int ret;
+#endif
+	u32 bond_id;
+
+	aicwf_pcie_tran(rwnx_hw->pcidev, (void *)0x40500004, &bond_id, 4, AIC_TRAN_EMB2DRV, 1);
+	AICWFDBG(LOGINFO, "0x40500004 bond_id %x >>17 %x \n",bond_id,(bond_id >> 17));
+
+	if (((bond_id >> 17) & 0x01UL) == 0x00UL) {
+		chip_mcu_id = 1;
+	}
+
+	AICWFDBG(LOGINFO,"M chip is %u \n ",chip_mcu_id);
+
+#ifdef CONFIG_UPG_FLASH
+	if(chip_mcu_id){
+		aicwf_pcie_tran(rwnx_hw->pcidev, (void *)0x8006000, &otad_base, 4, AIC_TRAN_EMB2DRV, 1);
+		AICWFDBG(LOGINFO, "0x8006000 otad_base %x fw_flsupg %d \n",otad_base,fw_flsupg);
+		aicwf_pcie_tran(rwnx_hw->pcidev, (void *)0x807f074, &gen2_base, 4, AIC_TRAN_EMB2DRV, 1);
+		AICWFDBG(LOGINFO, "0x807f074 gen2_base %x, FLASH_SET_GEN2 %d FLASH_SET_GEN1 %d \n",gen2_base, FLASH_SET_GEN2,FLASH_SET_GEN1);
+
+		//only use for M80x2P
+		if(otad_base != 0x474d4943)
+		{
+			fw_flsupg = 1;
+			if(FLASH_SET_GEN2){
+				fw_flggen2 = 1;
+			}if(FLASH_SET_GEN1){
+				fw_flggen1 = 1;
+			}
+		}
+		else
+		{
+			if(FLASH_SET_GEN2){
+				if(((gen2_base >> 24) & 0xFF) != 0xA3)
+					fw_flggen2 = 1;
+			}if(FLASH_SET_GEN1){
+				if(((gen2_base >> 24) & 0xFF) == 0xA3)
+					fw_flggen1 = 1;
+			}
+		}
+
+		if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) {
+			printk("fw_flsupg %d \n",fw_flsupg);
+			if(fw_flsupg){
+				ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FLASH_FW_NAME);
+				pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
+				fw_flsupg = 0;
+				mdelay(1000);
+			}
+
+			printk("fw_flggen2 %d \n",fw_flggen2);
+			if(fw_flggen2){
+				ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FLASHGEN2_FW_NAME);
+				pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
+				fw_flggen2 = 0;
+				mdelay(100);
+			}
+
+			printk("fw_flggen1 %d \n",fw_flggen1);
+			if(fw_flggen1){
+				ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FLASHGEN1_FW_NAME);
+				pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
+				fw_flggen1 = 0;
+				mdelay(100);
+			}
+		}
+	}
+#endif
+}
+
 
 /**
  * rwnx_platform_on() - Start the platform
@@ -4019,15 +4119,12 @@ err:
 
 int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
 {
-	int ret;
+	int ret = 0;
 	struct rwnx_plat *rwnx_plat = rwnx_hw->plat;
-	(void)ret;
+	//(void)ret;
     #if (defined(CONFIG_NO_FIRMWARE_RELOAD) || defined(CONFIG_LOWPOWER))
     u32 sysctl;
     #endif
-	u32 otad_base;
-	u32 gen2_base;
-	u32 bond_id;
     u32 fw_addr = testmode? RAM_LMAC_RF_FW_ADDR : RAM_FMAC_FW_ADDR;
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
@@ -4035,58 +4132,7 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
 	if (rwnx_plat->enabled)
 		return 0;
 
-	aicwf_pcie_tran(rwnx_hw->pcidev, (void *)0x40500004, &bond_id, 4, AIC_TRAN_EMB2DRV, 1);
-	AICWFDBG(LOGINFO, "0x40500004 bond_id %x >>17 %x \n",bond_id,(bond_id >> 17));
-
-	if (((bond_id >> 17) & 0x01UL) == 0x00UL) {
-		chip_mcu_id = 1;
-	}
-
-	AICWFDBG(LOGINFO,"M chip is %u \n ",chip_mcu_id);
-
-#ifdef CONFIG_UPG_FLASH
-	if(chip_mcu_id){
-		aicwf_pcie_tran(rwnx_hw->pcidev, (void *)0x8006000, &otad_base, 4, AIC_TRAN_EMB2DRV, 1);
-		AICWFDBG(LOGINFO, "0x8006000 otad_base %x fw_flsupg %d \n",otad_base,fw_flsupg);
-		aicwf_pcie_tran(rwnx_hw->pcidev, (void *)0x807f074, &gen2_base, 4, AIC_TRAN_EMB2DRV, 1);
-		AICWFDBG(LOGINFO, "0x807f074 gen2_base %x, %d\n",gen2_base, FLASH_SET_GEN2);
-
-		//only use for M80x2P
-		if(otad_base != 0x474d4943)
-		{
-			fw_flsupg = 1;
-			if(FLASH_SET_GEN2){
-				fw_flggen2 = 1;
-			}
-
-		}
-		else
-		{
-			if(FLASH_SET_GEN2){
-				if(((gen2_base >> 24) & 0xFF) != 0xA3)
-					fw_flggen2 = 1;
-			}
-		}
-
-		if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) {
-			printk("fw_flsupg %d \n",fw_flsupg);
-			if(fw_flsupg){
-				ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,fw_addr, RWNX_8800D80X2_PCIE_FLASH_FW_NAME);
-				pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
-				fw_flsupg = 0;
-				mdelay(1000);
-			}
-
-			printk("fw_flggen2 %d \n",fw_flggen2);
-			if(fw_flggen2){
-				ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,fw_addr, RWNX_8800D80X2_PCIE_FLASHGEN2_FW_NAME);
-				pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
-				fw_flggen2 = 0;
-				mdelay(100);
-			}
-		}
-	}
-#endif
+	rwnx_update_flash(rwnx_hw);
 
     #if (defined(CONFIG_NO_FIRMWARE_RELOAD) || defined(CONFIG_LOWPOWER))
     *(volatile uint32_t *)&rwnx_hw->ipc_env->shared->fw_init_done = 2;
@@ -4100,7 +4146,8 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
             patch_config_d80x2(rwnx_hw);
 
         AICWFDBG(LOGINFO, "fw already load\n");
-        pcie_reset_firmware(rwnx_hw, fw_addr);
+        if(pcie_reset_firmware(rwnx_hw, fw_addr))
+			return -1;
         rwnx_plat_userconfig_load(rwnx_hw);
         return 0;
     }
@@ -4136,7 +4183,8 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
 	else
 		patch_config_d80x2(rwnx_hw);
 
-	pcie_reset_firmware(rwnx_hw, fw_addr);
+	if(pcie_reset_firmware(rwnx_hw, fw_addr))
+		return -1;
 
 	#endif /* !CONFIG_ROM_PATCH_EN */
 	#endif
@@ -4172,6 +4220,7 @@ void rwnx_platform_off(struct rwnx_hw *rwnx_hw, void **config)
 #if defined(AICWF_USB_SUPPORT) || defined(AICWF_SDIO_SUPPORT)  || defined(AICWF_PCIE_SUPPORT)
 	rwnx_hw->plat->enabled = false;
 	tasklet_kill(&rwnx_hw->task);
+	rwnx_hw->task_inited = 0;
 	tasklet_kill(&rwnx_hw->task_txrestart);
     #ifdef CONFIG_RX_TASKLET
 	tasklet_kill(&rwnx_hw->task_rx_process);

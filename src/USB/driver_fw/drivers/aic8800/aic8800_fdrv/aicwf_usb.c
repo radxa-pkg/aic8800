@@ -781,7 +781,7 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
         aicwf_prealloc_rxbuff_free(rx_buff, &usb_dev->rx_priv->rxbuff_lock);
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
 
-        msleep(100);
+        mdelay(100);
 	    return -1;
     }else{
     	atomic_inc(&rx_urb_cnt);
@@ -840,7 +840,7 @@ static int aicwf_usb_submit_rx_urb(struct aic_usb_dev *usb_dev,
         usb_buf->skb = NULL;
         aicwf_usb_rx_buf_put(usb_dev, usb_buf);
 
-        msleep(100);
+        mdelay(100);
         return -1;
     }else{
         atomic_inc(&rx_urb_cnt);
@@ -913,7 +913,7 @@ static int aicwf_usb_submit_msg_rx_urb(struct aic_usb_dev *usb_dev,
         usb_buf->skb = NULL;
         aicwf_usb_msg_rx_buf_put(usb_dev, usb_buf);
 
-        msleep(100);
+        mdelay(100);
     }
     return 0;
 }
@@ -2576,8 +2576,10 @@ static int aicwf_usb_suspend(struct usb_interface *intf, pm_message_t state)
     struct rwnx_vif *rwnx_vif, *tmp;
         
     AICWFDBG(LOGINFO, "%s enter\r\n", __func__);
-#ifdef CONFIG_WOWLAN
+#ifdef CONFIG_WOWLAN 
+#ifndef ANDROID_PLATFORM
     rwnx_send_dummy_reboot(usb_dev->rwnx_hw);
+#endif
 #endif       
     list_for_each_entry_safe(rwnx_vif, tmp, &usb_dev->rwnx_hw->vifs, list) {
         if (rwnx_vif->ndev){

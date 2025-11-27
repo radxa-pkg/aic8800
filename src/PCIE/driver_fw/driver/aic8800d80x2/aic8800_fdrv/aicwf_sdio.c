@@ -1506,7 +1506,9 @@ int sdio_bustx_thread(void *data)
 			AICWFDBG(LOGERROR, "sdio bustx thread stop\n");
 			break;
 		}
-	if (!wait_for_completion_interruptible(&bus->bustx_trgg)) {
+	//if (!wait_for_completion_interruptible(&bus->bustx_trgg)) 
+	wait_for_completion(&bus->bustx_trgg);
+	{
 			if (sdiodev->bus_if->state == BUS_DOWN_ST)
 				continue;
 			if ((int)(atomic_read(&sdiodev->tx_priv->tx_pktcnt) > 0) || (sdiodev->tx_priv->cmd_txstate == true)){
@@ -1540,7 +1542,9 @@ int sdio_busrx_thread(void *data)
 			AICWFDBG(LOGERROR, "sdio busrx thread stop\n");
 			break;
 		}
-		if (!wait_for_completion_interruptible(&bus_if->busrx_trgg)) {
+		//if (!wait_for_completion_interruptible(&bus_if->busrx_trgg)) {
+        wait_for_completion(&bus_if->busrx_trgg);
+        {
 
 			if (bus_if->state == BUS_DOWN_ST)
 				continue;
@@ -1563,7 +1567,9 @@ static int aicwf_sdio_pwrctl_thread(void *data)
 			sdio_err("sdio pwrctl thread stop\n");
 			break;
 		}
-		if (!wait_for_completion_interruptible(&sdiodev->pwrctrl_trgg)) {
+		//if (!wait_for_completion_interruptible(&sdiodev->pwrctrl_trgg)) {
+		wait_for_completion(&sdiodev->pwrctrl_trgg);
+        {
 			//printk("%s working\r\n", __func__);
 
 			if (sdiodev->bus_if->state == BUS_DOWN_ST)

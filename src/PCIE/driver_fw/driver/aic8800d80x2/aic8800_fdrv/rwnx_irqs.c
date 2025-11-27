@@ -49,6 +49,7 @@ void rwnx_task(unsigned long data)
 {
     struct rwnx_hw *rwnx_hw = (struct rwnx_hw *)data;
     struct aic_pci_dev *adev = rwnx_hw->pcidev;
+    unsigned long flags;
 
 #ifdef AICWF_PCIE_SUPPORT
     //struct rwnx_plat *rwnx_plat = rwnx_hw->plat;
@@ -61,6 +62,11 @@ void rwnx_task(unsigned long data)
     uint32_t txc=0, rxc=0;
     uint32_t fw_txc = 0, fw_rxc = 0;
 
+	if (unlikely(rwnx_hw->pci_fw_err)) {
+		AICWFDBG(LOGERROR, "pcie fw err!\n");
+		return;
+	}
+
     if(rwnx_hw->pci_suspending) {
         AICWFDBG(LOGINFO, "%s pci_suspending return\n", __func__);
         if(rwnx_hw->is_irq_disable) {
@@ -70,7 +76,6 @@ void rwnx_task(unsigned long data)
         return;
     }
 
-    //writel(0x10, adev->emb_tpci + 0x0ec);
     if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
         status = *(volatile unsigned int *)(rwnx_hw->pcidev->pci_bar1_vaddr + AIC8800D80_PCIE_IRQ_STATUS_OFFSET);
     else
@@ -407,6 +412,7 @@ void rwnx_task(unsigned long data)
         if (status & PCIE_FW_ERR_BIT) {
             AICWFDBG(LOGERROR, "PCIE_FW_ERR_BIT\n");
             aicwf_pcie_dump(rwnx_hw);
+            break;
         }
 
         if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
@@ -437,12 +443,13 @@ void rwnx_task(unsigned long data)
     //if(debug_print)
        // printk("exit\n");
 
+    spin_lock_irqsave(&rwnx_hw->pcidev->irq_lock, flags);
     if(rwnx_hw->is_irq_disable) {
         //printk("en\n");
         rwnx_hw->is_irq_disable = 0;
         enable_irq(rwnx_hw->pcidev->pci_dev->irq);
     }
-
+    spin_unlock_irqrestore(&rwnx_hw->pcidev->irq_lock, flags);
 }
 
 void rwnx_txrestart_task(unsigned long data)

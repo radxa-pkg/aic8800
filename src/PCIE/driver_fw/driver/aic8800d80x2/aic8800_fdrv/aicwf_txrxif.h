@@ -125,6 +125,14 @@ struct aicwf_bus {
     struct completion rx_trgg;
     struct task_struct *rx_thread;
 #endif
+#ifdef CONFIG_PCIE_PROCESS_THREAD
+    struct completion pcie_irq_proc_trgg;
+    struct task_struct *pcie_irq_proc_thread;
+#endif
+#ifdef CONFIG_TX_THREAD
+	struct completion tx_trgg;
+	struct task_struct *tx_thread;
+#endif
 };
 
 struct aicwf_tx_priv {
@@ -150,6 +158,11 @@ struct aicwf_tx_priv {
 #endif
 #ifdef AICWF_PCIE_SUPPORT
 	struct aic_pci_dev *pciedev;
+#ifdef CONFIG_TX_THREAD
+	atomic_t tx_pktcnt;
+	spinlock_t txqlock;
+	struct frame_queue txq;
+#endif
 #endif
 
 	struct sk_buff *aggr_buf;
@@ -282,7 +295,7 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg);
 struct aicwf_rx_priv *aicwf_rx_init(void *arg);
 void aicwf_frame_queue_init(struct frame_queue *pq, int num_prio, int max_len);
 void aicwf_frame_queue_flush(struct frame_queue *pq);
-bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio);
+bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio, bool quick_enq);
 bool aicwf_rxframe_enqueue(struct frame_queue *q, struct sk_buff *pkt);
 bool aicwf_is_framequeue_empty(struct frame_queue *pq);
 void aicwf_frame_tx(void *dev, struct sk_buff *skb);

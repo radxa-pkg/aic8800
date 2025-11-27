@@ -6,6 +6,7 @@
 #include <net/if.h>
 #include<stdlib.h>
 #include <errno.h>
+#include <stdlib.h>
 #define WIFI_DRIVER_FW_PATH "sta"
 #define WIFI_DRIVER_MODULE_NAME "rwnx_fdrv"
 #define WIFI_DRIVER_MODULE_PATH "/vendor/modules/rwnx_fdrv.ko"
@@ -17,13 +18,13 @@
 #define CHIP_AIC8800D80     2
 #define CHIP_AIC8800D80X2	3
 
-#define CHIP_SELECT         CHIP_AIC8800D80
+// Default chip selection
+#define DEFAULT_CHIP_SELECT CHIP_AIC8800D80
 
-#if (CHIP_SELECT == CHIP_AIC8800D)
-#define EFUSE_CMD_OLD_FORMAT_EN 1
-#else
-#define EFUSE_CMD_OLD_FORMAT_EN 0
-#endif
+static int get_chip_type() {
+	const char *chip_env = getenv("WIFI_TEST_CHIP");
+	return (chip_env != NULL) ? atoi(chip_env) : DEFAULT_CHIP_SELECT;
+}
 
 #define RELEASE_DATE "2024_0701"
 
@@ -133,6 +134,7 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 	ifr.ifr_data = (void*)&priv_cmd;
 
 	printf("%s:\n", argV[2]);
+
 	if (strcasecmp(argV[2], "SET_TX") == 0) {
 		if (argC < 8) {
 			is_param_err = 1;
@@ -275,27 +277,27 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 
 	memcpy(&priv_cmd, ifr.ifr_data, sizeof(struct android_wifi_priv_cmd));
 	if (strcasecmp(argV[2], "SET_FREQ_CAL") == 0) {
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
-		printf("done: freq_cal: 0x%8x\n", *(unsigned int *)priv_cmd.buf);
-		#else
-		signed char rem_cnt = (signed char)priv_cmd.buf[1];
-		if (rem_cnt < 0) {
-			printf("failed to set freq_cal, no room!\n");
+		if (get_chip_type() == CHIP_AIC8800D) {
+			printf("done: freq_cal: 0x%8x\n", *(unsigned int *)priv_cmd.buf);
 		} else {
-			printf("done: freq_cal: 0x%2x (remain:%x)\n", (unsigned char)priv_cmd.buf[0], rem_cnt);
+			signed char rem_cnt = (signed char)priv_cmd.buf[1];
+			if (rem_cnt < 0) {
+				printf("failed to set freq_cal, no room!\n");
+			} else {
+				printf("done: freq_cal: 0x%2x (remain:%x)\n", (unsigned char)priv_cmd.buf[0], rem_cnt);
+			}
 		}
-		#endif
 	} else if (strcasecmp(argV[2], "SET_FREQ_CAL_FINE") == 0) {
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
-		printf("done: freq_cal_fine: 0x%8x\n", *(unsigned int *)priv_cmd.buf);
-		#else
-		signed char rem_cnt = (signed char)priv_cmd.buf[1];
-		if (rem_cnt < 0) {
-			printf("failed to set freq_cal_fine, no room!\n");
+		if (get_chip_type() == CHIP_AIC8800D) {
+			printf("done: freq_cal_fine: 0x%8x\n", *(unsigned int *)priv_cmd.buf);
 		} else {
-			printf("done: freq_cal_fine: 0x%2x (remain:%x)\n", (unsigned char)priv_cmd.buf[0], rem_cnt);
+			signed char rem_cnt = (signed char)priv_cmd.buf[1];
+			if (rem_cnt < 0) {
+				printf("failed to set freq_cal_fine, no room!\n");
+			} else {
+				printf("done: freq_cal_fine: 0x%2x (remain:%x)\n", (unsigned char)priv_cmd.buf[0], rem_cnt);
+			}
 		}
-		#endif
 	} else if (strcasecmp(argV[2], "GET_EFUSE_BLOCK") == 0)
 		printf("done:efuse: 0x%8x\n", *(unsigned int *)priv_cmd.buf);
 	else if (strcasecmp(argV[2], "SET_XTAL_CAP") == 0)
@@ -306,35 +308,31 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 		printf("done: getrx fcsok=%d, total=%d\n", *(unsigned int *)priv_cmd.buf, *(unsigned int *)&priv_cmd.buf[4]);
 	else if (strcasecmp(argV[2], "GET_MAC_ADDR") == 0) {
 		printf("done: get macaddr = %02x : %02x : %02x : %02x : %02x : %02x\n",
-			*(unsigned char *)&priv_cmd.buf[5], *(unsigned char *)&priv_cmd.buf[4], *(unsigned char *)&priv_cmd.buf[3],
-			*(unsigned char *)&priv_cmd.buf[2], *(unsigned char *)&priv_cmd.buf[1], *(unsigned char *)&priv_cmd.buf[0]);
-		#if (!EFUSE_CMD_OLD_FORMAT_EN)
+				*(unsigned char *)&priv_cmd.buf[5], *(unsigned char *)&priv_cmd.buf[4], *(unsigned char *)&priv_cmd.buf[3],
+				*(unsigned char *)&priv_cmd.buf[2], *(unsigned char *)&priv_cmd.buf[1], *(unsigned char *)&priv_cmd.buf[0]);
 		printf("  (remain:%x)\n", priv_cmd.buf[6]);
-		#endif
 	} else if (strcasecmp(argV[2], "GET_BT_MAC_ADDR") == 0) {
 		printf("done: get bt macaddr = %02x : %02x : %02x : %02x : %02x : %02x\n",
-			*(unsigned char *)&priv_cmd.buf[5], *(unsigned char *)&priv_cmd.buf[4], *(unsigned char *)&priv_cmd.buf[3],
-			*(unsigned char *)&priv_cmd.buf[2], *(unsigned char *)&priv_cmd.buf[1], *(unsigned char *)&priv_cmd.buf[0]);
-		#if (!EFUSE_CMD_OLD_FORMAT_EN)
+				*(unsigned char *)&priv_cmd.buf[5], *(unsigned char *)&priv_cmd.buf[4], *(unsigned char *)&priv_cmd.buf[3],
+				*(unsigned char *)&priv_cmd.buf[2], *(unsigned char *)&priv_cmd.buf[1], *(unsigned char *)&priv_cmd.buf[0]);
 		printf("  (remain:%x)\n", priv_cmd.buf[6]);
-		#endif
 	} else if (strcasecmp(argV[2], "GET_FREQ_CAL") == 0) {
 		unsigned int val = *(unsigned int *)&priv_cmd.buf[0];
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
-		printf("done: get_freq_cal: xtal_cap=0x%x, xtal_cap_fine=0x%x\n", val & 0x000000ff, (val >> 8) & 0x000000ff);
-		#elif (CHIP_SELECT == CHIP_AIC8800DCDW)
-		printf("done: get_freq_cal: xtal_cap=0x%x (remain:%x), xtal_cap_fine=0x%x (remain:%x)\n",
-			val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24) & 0xff);
-		#else
-                printf("done: get_freq_cal: xtal_cap=0x%x (remain:%x), xtal_cap_fine=0x%x (remain:%x)\n",
-                        val & 0xff, (val >> 16) & 0xff, (val >> 8) & 0xff, (val >> 24) & 0xff);
-		#endif
+		if (get_chip_type() == CHIP_AIC8800D) {
+			printf("done: get_freq_cal: xtal_cap=0x%x, xtal_cap_fine=0x%x\n", val & 0x000000ff, (val >> 8) & 0x000000ff);
+		} else if (get_chip_type() == CHIP_AIC8800DCDW) {
+			printf("done: get_freq_cal: xtal_cap=0x%x (remain:%x), xtal_cap_fine=0x%x (remain:%x)\n",
+				val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24) & 0xff);
+		} else {
+			printf("done: get_freq_cal: xtal_cap=0x%x (remain:%x), xtal_cap_fine=0x%x (remain:%x)\n",
+				val & 0xff, (val >> 16) & 0xff, (val >> 8) & 0xff, (val >> 24) & 0xff);
+		}
 	} else if (strcasecmp(argV[2], "GET_VENDOR_INFO") == 0) {
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
-		printf("done: get_vendor_info = 0x%x\n", *(unsigned char *)&priv_cmd.buf[0]);
-		#else
-		printf("done: get_vendor_info = 0x%x (remain:%x)\n", *(unsigned char *)&priv_cmd.buf[0], priv_cmd.buf[1]);
-		#endif
+		if (get_chip_type() == CHIP_AIC8800D) {
+			printf("done: get_vendor_info = 0x%x\n", *(unsigned char *)&priv_cmd.buf[0]);
+		} else {
+			printf("done: get_vendor_info = 0x%x (remain:%x)\n", *(unsigned char *)&priv_cmd.buf[0], priv_cmd.buf[1]);
+		}
 	} else if (strcasecmp(argV[2], "RDWR_PWRMM") == 0) {
 		printf("done: txpwr manual mode = %x\n", *(unsigned int *)&priv_cmd.buf[0]);
 	} else if (strcasecmp(argV[2], "RDWR_PWRIDX") == 0) {
@@ -396,7 +394,7 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 
 	} else if (strcasecmp(argV[2], "RDWR_PWROFST") == 0) {
 		signed char *buff = (signed char *)&priv_cmd.buf[0];
-		#if (CHIP_SELECT < CHIP_AIC8800D80)
+		if (get_chip_type() < CHIP_AIC8800D80) {
 		printf("done:\n"
 			"txpwr offset 2.4g: \n"
 			"  [0]=%d(ch1~4)\n"
@@ -407,49 +405,49 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 			"  [1]=%d(ch100~120)\n"
 			"  [2]=%d(ch122~140)\n"
 			"  [3]=%d(ch142~165)\n", (int8_t)buff[3], (int8_t)buff[4], (int8_t)buff[5], (int8_t)buff[6]);
-		#elif (CHIP_SELECT == CHIP_AIC8800D80X2)
-		int type, ch_grp;
-		printf("done:\n"
+		} else if (get_chip_type() == CHIP_AIC8800D80X2) {
+			int type, ch_grp;
+			printf("done:\n"
 			"pwrofst2x_2.4g(ant0/ant1): [0]:11b, [1]:ofdm_highrate\n"
 			"  chan=" "\t1-4" "\t5-9" "\t10-13");
 			for (type = 0; type < 2; type++) {
-            printf("\n  [%d] =", type);
-            for (ch_grp = 0; ch_grp < 3; ch_grp++) {
-				printf("\t%d/%d", buff[type + 3 * ch_grp], buff[type + 3 * ch_grp + 3 * 3]);
-            }
-        }
-        printf("\npwrofst2x_5g(ant0/ant1): [0]:ofdm_lowrate, [1]:ofdm_highrate\n"
-            "  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
-        buff = (signed char *)&priv_cmd.buf[3 * 3 * 2];
-        for (type = 0; type < 1; type++) {
-            printf("\n  [%d] =", type);
-            for (ch_grp = 0; ch_grp < 6; ch_grp++) {
-                printf("\t%d/%d", buff[type + 3 *ch_grp], buff[type + 3 *ch_grp + 3 * 6]);
-            }
-        }
-        printf("\n");
-		#else
-		int type, ch_grp;
-		printf("done:\n"
-			"pwrofst2x 2.4g: [0]:11b, [1]:ofdm_highrate, [2]:ofdm_lowrate\n"
-			"  chan=" "\t1-4" "\t5-9" "\t10-13");
-		for (type = 0; type < 3; type++) {
 			printf("\n  [%d] =", type);
 			for (ch_grp = 0; ch_grp < 3; ch_grp++) {
-				printf("\t%d", buff[3 * type + ch_grp]);
+				printf("\t%d/%d", buff[type + 3 * ch_grp], buff[type + 3 * ch_grp + 3 * 3]);
 			}
 		}
-		printf("\npwrofst2x 5g: [0]:ofdm_lowrate, [1]:ofdm_highrate, [2]:ofdm_midrate\n"
-			"  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
-		buff = (signed char *)&priv_cmd.buf[3 * 3];
-		for (type = 0; type < 3; type++) {
-			printf("\n  [%d] =", type);
-			for (ch_grp = 0; ch_grp < 6; ch_grp++) {
-				printf("\t%d", buff[6 * type + ch_grp]);
+			printf("\npwrofst2x_5g(ant0/ant1): [0]:ofdm_lowrate, [1]:ofdm_highrate\n"
+				"  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
+			buff = (signed char *)&priv_cmd.buf[3 * 3 * 2];
+			for (type = 0; type < 1; type++) {
+				printf("\n  [%d] =", type);
+				for (ch_grp = 0; ch_grp < 6; ch_grp++) {
+					printf("\t%d/%d", buff[type + 3 *ch_grp], buff[type + 3 *ch_grp + 3 * 6]);
+				}
 			}
+			printf("\n");
+		}else {
+			int type, ch_grp;
+			printf("done:\n"
+				"pwrofst2x 2.4g: [0]:11b, [1]:ofdm_highrate, [2]:ofdm_lowrate\n"
+				"  chan=" "\t1-4" "\t5-9" "\t10-13");
+			for (type = 0; type < 3; type++) {
+				printf("\n  [%d] =", type);
+				for (ch_grp = 0; ch_grp < 3; ch_grp++) {
+					printf("\t%d", buff[3 * type + ch_grp]);
+				}
+			}
+			printf("\npwrofst2x 5g: [0]:ofdm_lowrate, [1]:ofdm_highrate, [2]:ofdm_midrate\n"
+				"  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
+			buff = (signed char *)&priv_cmd.buf[3 * 3];
+			for (type = 0; type < 3; type++) {
+				printf("\n  [%d] =", type);
+				for (ch_grp = 0; ch_grp < 6; ch_grp++) {
+					printf("\t%d", buff[6 * type + ch_grp]);
+				}
+			}
+			printf("\n");
 		}
-		printf("\n");
-		#endif
 	} else if (strcasecmp(argV[2], "RDWR_PWROFSTFINE") == 0) {
 		signed char *buff = (signed char *)&priv_cmd.buf[0];
 		printf("done:\n"
@@ -474,7 +472,7 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 		}
 	} else if (strcasecmp(argV[2], "RDWR_EFUSE_PWROFST") == 0) {
 		signed char *buff = (signed char *)&priv_cmd.buf[0];
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
+		if (get_chip_type() == CHIP_AIC8800D) {
 		printf("done:\n"
 			"efuse txpwr offset 2.4g:\n"
 			"  [0]=%d(ch1~4)\n"
@@ -485,113 +483,18 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 			"  [1]=%d(ch100~120)\n"
 			"  [2]=%d(ch122~140)\n"
 			"  [3]=%d(ch142~165)\n", (int8_t)buff[3], (int8_t)buff[4], (int8_t)buff[5], (int8_t)buff[6]);
-		#else
-		#if (CHIP_SELECT < CHIP_AIC8800D80)
-		printf("done:\n"
-			"efuse txpwr offset 2.4g:\n"
-			"  [0]=%d(remain:%x, ch1~4)\n"
-			"  [1]=%d(remain:%x, ch5~9)\n"
-			"  [2]=%d(remain:%x, ch10~13)\n",
-			(int8_t)buff[0], (int8_t)buff[3],
-			(int8_t)buff[1], (int8_t)buff[4],
-			(int8_t)buff[2], (int8_t)buff[5]);
-		if (ret > 6) { // 5g_en
-			printf("efuse txpwr offset 5g:\n"
-				"  [0]=%d(remain:%x, ch36~64)\n"
-				"  [1]=%d(remain:%x, ch100~120)\n"
-				"  [2]=%d(remain:%x, ch122~140)\n"
-				"  [3]=%d(remain:%x, ch142~165)\n",
-				(int8_t)buff[6], (int8_t)buff[10],
-				(int8_t)buff[7], (int8_t)buff[11],
-				(int8_t)buff[8], (int8_t)buff[12],
-				(int8_t)buff[9], (int8_t)buff[13]);
-		}
-		#elif (CHIP_SELECT == CHIP_AIC8800D80X2)
-        int type, ch_grp;
-		int tmp_index_fls = 3*3 + 3*3 + 3*6 + 3*6;
-		signed char * rem_buff_fls ;
-		rem_buff_fls = (signed char *)&priv_cmd.buf[tmp_index_fls];
-        printf("done:\n"
-            "ef_pwrofst2x_2.4g(ant0/ant1): [0]:11b, [1]:ofdm_highrate\n"
-            "  chan=" "\t1-4" "\t5-9" "\t10-13");
-            for (type = 0; type < 2; type++) {
-            printf("\n  [%d] =", type);
-            for (ch_grp = 0; ch_grp < 3; ch_grp++) {
-                printf("\t%d(r:%x)/%d(r:%x)", buff[type + 3 * ch_grp],rem_buff_fls[type + 3 * ch_grp],
-					buff[type + 3 * ch_grp + 3 * 3],rem_buff_fls[type + 3 * ch_grp + 3 * 3]);
-            }
-        }
-        printf("\nef_pwrofst2x_5g(ant0/ant1): [0]:ofdm_highrate\n"
-            "  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
-        buff = (signed char *)&priv_cmd.buf[3 * 3 * 2];
-        for (type = 0; type < 1; type++) {
-            printf("\n  [%d] =", type);
-            for (ch_grp = 0; ch_grp < 6; ch_grp++) {
-                printf("\t%d(r:%x)/%d(r:%x)", buff[type + 3 *ch_grp],rem_buff_fls[type + 3 *ch_grp + 18],
-					buff[type + 3 *ch_grp + 3 * 6],rem_buff_fls[type + 3 *ch_grp + 3 * 6 + 18]);
-            }
-        }
-        printf("\n");
-		#else
-		int type, ch_grp;
-		int tmp_index = 3*3 + 3*6;;
-		signed char * rem_buff ;
-		rem_buff = (signed char *)&priv_cmd.buf[tmp_index];
-		printf("done:\n"
-			"pwrofst2x 2.4g: [0]:11b, [1]:ofdm_highrate, [2]:ofdm_lowrate\n"
-			"  chan=" "\t1-4\t" "\t5-9\t" "\t10-13\t");
-		for (type = 0; type < 3; type++) {
-			printf("\n	[%d] =", type);
-			for (ch_grp = 0; ch_grp < 3; ch_grp++) {
-				if (rem_buff[3 * type + ch_grp] < 0) {
-					printf("\t%d(no room,r%d)", (signed char)priv_cmd.buf[3 * type + ch_grp], rem_buff[3 * type + ch_grp]);
-				} else {
-					printf("\t%d(r:%x)\t", (signed char)priv_cmd.buf[3 * type + ch_grp], rem_buff[3 * type + ch_grp]);
-				}
-			}
-		}
-		printf("\npwrofst2x 5g: [0]:ofdm_lowrate, [1]:ofdm_highrate, [2]:ofdm_midrate\n"
-			"  chan=" "\t36-50\t" "\t51-64\t" "\t98-114\t" "\t115-130\t" "\t131-146\t" "\t147-166\t");
-		buff = (signed char *)&priv_cmd.buf[3 * 3];
-		tmp_index += 3*3;
-		rem_buff = (signed char *)&priv_cmd.buf[tmp_index];
-		for (type = 0; type < 3; type++) {
-			printf("\n	[%d] =", type);
-			for (ch_grp = 0; ch_grp < 6; ch_grp++) {
-				if (rem_buff[6 * type + ch_grp] < 0) {
-					printf("\t%d(no room,r%d)", buff[6 * type + ch_grp], rem_buff[6 * type + ch_grp]);
-				} else {
-					printf("\t%d(r:%x)\t", buff[6 * type + ch_grp], rem_buff[6 * type + ch_grp]);
-				}
-			}
-		}
-		printf("\n");
-		#endif
-		#endif
-	} else if (strcasecmp(argV[2], "RDWR_EFUSE_PWROFSTFINE") == 0) {
-		signed char *buff = (signed char *)&priv_cmd.buf[0];
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
-		printf("done:\n"
-			"efuse txpwr offset fine 2.4g:\n"
-			"  [0]=%d(ch1~4)\n"
-			"  [1]=%d(ch5~9)\n"
-			"  [2]=%d(ch10~13)\n", (int8_t)buff[0], (int8_t)buff[1], (int8_t)buff[2]);
-		printf("efuse txpwr offset fine 5g:\n"
-			"  [0]=%d(ch36~64)\n"
-			"  [1]=%d(ch100~120)\n"
-			"  [2]=%d(ch122~140)\n"
-			"  [3]=%d(ch142~165)\n", (int8_t)buff[3], (int8_t)buff[4], (int8_t)buff[5], (int8_t)buff[6]);
-		#else
-		printf("done:\n"
-			"efuse txpwr offset fine 2.4g:\n"
-			"  [0]=%d(remain:%x, ch1~4)\n"
-			"  [1]=%d(remain:%x, ch5~9)\n"
-			"  [2]=%d(remain:%x, ch10~13)\n",
-			(int8_t)buff[0], (int8_t)buff[3],
-			(int8_t)buff[1], (int8_t)buff[4],
-			(int8_t)buff[2], (int8_t)buff[5]);
-		if (ret > 6) { // 5g_en
-			printf("efuse txpwr offset fine 5g:\n"
+		} else {
+		if (get_chip_type() < CHIP_AIC8800D80) {
+			printf("done:\n"
+				"efuse txpwr offset 2.4g:\n"
+				"  [0]=%d(remain:%x, ch1~4)\n"
+				"  [1]=%d(remain:%x, ch5~9)\n"
+				"  [2]=%d(remain:%x, ch10~13)\n",
+				(int8_t)buff[0], (int8_t)buff[3],
+				(int8_t)buff[1], (int8_t)buff[4],
+				(int8_t)buff[2], (int8_t)buff[5]);
+			if (ret > 6) { // 5g_en
+				printf("efuse txpwr offset 5g:\n"
 					"  [0]=%d(remain:%x, ch36~64)\n"
 					"  [1]=%d(remain:%x, ch100~120)\n"
 					"  [2]=%d(remain:%x, ch122~140)\n"
@@ -600,19 +503,114 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 					(int8_t)buff[7], (int8_t)buff[11],
 					(int8_t)buff[8], (int8_t)buff[12],
 					(int8_t)buff[9], (int8_t)buff[13]);
-		}
-		#endif
-	} else if (strcasecmp(argV[2], "RDWR_EFUSE_DRVIBIT") == 0) {
-		#if (EFUSE_CMD_OLD_FORMAT_EN)
-		printf("done: efsue 2.4g txgain tbl pa drv_ibit: %x\n", priv_cmd.buf[0]);
-		#else
-		int val = *(int *)&priv_cmd.buf[0];
-		if (val < 0) {
-			printf("failed to rd/wr efuse drv_ibit, ret=%d\n", val);
+			}
+		}else if (get_chip_type() == CHIP_AIC8800D80X2) {
+			int type, ch_grp;
+			int tmp_index_fls = 3*3 + 3*3 + 3*6 + 3*6;
+			signed char * rem_buff_fls ;
+			rem_buff_fls = (signed char *)&priv_cmd.buf[tmp_index_fls];
+			printf("done:\n"
+				"ef_pwrofst2x_2.4g(ant0/ant1): [0]:11b, [1]:ofdm_highrate\n"
+				"  chan=" "\t1-4" "\t5-9" "\t10-13");
+				for (type = 0; type < 2; type++) {
+				printf("\n  [%d] =", type);
+				for (ch_grp = 0; ch_grp < 3; ch_grp++) {
+				printf("\t%d(r:%x)/%d(r:%x)", buff[type + 3 * ch_grp],rem_buff_fls[type + 3 * ch_grp],
+						buff[type + 3 * ch_grp + 3 * 3],rem_buff_fls[type + 3 * ch_grp + 3 * 3]);
+				}
+			}
+			printf("\nef_pwrofst2x_5g(ant0/ant1): [0]:ofdm_highrate\n"
+				"  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
+			buff = (signed char *)&priv_cmd.buf[3 * 3 * 2];
+			for (type = 0; type < 1; type++) {
+				printf("\n  [%d] =", type);
+				for (ch_grp = 0; ch_grp < 6; ch_grp++) {
+					printf("\t%d(r:%x)/%d(r:%x)", buff[type + 3 *ch_grp],rem_buff_fls[type + 3 *ch_grp + 18],
+						buff[type + 3 *ch_grp + 3 * 6],rem_buff_fls[type + 3 *ch_grp + 3 * 6 + 18]);
+				}
+			}
+			printf("\n");
 		} else {
-			printf("done: efsue 2.4g txgain tbl pa drv_ibit: %x (remain: %x)\n", priv_cmd.buf[0], priv_cmd.buf[1]);
+			int type, ch_grp;
+			int tmp_index = 3*3 + 3*6;;
+			signed char * rem_buff ;
+			rem_buff = (signed char *)&priv_cmd.buf[tmp_index];
+			printf("done:\n"
+				"pwrofst2x 2.4g: [0]:11b, [1]:ofdm_highrate, [2]:ofdm_lowrate\n"
+				"  chan=" "\t1-4\t" "\t5-9\t" "\t10-13\t");
+			for (type = 0; type < 3; type++) {
+				printf("\n	[%d] =", type);
+				for (ch_grp = 0; ch_grp < 3; ch_grp++) {
+					if (rem_buff[3 * type + ch_grp] < 0) {
+						printf("\t%d(no room,r%d)", (signed char)priv_cmd.buf[3 * type + ch_grp], rem_buff[3 * type + ch_grp]);
+					} else {
+						printf("\t%d(r:%x)\t", (signed char)priv_cmd.buf[3 * type + ch_grp], rem_buff[3 * type + ch_grp]);
+					}
+				}
+			}
+			printf("\npwrofst2x 5g: [0]:ofdm_lowrate, [1]:ofdm_highrate, [2]:ofdm_midrate\n"
+				"  chan=" "\t36-50\t" "\t51-64\t" "\t98-114\t" "\t115-130\t" "\t131-146\t" "\t147-166\t");
+			buff = (signed char *)&priv_cmd.buf[3 * 3];
+			tmp_index += 3*3;
+			rem_buff = (signed char *)&priv_cmd.buf[tmp_index];
+			for (type = 0; type < 3; type++) {
+				printf("\n	[%d] =", type);
+				for (ch_grp = 0; ch_grp < 6; ch_grp++) {
+					if (rem_buff[6 * type + ch_grp] < 0) {
+						printf("\t%d(no room,r%d)", buff[6 * type + ch_grp], rem_buff[6 * type + ch_grp]);
+					} else {
+						printf("\t%d(r:%x)\t", buff[6 * type + ch_grp], rem_buff[6 * type + ch_grp]);
+					}
+				}
+			}
+			printf("\n");
+			}
 		}
-		#endif
+	} else if (strcasecmp(argV[2], "RDWR_EFUSE_PWROFSTFINE") == 0) {
+		signed char *buff = (signed char *)&priv_cmd.buf[0];
+		if (get_chip_type() == CHIP_AIC8800D) {
+			printf("done:\n"
+				"efuse txpwr offset fine 2.4g:\n"
+				"  [0]=%d(ch1~4)\n"
+				"  [1]=%d(ch5~9)\n"
+				"  [2]=%d(ch10~13)\n", (int8_t)buff[0], (int8_t)buff[1], (int8_t)buff[2]);
+			printf("efuse txpwr offset fine 5g:\n"
+				"  [0]=%d(ch36~64)\n"
+				"  [1]=%d(ch100~120)\n"
+				"  [2]=%d(ch122~140)\n"
+				"  [3]=%d(ch142~165)\n", (int8_t)buff[3], (int8_t)buff[4], (int8_t)buff[5], (int8_t)buff[6]);
+		} else {
+			printf("done:\n"
+				"efuse txpwr offset fine 2.4g:\n"
+				"  [0]=%d(remain:%x, ch1~4)\n"
+				"  [1]=%d(remain:%x, ch5~9)\n"
+				"  [2]=%d(remain:%x, ch10~13)\n",
+				(int8_t)buff[0], (int8_t)buff[3],
+				(int8_t)buff[1], (int8_t)buff[4],
+				(int8_t)buff[2], (int8_t)buff[5]);
+			if (ret > 6) { // 5g_en
+				printf("efuse txpwr offset fine 5g:\n"
+						"  [0]=%d(remain:%x, ch36~64)\n"
+						"  [1]=%d(remain:%x, ch100~120)\n"
+						"  [2]=%d(remain:%x, ch122~140)\n"
+						"  [3]=%d(remain:%x, ch142~165)\n",
+						(int8_t)buff[6], (int8_t)buff[10],
+						(int8_t)buff[7], (int8_t)buff[11],
+						(int8_t)buff[8], (int8_t)buff[12],
+						(int8_t)buff[9], (int8_t)buff[13]);
+			}
+		}
+	} else if (strcasecmp(argV[2], "RDWR_EFUSE_DRVIBIT") == 0) {
+		if (get_chip_type() == CHIP_AIC8800D) {
+			printf("done: efsue 2.4g txgain tbl pa drv_ibit: %x\n", priv_cmd.buf[0]);
+		} else {
+			int val = *(int *)&priv_cmd.buf[0];
+			if (val < 0) {
+				printf("failed to rd/wr efuse drv_ibit, ret=%d\n", val);
+			} else {
+				printf("done: efsue 2.4g txgain tbl pa drv_ibit: %x (remain: %x)\n", priv_cmd.buf[0], priv_cmd.buf[1]);
+			}
+		}
 	} else if (strcasecmp(argV[2], "RDWR_EFUSE_SDIOCFG") == 0) {
 		printf("done: efsue sdio cfg: %x\n", priv_cmd.buf[0]);
 	} else if (strcasecmp(argV[2], "RDWR_EFUSE_USBVIDPID") == 0) {
@@ -652,8 +650,14 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 			printf("%02x ", buff[idx]);
 		}
 		printf("\n");
+	} else if (strcasecmp(argV[2], "RDWR_PWRADD2X") == 0) {
+		printf("pwradd2x_2g4: %d, pwradd2x_5g: %d\n", (signed char)priv_cmd.buf[0], (signed char)priv_cmd.buf[1]);
+	} else if (strcasecmp(argV[2], "RDWR_EFUSE_PWRADD2X") == 0) {
+		printf("pwradd2x_2g4: %d, pwradd2x_5g: %d\n", (signed char)priv_cmd.buf[0], (signed char)priv_cmd.buf[1]);
+		printf("remain_cnt_2g4: %d, remain_cnt_5g: %d\n", (unsigned char)(priv_cmd.buf[2] & 0x0F),
+				(unsigned char)(((priv_cmd.buf[2]) >> 4) & 0x0F));
 	} else if (strcasecmp(argV[2], "RDWR_BT_EFUSE_PWROFST") == 0) {
-		signed char *buff = (signed char *)&priv_cmd.buf[0];
+		//signed char *buff = (signed char *)&priv_cmd.buf[0];
 		printf("done: bt efsue pwrofst %d (remain: %x)\n", priv_cmd.buf[0], priv_cmd.buf[1]);
 	} else if(strcasecmp(argV[2], "GET_CS_INFO") == 0) {
 		struct aicwf_cs_info *cs_info = (struct aicwf_cs_info *)priv_cmd.buf;
@@ -675,7 +679,36 @@ int wifi_send_cmd_to_net_interface(const char* if_name, int argC, char *argV[])
 		printf("tx_ack_fail_stat=%d\n", cs_info->tx_ack_fail_stat);
 	} else if(strcasecmp(argV[2], "GET_NOISE") == 0) {
 		printf("noise: %d,%d\n", priv_cmd.buf[0], priv_cmd.buf[1]);
-        } else {
+        } else if(strcasecmp(argV[2], "GET_TXBYTES") == 0) {
+		printf("sta cnt=%d\n", priv_cmd.buf[0]);
+		unsigned char sta_cnt = priv_cmd.buf[0];
+		char i;
+		unsigned int txbytes;
+		for(i=0; i<sta_cnt; i++) {
+		    txbytes = *(unsigned int *)&priv_cmd.buf[1+10*i+6];
+		    printf("mac:%2x:%2x:%2x:%2x:%2x:%2x, %d\n", (unsigned char)priv_cmd.buf[1+10*i], (unsigned char)priv_cmd.buf[1+10*i+1], (unsigned char)priv_cmd.buf[1+10*i+2],
+								(unsigned char)priv_cmd.buf[1+10*i+3], (unsigned char)priv_cmd.buf[1+10*i+4], (unsigned char)priv_cmd.buf[1+10*i+5],
+								txbytes);
+		}
+	} else if(strcasecmp(argV[2], "CHECK_FLASH") == 0) {
+		unsigned int get_crc = (unsigned char)priv_cmd.buf[0] |
+			(unsigned char)(priv_cmd.buf[1] & 0xff) <<  8 |
+			(unsigned char)(priv_cmd.buf[2] & 0xff) << 16 |
+			(unsigned char)(priv_cmd.buf[3] & 0xff) << 24;
+		unsigned int bin_crc = (unsigned char)priv_cmd.buf[4] |
+			(unsigned char)(priv_cmd.buf[5] & 0xff) <<  8 |
+			(unsigned char)(priv_cmd.buf[6] & 0xff) << 16 |
+			(unsigned char)(priv_cmd.buf[7] & 0xff) << 24;
+		if (get_crc == bin_crc) {
+			printf("check flash crc success\n");
+		} else {
+			printf("check flash crc fail, get_crc is 0x%x, bin_crc is 0x%x\n", get_crc, bin_crc);
+		}
+	} else if (strcasecmp(argV[2], "GET_RSSI") == 0) {
+		printf("done: get rssi = %d\n", *(char *)&priv_cmd.buf[0]);
+        } else if(strcasecmp(argV[2], "GET_2ANT_RSSI") == 0) {
+		printf("rssi=%d,%d\n", priv_cmd.buf[0], priv_cmd.buf[1]);
+	} else {
 		printf("done\n");
 	}
 
@@ -692,16 +725,26 @@ int main(int argC, char *argV[])
 	//printf("enter!!!AIC    argC=%d    argV[0]=%s    argV[1]=%s    argV[2]=%s\n", argC, argV[0], argV[1],argV[2]);
 	if (argC == 1) {
 		printf("Please enter parameters!\n");
+		printf("Usage:\n");
+		printf("  %s <interface> <command> [args]\n", argV[0]);
+		printf("  %s version - Show version\n", argV[0]);
+		printf("  export WIFI_TEST_CHIP=<chip_type> - Change chip type\n");
+		printf("  Available chip types:\n");
+		printf("  0 - AIC8800D\n");
+		printf("  1 - AIC8800DCDW\n");
+		printf("  2 - AIC8800D80\n");
+		printf("  3 - AIC8800D80X2\n");
+		printf("  Current chip selection: %d\n", get_chip_type());
 		return -1;
 	}
-
 	if (argC >= 3)
 		wifi_send_cmd_to_net_interface(argV[1], argC, argV);
-	else if ((strcasecmp(argV[1], "-v") == 0) || (strcasecmp(argV[1], "version") == 0))
-		printf("wifi_test %s_%d\n", RELEASE_DATE, CHIP_SELECT);
+	else if ((strcasecmp(argV[1], "-v") == 0) || (strcasecmp(argV[1], "version") == 0)) {
+		printf("wifi_test %s\n", RELEASE_DATE);
+		printf("Current chip selection: %d\n", get_chip_type());
+	}
 	else
 		printf("Bad parameter! %d\n",argC);
-
 
 	return 0;
 }

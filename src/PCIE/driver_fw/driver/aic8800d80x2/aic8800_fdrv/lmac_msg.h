@@ -408,6 +408,13 @@ enum mm_msg_tag {
 	MM_SET_TXPWR_PER_STA_REQ,
 	MM_SET_TXPWR_PER_STA_CFM,
 
+    MM_GET_STATISTIC_REQ,
+    MM_GET_STATISTIC_CFM,
+
+    MM_VENDOR_SWCONFIG_IND,
+    MM_FW_PANIC_IND,
+	MM_FW_ASSERT_IND,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -832,6 +839,7 @@ struct mm_key_add_cfm {
 	u8_l status;
 	/// HW index of the key just added
 	u8_l hw_key_idx;
+	u8_l alligned[2];
 };
 
 /// Structure containing the parameters of the @ref MM_KEY_DEL_REQ message.
@@ -1193,6 +1201,19 @@ struct mm_set_rf_config_req {
 	u32_l tx_gain[32];
 };
 #endif
+
+typedef struct
+{ 
+	u32_l magic_num; /*“GWCR” or ’SWCR”*/
+	u32_l info_flag; 
+	u32_l calib_flag; 
+	u32_l reserved0; 	
+	u32_l res_data[536/sizeof(u32_l)];
+}wf_rf_calib_res_drv_t;
+
+#define DRIVER_GET_WIFI_CALRES_MAGIC_NUM 0x52435747
+#define DRIVER_SET_WIFI_CALRES_MAGIC_NUM 0x52435753
+
 struct mm_set_rf_config_req
 {
     u8_l table_sel;
@@ -1210,6 +1231,10 @@ struct mm_set_rf_calib_req {
 	u32_l bt_calib_param;
 	u8_l xtal_cap;
     u8_l xtal_cap_fine;
+#ifdef RF_WRITE_FILE
+	u8_l reserved0[2];
+	wf_rf_calib_res_drv_t cal_res;
+#endif
 };
 
 struct mm_set_rf_calib_cfm {
@@ -1218,6 +1243,16 @@ struct mm_set_rf_calib_cfm {
 	u32_l txgain_24g_addr;
 	u32_l txgain_5g_addr;
 };
+
+struct mm_set_rf_calib_cfm_v2
+{
+	u32_l rxgain_24g_addr;
+	u32_l rxgain_5g_addr;
+	u32_l txgain_24g_addr;
+	u32_l txgain_5g_addr;
+	wf_rf_calib_res_drv_t cal_res;
+};
+
 
 struct mm_get_mac_addr_req {
 	u32_l get;
@@ -1892,6 +1927,7 @@ struct me_sta_add_cfm {
 	u8_l status;
 	/// PM state of the station
 	u8_l pm_state;
+	u8_l alligned;
 };
 
 /// Structure containing the parameters of the @ref ME_STA_DEL_REQ message.
@@ -1928,6 +1964,19 @@ struct mm_apm_staloss_ind
         u8_l vif_idx;
         u8_l mac_addr[6];
 };
+
+struct fw_panic_info_ind
+{
+    uint32_t len;
+    uint8_t info[384];
+};
+
+struct fw_assert_info_ind
+{
+    uint32_t len;
+    uint8_t info[384];
+};
+
 
 enum vendor_hwconfig_tag{
 	ACS_TXOP_REQ = 0,
@@ -2096,7 +2145,9 @@ enum vendor_swconfig_tag
     EXT_FLAGS_SET_REQ,
     EXT_FLAGS_GET_REQ,
     EXT_FLAGS_MASK_SET_REQ,
-    TWO_ANT_RSSI_GET_REQ,
+    TWO_ANT_RSSI_GET_REQ,//6
+    FWLOG_REDIR_ENABLE_REQ,//7
+    FWLOG_REDIR_DEBUGMASK_SET_REQ,//8
 };
 
 struct mm_set_bcn_cfg_req
@@ -2159,6 +2210,15 @@ struct mm_mask_set_ext_flags_cfm
     u32_l user_flags;
 };
 
+struct mm_fwlog_redir_enable_req
+{
+	u8_l enable;
+};
+
+struct mm_fwlog_redir_debugmask_req
+{
+	u16_l debugmask;
+};
 struct mm_set_vendor_swconfig_req
 {
     u32_l swconfig_id;
@@ -2167,6 +2227,8 @@ struct mm_set_vendor_swconfig_req
         struct mm_set_temp_comp_req temp_comp_set_req;
         struct mm_set_ext_flags_req ext_flags_set_req;
         struct mm_mask_set_ext_flags_req ext_flags_mask_set_req;
+		struct mm_fwlog_redir_enable_req fwlog_redir_req;
+		struct mm_fwlog_redir_debugmask_req fwlog_redir_dbgmask_req;
     };
 };
 
@@ -2187,6 +2249,27 @@ struct mm_set_txpwr_lvl_per_sta_req
 {
 	u8_l sta_idx;
 	s8_l tx_pwr_offset;
+};
+
+struct mm_get_statistic_req {
+    u32 sub_id;
+};
+
+struct mm_get_sta_txbytes {
+    u32 sta_idx;
+    u32 txbytes;
+};
+
+struct mm_get_sta_txbytes_cfm {
+    uint32_t sta_cnt;
+    struct mm_get_sta_txbytes sta_txbytes[NX_REMOTE_STA_MAX];
+};
+
+struct mm_get_statistic_cfm {
+    uint32_t sub_id;
+    union {
+        struct mm_get_sta_txbytes_cfm sta_txbytes_cfm;
+    };
 };
 
 /// Structure containing the parameters of the @ref ME_RC_STATS_REQ message.
@@ -2424,6 +2507,8 @@ struct sm_disconnect_ind {
 	u16_l reason_code;
 	/// Index of the VIF.
 	u8_l vif_idx;
+	/// FT over DS is ongoing
+	bool_l ft_over_ds;
     // Disconnection happen before a re-association
     bool_l reassoc;
 

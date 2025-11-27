@@ -38,6 +38,7 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/reboot.h>
+#include <linux/compat.h>
 
 #include "aic_btusb.h"
 
@@ -1476,7 +1477,7 @@ static long btchr_ioctl(struct file *file_p,unsigned int cmd, unsigned long arg)
             return 1;
         case DWFW_CMPLT:
             AICBT_INFO(" btchr_ioctl DWFW_CMPLT");
-#if 1
+			break;
 	case SET_ISO_CFG:
             AICBT_INFO("btchr_ioctl SET_ISO_CFG");
 		if(copy_from_user(&(hdev->voice_setting), (__u16*)arg, sizeof(__u16))){
@@ -1485,7 +1486,7 @@ static long btchr_ioctl(struct file *file_p,unsigned int cmd, unsigned long arg)
 		//hdev->voice_setting = *(uint16_t*)arg;
 		AICBT_INFO(" voice settings = %d", hdev->voice_setting);
 		//return 1;
-#endif
+			break;
         case GET_USB_INFO:
 			//ret = download_patch(fw_info,1);
             AICBT_INFO(" btchr_ioctl GET_USB_INFO");
@@ -1514,11 +1515,13 @@ static long btchr_ioctl(struct file *file_p,unsigned int cmd, unsigned long arg)
 }
 
 #ifdef CONFIG_PLATFORM_UBUNTU//AIDEN
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
 typedef u32		compat_uptr_t;
 static inline void __user *compat_ptr(compat_uptr_t uptr)
 {
 	return (void __user *)(unsigned long)uptr;
 }
+#endif
 #endif
 
 #ifdef CONFIG_COMPAT
@@ -1666,7 +1669,7 @@ int rcv_hci_evt(firmware_info *fw_info)
 }
 
 #ifdef CONFIG_BT_WAKEUP_IN_PM
-int rcv_hci_evt_in_pm(firmware_info *fw_info)
+int rcv_hci_evt_in_pm(firmware_info *fw_info, bool is_cmp)
 {
     int ret_len = 0, ret_val = 0;
     int i;
@@ -1676,7 +1679,7 @@ int rcv_hci_evt_in_pm(firmware_info *fw_info)
         ret_val = usb_interrupt_msg(
             fw_info->udev, fw_info->pipe_in,
             (void *)(fw_info->rcv_pkt), RCV_PKT_LEN,
-            &ret_len, 200);
+            &ret_len, 10);
             if (ret_val >= 0)
                 break;
         }
@@ -1684,9 +1687,30 @@ int rcv_hci_evt_in_pm(firmware_info *fw_info)
         if (ret_val < 0)
             return ret_val;
 
-        if (CMD_CMP_EVT == fw_info->evt_hdr->evt) {
-            if (fw_info->cmd_hdr->opcode == fw_info->cmd_cmp->opcode)
-                return ret_len;
+        if (is_cmp){
+            if (CMD_CMP_EVT == fw_info->evt_hdr->evt) {
+                if (fw_info->cmd_hdr->opcode == fw_info->cmd_cmp->opcode)
+                    return ret_len;
+            }
+        }else{
+            return ret_len;
+        }
+    }
+}
+
+void rcv_ble_wakeup_event(firmware_info *fw_info)
+{
+    int ret_val = 0;
+    u8 reportdata[128];
+    ret_val = rcv_hci_evt_in_pm(fw_info,0);
+    if (ret_val < 0) {
+        AICBT_ERR("%s: Failed to receive ble wakeup event, errno %d",
+                __func__, ret_val);
+        return;
+    }else{
+        for(int i = 0;i<RCV_PKT_LEN ;i++){
+            reportdata[i] = fw_info->rcv_pkt[i];
+            printk("%x ",fw_info->rcv_pkt[i]);
         }
     }
 }
@@ -1844,7 +1868,7 @@ int set_bt_wakeup_param(firmware_info *fw_info)
         return ret_val;
     }
 
-    ret_val = rcv_hci_evt_in_pm(fw_info);
+    ret_val = rcv_hci_evt_in_pm(fw_info,0);
     if (ret_val < 0) {
         AICBT_ERR("%s: Failed to receive bt event, errno %d",
                 __func__, ret_val);
@@ -1859,6 +1883,7 @@ int reset_bt_from_wakeup_process(firmware_info *fw_info)
     int ret_val;
 
     AICBT_INFO("%s", __func__);
+    rcv_ble_wakeup_event(fw_info);
 
     fw_info->cmd_hdr->opcode = cpu_to_le16(HCI_VSC_RESET_ADFILTER_PROCESS_PT_CMD);
     fw_info->cmd_hdr->plen = 0;
@@ -1870,8 +1895,9 @@ int reset_bt_from_wakeup_process(firmware_info *fw_info)
                 __func__, ret_val);
         return ret_val;
     }
+    fw_info->cmd_hdr->opcode = cpu_to_le16(HCI_OP_RESET);
 
-    ret_val = rcv_hci_evt_in_pm(fw_info);
+    ret_val = rcv_hci_evt_in_pm(fw_info,1);
     if (ret_val < 0) {
         AICBT_ERR("%s: Failed to receive bt event, errno %d",
                 __func__, ret_val);
@@ -2418,8 +2444,10 @@ struct aicbsp_info_t aicbsp_info = {
 char aic_fw_path[FW_PATH_MAX];
 #if (CONFIG_BLUEDROID == 0)
 static const char* aic_default_fw_path = "/lib/firmware/aic8800DC";
-#else
+#elif CONFIG_BLUEDROID == 1
 static const char* aic_default_fw_path = "/vendor/etc/firmware";
+#else
+static const char* aic_default_fw_path = "/lib/firmware/aic8800DC";
 #endif
 #endif //CONFIG_USE_FW_REQUEST
 
@@ -3144,11 +3172,15 @@ void check_sco_event(struct urb *urb)
 		printk("%s status:%d,air_mode:%d \r\n", __func__, status,air_mode);
         if (status == 0) {
             SCO_NUM++;
-			hdev->notify(hdev, 0);
-            //schedule_work(&data->work);
             if (air_mode == 0x03) {
                 set_select_msbc(CODEC_MSBC);
-            }
+				hdev->voice_setting = 0x43;
+            }else{
+				hdev->voice_setting = 0x60;
+			}
+			hdev->notify(hdev, 0);
+            //schedule_work(&data->work);
+
         }
         break;
     case HCI_EV_DISCONN_COMPLETE:
@@ -5300,17 +5332,14 @@ static void btusb_disconnect(struct usb_interface *intf)
 static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 {
     struct btusb_data *data = usb_get_intfdata(intf);
-    //firmware_info *fw_info = data->fw_info;
-
+#ifdef CONFIG_BT_WAKEUP_IN_PM
+    firmware_info *fw_info = data->fw_info;
+#endif
     AICBT_INFO("%s: event 0x%x, suspend count %d", __func__,
             message.event, data->suspend_count);
 
     if (intf->cur_altsetting->desc.bInterfaceNumber != 0)
         return 0;
-
-    #ifdef CONFIG_BT_WAKEUP_IN_PM
-    set_bt_wakeup_param(fw_info);
-    #endif
 
     if (data->suspend_count++)
         return 0;
@@ -5331,6 +5360,9 @@ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
     btusb_stop_traffic(data);
     mdelay(URB_CANCELING_DELAY_MS);
     usb_kill_anchored_urbs(&data->tx_anchor);
+#ifdef CONFIG_BT_WAKEUP_IN_PM
+    set_bt_wakeup_param(fw_info);
+#endif
 
     return 0;
 }
@@ -5501,7 +5533,9 @@ module_exit(btusb_exit);
 module_param(mp_drv_mode, int, 0644);
 MODULE_PARM_DESC(mp_drv_mode, "0: NORMAL; 1: MP MODE");
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #endif
 

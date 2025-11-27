@@ -91,9 +91,16 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
 
 	init_completion(&bus_if->bustx_trgg);
 	init_completion(&bus_if->busrx_trgg);
+#ifdef CONFIG_PCIE_PROCESS_THREAD
+    init_completion(&bus_if->pcie_irq_proc_trgg);
+#endif
 #ifndef CONFIG_RX_TASKLET
 	init_completion(&bus_if->rx_trgg);
 #endif
+#ifdef CONFIG_TX_THREAD
+	init_completion(&bus_if->tx_trgg);
+#endif
+
 #ifdef AICWF_SDIO_SUPPORT
 	spin_lock_init(&bus_if->bus_priv.sdio->wslock);//AIDEN test
 	atomic_set(&bus_if->bus_priv.sdio->irq_sdio_atomic, 0);//AIDEN test
@@ -105,13 +112,20 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
 	bus_if->busrx_thread = kthread_run(usb_busrx_thread, (void *)bus_if->bus_priv.usb->rx_priv, "aicwf_busrx_thread");
 #endif
 #ifdef AICWF_PCIE_SUPPORT
-	bus_if->busrx_thread = kthread_run(pcie_rxbuf_rep_thread, (void *)bus_if->bus_priv.pci->rx_priv, "pcie_rxbuf_rep_thread");
+#ifdef CONFIG_PCIE_PROCESS_THREAD
+    bus_if->pcie_irq_proc_thread = kthread_run(pcie_irq_process_thread, (void *)bus_if->bus_priv.pci, "pcie_irq_proc_thread");
+#endif
 #ifdef CONFIG_RX_SKBLIST
 #ifndef CONFIG_RX_TASKLET
     bus_if->rx_thread = kthread_run(pcie_rxbuf_process_thread, (void *)bus_if->bus_priv.pci->rx_priv, "pcie_rxbuf_process_thread");
+#endif /* CONFIG_RX_TASKLET */
+#endif /* CONFIG_RX_SKBLIST */
+
+#ifdef CONFIG_TX_THREAD
+	bus_if->tx_thread = kthread_run(pcie_txbuf_process_thread, (void *)bus_if, "pcie_txbuf_process_thread");
 #endif
-#endif
-#endif
+
+#endif /* AICWF_PCIE_SUPPORT */
 
 #if defined(AICWF_SDIO_SUPPORT) || defined(AICWF_USB_SUPPORT)
 	if (IS_ERR(bus_if->bustx_thread)) {
@@ -128,11 +142,29 @@ int aicwf_bus_init(uint bus_hdrlen, struct device *dev)
 #endif
 
 #ifdef AICWF_PCIE_SUPPORT
-	if (IS_ERR(bus_if->busrx_thread)) {
-		bus_if->busrx_thread  = NULL;
-		txrx_err("pcie_rxbuf_rep_thread run fail\n");
+#ifdef CONFIG_PCIE_PROCESS_THREAD
+    if (IS_ERR(bus_if->pcie_irq_proc_thread)) {
+		bus_if->pcie_irq_proc_thread  = NULL;
+		txrx_err("pcie_irq_proc_thread run fail\n");
 		goto fail;
 	}
+#endif
+#ifndef CONFIG_RX_TASKLET
+	if (IS_ERR(bus_if->rx_thread)) {
+		bus_if->rx_thread  = NULL;
+		txrx_err("pcie_rxbuf_process_thread run fail\n");
+		goto fail;
+	}
+#endif
+
+#ifdef CONFIG_TX_THREAD
+	if (IS_ERR(bus_if->tx_thread)) {
+		bus_if->tx_thread  = NULL;
+		txrx_err("pcie_txbuf_process_thread run fail\n");
+		goto fail;
+	}
+#endif
+
 #endif
 
 	return ret;
@@ -177,11 +209,14 @@ void aicwf_bus_deinit(struct device *dev)
 		bus_if->cmd_buf = NULL;
 	}
 
+#ifndef AICWF_PCIE_SUPPORT
 	if (bus_if->bustx_thread) {
 		complete_all(&bus_if->bustx_trgg);
 		kthread_stop(bus_if->bustx_thread);
 		bus_if->bustx_thread = NULL;
 	}
+#endif
+
 	AICWFDBG(LOGINFO, "%s Exit\r\n", __func__);
 }
 
@@ -225,6 +260,11 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg)
 	tx_priv->usbdev = (struct aic_usb_dev *)arg;
 #endif
 
+#ifdef AICWF_PCIE_SUPPORT
+	tx_priv->pciedev = (struct aic_pci_dev *)arg;
+#endif
+
+#ifndef AICWF_PCIE_SUPPORT
 	atomic_set(&tx_priv->aggr_count, 0);
 	tx_priv->aggr_buf = dev_alloc_skb(MAX_AGGR_TXPKT_LEN);
 	if (!tx_priv->aggr_buf) {
@@ -234,16 +274,30 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg)
 	}
 	tx_priv->head = tx_priv->aggr_buf->data;
 	tx_priv->tail = tx_priv->aggr_buf->data;
+#endif
 
 	return tx_priv;
 }
 
 void aicwf_tx_deinit(struct aicwf_tx_priv *tx_priv)
 {
+#ifdef CONFIG_TX_THREAD
+	AICWFDBG(LOGINFO, "%s pcie tx thread\n", __func__);
+	if (tx_priv->pciedev->bus_if->tx_thread) {
+		complete_all(&tx_priv->pciedev->bus_if->tx_trgg);
+		kthread_stop(tx_priv->pciedev->bus_if->tx_thread);
+		tx_priv->pciedev->bus_if->tx_thread = NULL;
+	}
+#endif
+
+#ifndef AICWF_PCIE_SUPPORT
 	if (tx_priv && tx_priv->aggr_buf) {
 		dev_kfree_skb(tx_priv->aggr_buf);
-		kfree(tx_priv);
 	}
+#endif
+
+	if (tx_priv)
+		kfree(tx_priv);
 }
 
 #ifdef AICWF_SDIO_SUPPORT
@@ -624,12 +678,10 @@ void aicwf_rx_deinit(struct aicwf_rx_priv *rx_priv)
 
 	AICWFDBG(LOGINFO, "%s\n", __func__);
 
-	spin_lock_bh(&rx_priv->stas_reord_lock);
 	list_for_each_entry_safe(reord_info, tmp,
 		&rx_priv->stas_reord_list, list) {
 		reord_deinit_sta(rx_priv, reord_info);
 	}
-	spin_unlock_bh(&rx_priv->stas_reord_lock);
 #endif
 
 #ifdef AICWF_PCIE_SUPPORT
@@ -641,7 +693,17 @@ void aicwf_rx_deinit(struct aicwf_rx_priv *rx_priv)
 		rx_priv->pciedev->bus_if->busrx_thread = NULL;
 	}
 
+#ifdef CONFIG_PCIE_PROCESS_THREAD
+	AICWFDBG(LOGINFO, "pcie irq proc thread\n");
+	if (rx_priv->pciedev->bus_if->pcie_irq_proc_thread) {
+		complete_all(&rx_priv->pciedev->bus_if->pcie_irq_proc_trgg);
+		kthread_stop(rx_priv->pciedev->bus_if->pcie_irq_proc_thread);
+		rx_priv->pciedev->bus_if->pcie_irq_proc_thread = NULL;
+	}
+#endif
+
 #ifndef CONFIG_RX_TASKLET
+	AICWFDBG(LOGINFO, "pcie rx thread\n");
 	if (rx_priv->pciedev->bus_if->rx_thread) {
 		complete_all(&rx_priv->pciedev->bus_if->rx_trgg);
 		kthread_stop(rx_priv->pciedev->bus_if->rx_thread);
@@ -688,7 +750,7 @@ void aicwf_rx_deinit(struct aicwf_rx_priv *rx_priv)
 
 bool aicwf_rxframe_enqueue(struct frame_queue *q, struct sk_buff *pkt)
 {
-	return aicwf_frame_enq(q, pkt, 0);
+	return aicwf_frame_enq(q, pkt, 0, false);
 }
 
 
@@ -810,7 +872,7 @@ static struct sk_buff *aicwf_skb_dequeue_tail(struct frame_queue *pq, int prio)
 }
 #endif
 
-bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio)
+bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio, bool quick_enq)
 {
 	#if 0
 	struct sk_buff *p = NULL;
@@ -842,7 +904,7 @@ bool aicwf_frame_enq(struct frame_queue *q, struct sk_buff *pkt, int prio)
 
 	return p != NULL;
 	#else
-	if (q->queuelist[prio].qlen < q->qmax && q->qcnt < q->qmax) {
+	if (quick_enq || (q->queuelist[prio].qlen < q->qmax && q->qcnt < q->qmax)) {
                 aicwf_frame_queue_penq(q, prio, pkt);
                 return true;
         } else

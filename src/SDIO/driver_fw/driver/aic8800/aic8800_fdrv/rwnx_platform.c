@@ -256,6 +256,7 @@ reg_table reg_tables[] = {
 	{.ccode = "CL", .region = REGIONS_ETSI},
 	{.ccode = "CO", .region = REGIONS_FCC},
 	{.ccode = "CR", .region = REGIONS_FCC},
+	{.ccode = "CU", .region = REGIONS_FCC},
 	{.ccode = "CX", .region = REGIONS_FCC},
 	{.ccode = "CY", .region = REGIONS_ETSI},
 	{.ccode = "CZ", .region = REGIONS_ETSI},
@@ -280,7 +281,7 @@ reg_table reg_tables[] = {
 	{.ccode = "GL", .region = REGIONS_ETSI},
 	{.ccode = "GP", .region = REGIONS_ETSI},
 	{.ccode = "GR", .region = REGIONS_ETSI},
-	{.ccode = "GT", .region = REGIONS_FCC},
+	{.ccode = "GT", .region = REGIONS_DEFAULT},
 	{.ccode = "GU", .region = REGIONS_FCC},
 	{.ccode = "GY", .region = REGIONS_DEFAULT},
 	{.ccode = "HK", .region = REGIONS_ETSI},
@@ -293,7 +294,7 @@ reg_table reg_tables[] = {
 	{.ccode = "IL", .region = REGIONS_ETSI},
 	{.ccode = "IN", .region = REGIONS_ETSI},
 	{.ccode = "IQ", .region = REGIONS_ETSI},
-	{.ccode = "IR", .region = REGIONS_JP},
+	{.ccode = "IR", .region = REGIONS_ETSI},
 	{.ccode = "IS", .region = REGIONS_ETSI},
 	{.ccode = "IT", .region = REGIONS_ETSI},
 	{.ccode = "JM", .region = REGIONS_FCC},
@@ -303,7 +304,7 @@ reg_table reg_tables[] = {
 	{.ccode = "KH", .region = REGIONS_ETSI},
 	{.ccode = "KN", .region = REGIONS_ETSI},
 	{.ccode = "KP", .region = REGIONS_JP},
-	{.ccode = "KR", .region = REGIONS_ETSI},
+	{.ccode = "KR", .region = REGIONS_KCC},
 	{.ccode = "KW", .region = REGIONS_ETSI},
 	{.ccode = "KY", .region = REGIONS_FCC},
 	{.ccode = "KZ", .region = REGIONS_DEFAULT},
@@ -347,7 +348,7 @@ reg_table reg_tables[] = {
 	{.ccode = "PF", .region = REGIONS_ETSI},
 	{.ccode = "PG", .region = REGIONS_FCC},
 	{.ccode = "PH", .region = REGIONS_FCC},
-	{.ccode = "PK", .region = REGIONS_ETSI},
+	{.ccode = "PK", .region = REGIONS_DEFAULT},
 	{.ccode = "PL", .region = REGIONS_ETSI},
 	{.ccode = "PM", .region = REGIONS_ETSI},
 	{.ccode = "PR", .region = REGIONS_FCC},
@@ -369,7 +370,7 @@ reg_table reg_tables[] = {
 	{.ccode = "SN", .region = REGIONS_FCC},
 	{.ccode = "SR", .region = REGIONS_ETSI},
 	{.ccode = "SV", .region = REGIONS_FCC},
-	{.ccode = "SY", .region = REGIONS_DEFAULT},
+	{.ccode = "SY", .region = REGIONS_ETSI},
 	{.ccode = "TC", .region = REGIONS_FCC},
 	{.ccode = "TD", .region = REGIONS_ETSI},
 	{.ccode = "TG", .region = REGIONS_ETSI},
@@ -380,6 +381,7 @@ reg_table reg_tables[] = {
 	{.ccode = "TR", .region = REGIONS_ETSI},
 	{.ccode = "TT", .region = REGIONS_FCC},
 	{.ccode = "TW", .region = REGIONS_FCC},
+	{.ccode = "TZ", .region = REGIONS_ETSI},
 	{.ccode = "UA", .region = REGIONS_ETSI},
 	{.ccode = "UG", .region = REGIONS_FCC},
 	{.ccode = "UY", .region = REGIONS_FCC},
@@ -390,10 +392,13 @@ reg_table reg_tables[] = {
 	{.ccode = "VN", .region = REGIONS_JP},
 	{.ccode = "VU", .region = REGIONS_FCC},
 	{.ccode = "WF", .region = REGIONS_ETSI},
+	{.ccode = "WS", .region = REGIONS_ETSI},
 	{.ccode = "YE", .region = REGIONS_DEFAULT},
 	{.ccode = "YT", .region = REGIONS_ETSI},
 	{.ccode = "ZA", .region = REGIONS_ETSI},
 	{.ccode = "ZM", .region = REGIONS_ETSI},
+	{.ccode = "FO", .region = REGIONS_ETSI},
+	{.ccode = "FK", .region = REGIONS_ETSI},
 	{.ccode = "ZW", .region = REGIONS_ETSI},
 };
 
@@ -425,11 +430,14 @@ u8 get_region_index(char * name)
 		return REGIONS_ETSI;
 	else if (strncmp(name, "JP", 2) == 0)
 		return REGIONS_JP;
+	else if (strncmp(name, "KCC", 3) == 0)
+		return REGIONS_KCC;
 	else if (strncmp(name, "UNSET", 5) == 0)
 		return REGIONS_DEFAULT;
 
 	return REGIONS_DEFAULT;
 }
+
 
 
 #ifdef CONFIG_POWER_LIMIT
@@ -439,7 +447,7 @@ u8 get_region_index(char * name)
 
 #define MAX_2_4G_BW_NUM    2
 #define MAX_5G_BW_NUM      3
-#define MAX_REGION_NUM            5
+#define MAX_REGION_NUM     6
 
 typedef struct
 {
@@ -973,7 +981,42 @@ s8_l get_txpwr_max(s8_l power)
 {
 	int i=0;
 
-	if (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80 || g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
+	if(g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2){
+		for (i = 0; i <= 11; i++){
+			if(power < userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[i])
+				power = userconfig_info.txpwr_lvl_v4.pwrlvl_11b_11ag_2g4[i];
+		}
+	    for (i = 0; i <= 9; i++){
+			if(power < userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[i])
+				power = userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_2g4[i];
+	    }
+	    for (i = 0; i <= 11; i++){
+			if(power < userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[i])
+				power = userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_2g4[i];
+	    }
+		for (i = 0; i <= 7; i++){
+			if(power < userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[i])
+				power = userconfig_info.txpwr_lvl_v4.pwrlvl_11a_5g[i];
+		}
+	    for (i = 0; i <= 9; i++){
+			if(power < userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[i])
+				power = userconfig_info.txpwr_lvl_v4.pwrlvl_11n_11ac_5g[i];
+	    }
+		for (i = 0; i <= 11; i++){
+			if(power < userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[i])
+				power = userconfig_info.txpwr_lvl_v4.pwrlvl_11ax_5g[i];
+		}
+
+		if ((userconfig_info.txpwr_loss.loss_enable_2g4 == 1) ||
+			(userconfig_info.txpwr_loss.loss_enable_5g == 1)) {
+		if (userconfig_info.txpwr_loss.loss_value_2g4 <
+			userconfig_info.txpwr_loss.loss_value_5g)
+			power += userconfig_info.txpwr_loss.loss_value_5g;
+		else
+			power += userconfig_info.txpwr_loss.loss_value_2g4;
+		}
+	}
+	else if (g_rwnx_plat->sdiodev->chipid == PRODUCT_ID_AIC8800D80){
 		for (i = 0; i <= 11; i++){
 			if(power < userconfig_info.txpwr_lvl_v3.pwrlvl_11b_11ag_2g4[i])
 				power = userconfig_info.txpwr_lvl_v3.pwrlvl_11b_11ag_2g4[i];
@@ -2872,7 +2915,7 @@ int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit,
 }
 
 
-void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
+void rwnx_plat_powerlimit_parsing(char *buffer, int size)
 {
 #define LD_STAGE_EXC_MAPPING    0
 #define LD_STAGE_TAB_DEFINE     1

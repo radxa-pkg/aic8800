@@ -207,6 +207,7 @@ void rwnx_cmd_free(struct rwnx_cmd *cmd){
 
 	spin_lock_irqsave(&cmd_array_lock, flags);
 	cmd->used = 0;
+	cmd->flags = 0;
 	AICWFDBG(LOGTRACE, "%s cmd_array[%d]:%p \r\n", __func__, cmd->array_id, cmd);
 	spin_unlock_irqrestore(&cmd_array_lock, flags);
 }
@@ -440,7 +441,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
 	return ret;
 }
 
-
+#if 0
 static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
 						 int reqcfm, lmac_msg_id_t reqid, void *cfm, bool defer)
 {
@@ -491,6 +492,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
 	//return ret;
 	return 0;
 }
+#endif
 
 /******************************************************************************
  *    Control messages handling functions (FULLMAC)
@@ -620,7 +622,7 @@ int rwnx_send_remove_if (struct rwnx_hw *rwnx_hw, u8 vif_index, bool defer)
 	remove_if_req->inst_nbr = vif_index;
 
 	/* Send the MM_REMOVE_IF_REQ message to LMAC FW */
-	return rwnx_send_msg1(rwnx_hw, remove_if_req, 1, MM_REMOVE_IF_CFM, NULL, defer);
+	return rwnx_send_msg(rwnx_hw, remove_if_req, 1, MM_REMOVE_IF_CFM, NULL);
 }
 
 int rwnx_send_set_channel(struct rwnx_hw *rwnx_hw, int phy_idx,
@@ -1190,8 +1192,6 @@ int rwnx_send_set_stack_start_req(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_v
 	return error;
 }
 
-#ifdef CONFIG_TEMP_COMP
-
 int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm)
 {
 	struct mm_set_vendor_swconfig_req *req;
@@ -1221,6 +1221,7 @@ int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfi
 }
 
 
+#ifdef CONFIG_TEMP_COMP
 int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm)
 {
 	struct mm_set_vendor_swconfig_req *req;
@@ -1743,6 +1744,34 @@ int rwnx_send_txpwr_lvl_v3_req(struct rwnx_hw *rwnx_hw)
     }
 }
 
+#ifdef CONFIG_DYNAMIC_PERPWR
+int rwnx_send_txpwr_per_sta_req(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta)
+{
+	struct mm_set_txpwr_lvl_per_sta_req *req;
+	int ret;
+
+	RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+	req = rwnx_msg_zalloc(MM_SET_TXPWR_PER_STA_REQ, TASK_MM, DRV_TASK_ID,
+							sizeof(struct mm_set_txpwr_lvl_per_sta_req));
+	if (!req) {
+		AICWFDBG(LOGERROR, "%s msg alloc fail\n", __func__);
+		return -ENOMEM;
+	}
+
+	AICWFDBG(LOGINFO, "sta_idx: %d, per_pwrloss: %d\r\n", sta->sta_idx, sta->per_pwrloss);
+
+	req->sta_idx = sta->sta_idx;
+	req->tx_pwr_offset = sta->per_pwrloss;
+
+	AICWFDBG(LOGDEBUG, "per_pwrloss: %d\n", req->tx_pwr_offset);
+
+	ret = rwnx_send_msg(rwnx_hw, req, 1, MM_SET_TXPWR_PER_STA_CFM, NULL);
+
+	return ret;
+}
+#endif
+
 int rwnx_send_txpwr_lvl_adj_req(struct rwnx_hw *rwnx_hw)
 {
     struct mm_set_txpwr_lvl_adj_req *txpwr_lvl_adj_req;
@@ -2217,11 +2246,20 @@ int rwnx_send_me_sta_add(struct rwnx_hw *rwnx_hw, struct station_parameters *par
 
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
     printk("assoc_req idx %d, he: %d, vht: %d\n ", rwnx_vif->ap.aic_index, sta->he, sta->vht);
-    if (rwnx_vif->ap.aic_index < NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX)
+    if (rwnx_vif->ap.aic_index < (NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX - 1))
         rwnx_vif->ap.aic_index++;
     else
         rwnx_vif->ap.aic_index = 0;
     #endif
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	if((rwnx_hw->radar.sta_num == 0) && (rwnx_hw->radar.status != RWNX_RADAR_INSERVICE_BUSY))
+		rwnx_hw->radar.status = RWNX_RADAR_INSERVICE_BUSY;
+
+	AICWFDBG(LOGINFO, "DFS: assoc add num %d, %d\n", rwnx_hw->radar.sta_num, rwnx_hw->radar.status);
+	if(rwnx_hw->radar.sta_num < 0x0FFF)
+		rwnx_hw->radar.sta_num++;
+#endif
 
     /* Build the MM_STA_ADD_REQ message */
     req = rwnx_msg_zalloc(ME_STA_ADD_REQ, TASK_ME, DRV_TASK_ID,
@@ -2418,6 +2456,15 @@ int rwnx_send_me_sta_del(struct rwnx_hw *rwnx_hw, u8 sta_idx, bool tdls_sta)
 	/* Set parameters for the MM_STA_DEL_REQ message */
 	req->sta_idx = sta_idx;
 	req->tdls_sta = tdls_sta;
+
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	if((rwnx_hw->radar.sta_num == 1) && (rwnx_hw->radar.status == RWNX_RADAR_INSERVICE_BUSY))
+		rwnx_hw->radar.status = RWNX_RADAR_INSERVICE_DONE;
+
+	AICWFDBG(LOGINFO, "DFS: assoc del num %d, %d\n", rwnx_hw->radar.sta_num, rwnx_hw->radar.status);
+	if(rwnx_hw->radar.sta_num > 0)
+		rwnx_hw->radar.sta_num--;
+#endif
 
 	/* Send the ME_STA_DEL_REQ message to LMAC FW */
 	return rwnx_send_msg(rwnx_hw, req, 1, ME_STA_DEL_CFM, NULL);
@@ -3046,7 +3093,10 @@ int rwnx_send_apm_start_cac_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *vif,
 	req->chan.center2_freq = chandef->center_freq2;
 	req->chan.tx_power = 20;
 	req->chan.flags = get_chan_flags(chandef->chan->flags);
-
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	rwnx_hw->radar.status = RWNX_RADAR_CAC_BUSY;
+	AICWFDBG(LOGINFO, "DFS: radar st = %d\n", rwnx_hw->radar.status);
+#endif
 	/* Send the APM_START_CAC_REQ message to LMAC FW */
 	return rwnx_send_msg(rwnx_hw, req, 1, APM_START_CAC_CFM, cfm);
 }
@@ -3067,6 +3117,10 @@ int rwnx_send_apm_stop_cac_req(struct rwnx_hw *rwnx_hw, struct rwnx_vif *vif)
 	req->vif_idx = vif->vif_index;
 
 	/* Send the APM_STOP_CAC_REQ message to LMAC FW */
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	rwnx_hw->radar.status = RWNX_RADAR_CAC_DONE;
+	AICWFDBG(LOGINFO, "DFS: radar st = %d\n", rwnx_hw->radar.status);
+#endif
 	return rwnx_send_msg(rwnx_hw, req, 1, APM_STOP_CAC_CFM, NULL);
 }
 

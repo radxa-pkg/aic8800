@@ -325,6 +325,11 @@ static int aicwf_vendor_subcmd_set_country_code(struct wiphy *wiphy, struct wire
     char *country = NULL;
     struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
 
+	if (!rwnx_hw->mod_params->custregd) {
+		AICWFDBG(LOGERROR, "%s: invalid custregd\n", __func__);
+		return -EINVAL;
+	}
+
 	nla_for_each_attr(iter, data, len, rem) {
 		type = nla_type(iter);
 		switch (type) {

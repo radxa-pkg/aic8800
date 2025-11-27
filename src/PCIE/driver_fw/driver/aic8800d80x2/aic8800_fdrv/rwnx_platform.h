@@ -49,6 +49,8 @@
 
 #define RWNX_8800D80X2_PCIE_FLASH_FW_NAME                   "fw_flsupg_m80x2p.bin"
 
+#define RWNX_8800D80X2_PCIE_FLASHGEN1_FW_NAME                   "fw_flsgen1_m80x2p.bin"
+
 #define RWNX_8800D80X2_PCIE_FLASHGEN2_FW_NAME                   "fw_flsgen2_m80x2p.bin"
 
 #ifdef CONFIG_FOR_IPCAM
@@ -100,6 +102,7 @@ typedef enum {
 	REGIONS_FCC,
 	REGIONS_ETSI,
 	REGIONS_JP,
+	REGIONS_KCC,
 	REGIONS_DEFAULT,
 } Regions_code;
 
@@ -186,12 +189,12 @@ void get_userconfig_txpwr_ofst_in_fdrv(txpwr_ofst_conf_t *txpwr_ofst);
 void get_userconfig_txpwr_ofst2x_in_fdrv(txpwr_ofst2x_conf_t *txpwr_ofst2x);
 void get_userconfig_txpwr_ofst2x_v2_in_fdrv(txpwr_ofst2x_conf_v2_t *txpwr_ofst2x_v2);
 
-uint8_t get_ccode_region(char * ccode);
+uint8_t get_ccode_region(const char * ccode);
 u8 get_region_index(char * name);
 
 #ifdef CONFIG_POWER_LIMIT
 int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name);
-void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
+void rwnx_plat_powerlimit_parsing(char *buffer, int size);
 int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx);
 int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw);
 #endif

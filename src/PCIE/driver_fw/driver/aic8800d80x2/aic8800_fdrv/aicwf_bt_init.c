@@ -81,7 +81,7 @@ int aicbt_ext_patch_data_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_info_t
 #define BT_INIT_DONE_BIT (1<<16)
 #endif
 #ifndef BT_INIT_TO_NS
-#define BT_INIT_TO_NS 80000000
+#define BT_INIT_TO_NS 100000000
 #endif
 int aicwf_bt_init(struct rwnx_hw *rwnx_hw){
     //u32 tmp = 0;

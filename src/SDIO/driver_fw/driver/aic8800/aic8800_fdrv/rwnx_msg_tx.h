@@ -15,6 +15,11 @@
 
 #include "rwnx_defs.h"
 
+#ifdef RF_WRITE_FILE
+#define	FW_RF_CALIB_FILE "aic_rf_calib.bin"
+#endif
+
+
 int rwnx_send_reset(struct rwnx_hw *rwnx_hw);
 int rwnx_send_start(struct rwnx_hw *rwnx_hw);
 int rwnx_send_version_req(struct rwnx_hw *rwnx_hw, struct mm_version_cfm *cfm);

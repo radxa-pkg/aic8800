@@ -37,9 +37,9 @@
 
 
 #ifdef CONFIG_PLATFORM_UBUNTU
-#define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
+#define CONFIG_BLUEDROID        1 /* bluez 0, bluedroid 1, lbh 2 */
 #else
-#define CONFIG_BLUEDROID        1 /* bleuz 0, bluedroid 1 */
+#define CONFIG_BLUEDROID        1 /* bluez 0, bluedroid 1, lbh 2 */
 #endif
 
 
@@ -329,10 +329,10 @@ int mp_drv_mode = 0; /* 1 Mptool Fw; 0 Normal Fw */
 /* Reserv for core and drivers use */
 #define BT_SKB_RESERVE    8
 
-/* BD Address */
+
 typedef struct {
-    __u8 b[6];
-} __packed bdaddr_t;
+	uint8_t addr[6];
+}bdaddr_t;
 
 /* Skb helpers */
 struct bt_skb_cb {

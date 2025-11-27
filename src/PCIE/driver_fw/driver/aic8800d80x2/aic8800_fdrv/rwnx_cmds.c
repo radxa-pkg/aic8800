@@ -136,9 +136,13 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 #endif
 	if(cmd->e2a_msg != NULL) {
 		do {
-			if(cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED)
-				break;
 			spin_lock_bh(&cmd_mgr->lock);
+			if(cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
+				AICWFDBG(LOGERROR, "cmd queue crashed\n");
+				cmd->result = -EPIPE;
+				spin_unlock_bh(&cmd_mgr->lock);
+				return -EPIPE;
+			}
 			empty = list_empty(&cmd_mgr->cmds);
 			if(!empty) {
 				spin_unlock_bh(&cmd_mgr->lock);
@@ -153,13 +157,12 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 		} while(!empty);//wait for cmd queue empty
 	} else {
 		spin_lock_bh(&cmd_mgr->lock);
-	}
-
-	if (cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
-		AICWFDBG(LOGERROR, KERN_CRIT"cmd queue crashed\n");
-		cmd->result = -EPIPE;
-		spin_unlock_bh(&cmd_mgr->lock);
-		return -EPIPE;
+		if (cmd_mgr->state == RWNX_CMD_MGR_STATE_CRASHED) {
+			AICWFDBG(LOGERROR, KERN_CRIT"cmd queue crashed\n");
+			cmd->result = -EPIPE;
+			spin_unlock_bh(&cmd_mgr->lock);
+			return -EPIPE;
+		}
 	}
 
 	#ifndef CONFIG_RWNX_FHOST
@@ -216,8 +219,9 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 		//printk("defer push: tkn=%d\r\n", cmd->tkn);
 	}
 
-	spin_unlock_bh(&cmd_mgr->lock);
+	//spin_unlock_bh(&cmd_mgr->lock);
 	if (!defer_push) {
+		spin_unlock_bh(&cmd_mgr->lock);
 		//printk("queue:id=%x, param_len=%u\n",cmd->a2e_msg->id, cmd->a2e_msg->param_len);
 		#ifdef AICWF_SDIO_SUPPORT
 		aicwf_set_cmd_tx((void *)(sdiodev), cmd->a2e_msg, sizeof(struct lmac_msg) + cmd->a2e_msg->param_len);
@@ -231,8 +235,12 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
 		//rwnx_ipc_msg_push(rwnx_hw, cmd, RWNX_CMD_A2EMSG_LEN(cmd->a2e_msg));
 		kfree(cmd->a2e_msg);
 	} else {
-        if(cmd_mgr->queue_sz <= 1)
+        if(cmd_mgr->queue_sz <= 1) {
+			spin_unlock_bh(&cmd_mgr->lock);
 			WAKE_CMD_WORK(cmd_mgr);
+		} else {
+			spin_unlock_bh(&cmd_mgr->lock);
+		}
 #ifdef CONFIG_WS
 		rwnx_pm_relax_pc(rwnx_hw);
 #endif
@@ -533,7 +541,7 @@ static void cmd_mgr_drain(struct rwnx_cmd_mgr *cmd_mgr)
 	spin_unlock_bh(&cmd_mgr->lock);
 }
 
-void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr)
+bool rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr)
 {
 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 
@@ -551,8 +559,10 @@ void rwnx_cmd_mgr_init(struct rwnx_cmd_mgr *cmd_mgr)
 	cmd_mgr->cmd_wq = create_singlethread_workqueue("cmd_wq");
 	if (!cmd_mgr->cmd_wq) {
 		txrx_err("insufficient memory to create cmd workqueue.\n");
-		return;
+		return -ENOMEM;
 	}
+
+    return 0;
 }
 
 void rwnx_cmd_mgr_deinit(struct rwnx_cmd_mgr *cmd_mgr)

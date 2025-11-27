@@ -74,7 +74,11 @@ enum {
 	SET_USB_OFF,
 	SET_PLL_TEST,
 	SET_ANT_MODE,
+	GET_NOISE,
 	RDWR_BT_EFUSE_PWROFST,
+	EXEC_FLASH_OPER,
+	RDWR_PWRADD2X,
+	RDWR_EFUSE_PWRADD2X,
 };
 
 typedef struct {
@@ -315,7 +319,7 @@ static int aic_priv_cmd_set_tx (struct rwnx_hw *rwnx_hw, int argc, char *argv[],
 	AICWFDBG(LOGINFO, "txparam:%d,%d,%d,%d,%d,%d\n", settx_param.chan, settx_param.bw,
 		settx_param.mode, settx_param.rate, settx_param.length, settx_param.tx_intv_us);
 #ifdef CONFIG_POWER_LIMIT
-	r_idx = get_ccode_region(country_code);
+	r_idx = get_ccode_region(rwnx_hw->wiphy->regd->alpha2);
 	txpwr_loss = &txpwr_loss_tmp;
 	get_userconfig_txpwr_loss(txpwr_loss);
 	if (txpwr_loss->loss_enable_2g4 == 1)
@@ -1356,6 +1360,11 @@ static int aic_priv_cmd_country_set(struct rwnx_hw *rwnx_hw, int argc,
 		AICWFDBG(LOGINFO, "%s param err\n", __func__);
 		return -1;
 	}
+	if (!rwnx_hw->mod_params->custregd) {
+			AICWFDBG(LOGERROR, "%s: invalid custregd\n", __func__);
+			return -1;
+	}
+
 
 	AICWFDBG(LOGINFO, "cmd country_set: %s\n", argv[1]);
 
@@ -1381,6 +1390,126 @@ static int aic_priv_cmd_country_set(struct rwnx_hw *rwnx_hw, int argc,
 
 	return ret;
 }
+
+static int aic_priv_cmd_rdwr_pwradd2x (struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
+{
+	u8_l func = 0;
+	int8_t pwradd2x_in = 0;
+
+#ifdef AICWF_PCIE_SUPPORT
+	struct aic_pci_dev *dev = g_rwnx_plat->pcidev;
+#endif
+
+	if (dev->chip_id != PRODUCT_ID_AIC8800D80) {
+		AICWFDBG(LOGERROR, "RDWR_PWRADD2X, only D40/80 support\n");
+		return -EINVAL;
+	}
+
+	if (argc > 1) {
+		func = (u8_l)command_strtoul(argv[1], NULL, 10);
+	}
+	if ((func > 0) && (argc > 2)) {
+		pwradd2x_in = (int8_t)command_strtoul(argv[2], NULL, 10);
+	}
+	if (func == 0) { // read cur
+		rwnx_send_rftest_req(rwnx_hw, RDWR_PWRADD2X, 0, NULL, &cfm);
+	} else if ((func == 1) || (func == 2)) { // write pwradd2x
+			AICWFDBG(LOGINFO, "set pwradd2x_%s %d\r\n", (func == 1) ? "2g4" : "5g", pwradd2x_in);
+			if (pwradd2x_in < -15 ||  pwradd2x_in > 15) {
+				AICWFDBG(LOGERROR, "wrong params %d,  pwradd2x: -15 ~ 15\n", pwradd2x_in);
+				return -EINVAL;
+			} else {
+				u8_l buf[2] = {func, (u8_l)pwradd2x_in};
+				rwnx_send_rftest_req(rwnx_hw, RDWR_PWRADD2X, sizeof(buf), buf, &cfm);
+			}
+	} else {
+		AICWFDBG(LOGERROR, "wrong func: %x\n", func);
+		return -EINVAL;
+	}
+	memcpy(command, &cfm.rftest_result[0], 2);
+	return 2;
+}
+
+static int aic_priv_cmd_rdwr_efuse_pwradd2x (struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
+{
+	u8_l func = 0;
+	int8_t pwradd2x_in = 0;
+#ifdef AICWF_PCIE_SUPPORT
+	struct aic_pci_dev *dev = g_rwnx_plat->pcidev;
+#endif
+
+	if (dev->chip_id != PRODUCT_ID_AIC8800D80) {
+		AICWFDBG(LOGERROR, "RDWR_PWRADD2X, only D40/80 support\n");
+		return -EINVAL;
+	}
+
+	if (argc > 1) {
+		func = (u8_l)command_strtoul(argv[1], NULL, 10);
+	}
+	if ((func > 0) && (argc > 2)) {
+		pwradd2x_in = (int8_t)command_strtoul(argv[2], NULL, 10);
+	}
+	if (func == 0) { // read cur
+		rwnx_send_rftest_req(rwnx_hw, RDWR_EFUSE_PWRADD2X, 0, NULL, &cfm);
+	} else if ((func == 1) || (func == 2)) { // write pwradd2x
+			AICWFDBG(LOGINFO, "set efuse pwradd2x_%s %d\r\n", (func == 1) ? "2g4" : "5g", pwradd2x_in);
+			if (pwradd2x_in < -15 ||  pwradd2x_in > 15) {
+				AICWFDBG(LOGERROR, "wrong params %d,  pwradd2x: -15 ~ 15\n", pwradd2x_in);
+				return -EINVAL;
+			} else {
+				u8_l buf[2] = {func, (u8_l)pwradd2x_in};
+				rwnx_send_rftest_req(rwnx_hw, RDWR_EFUSE_PWRADD2X, sizeof(buf), buf, &cfm);
+			}
+	} else {
+		AICWFDBG(LOGERROR, "wrong func: %x\n", func);
+		return -EINVAL;
+	}
+	memcpy(command, &cfm.rftest_result[0], 3);
+	return 3;
+}
+
+#ifdef CONFIG_DYNAMIC_PERPWR
+static int aic_priv_cmd_set_sta_thd(struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
+{
+	int ret = 0;
+	int i;
+	s8_l val;
+
+	if (argc < 3) {
+		AICWFDBG(LOGERROR, "%s: Invalid parameters (argc=%d)\n", __func__, argc);
+		return -EINVAL;
+	}
+
+	AICWFDBG(LOGDEBUG, "cmd set_sta_thd: %s, %s\n", argv[1], argv[2]);
+
+	val = (s8_l)command_strtoul(argv[2], NULL, 10);
+
+	struct {
+		const char *name;
+		s8_l *target;
+		size_t name_len;
+	} thd_map[] = {
+		{ "rssi_thd_0",     &rwnx_hw->pwrth.rssi_thd_0,     10 },
+		{ "rssi_thd_1",     &rwnx_hw->pwrth.rssi_thd_1,     10 },
+		{ "rssi_thd_2",     &rwnx_hw->pwrth.rssi_thd_2,     10 },
+		{ "pwr_loss_lvl_0", &rwnx_hw->pwrth.pwr_loss_lvl_0, 14 },
+		{ "pwr_loss_lvl_1", &rwnx_hw->pwrth.pwr_loss_lvl_1, 14 },
+		{ "pwr_loss_lvl_2", &rwnx_hw->pwrth.pwr_loss_lvl_2, 14 },
+		{ "pwr_loss_lvl_3", &rwnx_hw->pwrth.pwr_loss_lvl_3, 14 },
+	};
+
+	for (i = 0; i < ARRAY_SIZE(thd_map); i++) {
+		if (strncmp(argv[1], thd_map[i].name, thd_map[i].name_len) == 0) {
+			*thd_map[i].target = val;
+			AICWFDBG(LOGINFO, "%s: %s = %d\n", __func__, thd_map[i].name, val);
+			return 0;
+		}
+	}
+
+	AICWFDBG(LOGERROR, "%s: Unknown parameter '%s'\n", __func__, argv[1]);
+	return -EINVAL;
+}
+#endif
 
 static int aic_priv_cmd_help (struct rwnx_hw *rwnx_hw, int argc, char *argv[], char *command)
 {
@@ -1492,6 +1621,14 @@ static const struct aic_priv_cmd aic_priv_commands[] = {
 	{ "rdwr_bt_efuse_pwrofst", aic_priv_cmd_rdwr_bt_efuse_pwrofst,
 	  "<pwrofst> = read/write bt tx power offset into efuse" },
 	{"country_set", aic_priv_cmd_country_set, "<ccode>"},
+	{"rdwr_pwradd2x", aic_priv_cmd_rdwr_pwradd2x,
+	  "a value is added for both 2.4G and 5G to achieve overall power adjustment of the band"},
+	{"rdwr_efuse_pwradd2x", aic_priv_cmd_rdwr_efuse_pwradd2x,
+	  "a value is added for both 2.4G and 5G to achieve overall power adjustment of the band, write to efuse"},
+#ifdef CONFIG_DYNAMIC_PERPWR
+	{"set_sta_thd", aic_priv_cmd_set_sta_thd,
+	  "set per_sta power threshold, (set_sta_thd rssi_thd_0 value; set_sta_thd pwr_loss_lvl_0 value)"},
+#endif
 //Reserve for new aic_priv_cmd.
 	{ "help", aic_priv_cmd_help,
 	  "= show usage help" },
@@ -1790,6 +1927,11 @@ int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 		strncasecmp(command, "country_set", strlen("country_set"))) {
 		skip = strlen(CMD_SET_COUNTRY) + 1;
 		country = command + skip;
+		if (!vif->rwnx_hw->mod_params->custregd) {
+			AICWFDBG(LOGERROR, "%s: invalid custregd\n", __func__);
+			ret = -EINVAL;
+			goto exit;
+		}
 		if (!country || strlen(country) < RWNX_COUNTRY_CODE_LEN) {
 			AICWFDBG(LOGERROR, "%s: invalid country code\n", __func__);
 			ret = -EINVAL;
