@@ -1,0 +1,82 @@
+From 71828757520a8fcef3ebd3c2f97fa45052b8969e Mon Sep 17 00:00:00 2001
+From: Feng Zhang <feng@radxa.com>
+Date: Tue, 2 Dec 2025 07:31:19 +0000
+Subject: [PATCH] fix: Lower the debugging log level
+
+Signed-off-by: Feng Zhang <feng@radxa.com>
+---
+ src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c      | 2 +-
+ src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_main.c    | 2 +-
+ src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c      | 2 +-
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c      | 2 +-
+ .../driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c  | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index f5fc2f8..a421ac9 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -512,7 +512,7 @@ static const int rwnx_hwq2uapsd[NL80211_NUM_ACS] = {
+ #endif
+ 
+ extern uint8_t scanning;
+-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
++int aicwf_dbg_level = LOGERROR;
+ module_param(aicwf_dbg_level, int, 0660);
+ #ifdef CONFIG_DYNAMIC_PWR
+ int dynamic_pwr = 1;
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_main.c
+index 062944f..4067819 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_main.c
+@@ -15,7 +15,7 @@
+ #define DRV_AUTHOR            "AICSemi"
+ #define DRV_VERS_MOD          "1.0"
+ 
+-int aicwf_dbg_level_bsp = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
++int aicwf_dbg_level_bsp = LOGERROR;
+ 
+ struct semaphore aicbsp_probe_semaphore;
+ 
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 7136456..d20167b 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -512,7 +512,7 @@ static const int rwnx_hwq2uapsd[NL80211_NUM_ACS] = {
+ 
+ 
+ extern uint8_t scanning;
+-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
++int aicwf_dbg_level = LOGERROR;
+ module_param(aicwf_dbg_level, int, 0660);
+ int testmode = 0;
+ char aic_fw_path[200];
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+index ae0e4df..c5cbb91 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -536,7 +536,7 @@ static const int rwnx_hwq2uapsd[NL80211_NUM_ACS] = {
+ struct semaphore aicwf_deinit_sem;
+ atomic_t aicwf_deinit_atomic;
+ 
+-int aicwf_dbg_level = LOGERROR|LOGINFO;
++int aicwf_dbg_level = LOGERROR;
+ module_param(aicwf_dbg_level, int, 0660);
+ #ifdef CONFIG_DYNAMIC_PWR
+ int dynamic_pwr = 1;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
+index be05052..69f23f0 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
+@@ -20,7 +20,7 @@ int adap_test = 0;
+ char paringid[100];
+ int n_para = 1;
+ int ble_scan_wakeup_reboot_time = 1000;
+-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
++int aicwf_dbg_level = LOGERROR;
+ int flash_erase_len = 0x400000;
+ uint32_t ad_data_filter_mask = 0;
+ uint32_t gpio_num = 2;//default select gpiob2 for fw_wakeup_host
+-- 
+2.49.0
+
