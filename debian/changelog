@@ -1,3 +1,20 @@
+aic8800 (4.0+git20250410.b99ca8b6-4) noble; urgency=medium
+
+  [ dependabot[bot] ]
+  * chore(deps): bump actions/upload-artifact from 4 to 5
+  * chore(deps): bump actions/checkout from 5 to 6
+  * chore(deps): bump actions/download-artifact from 5 to 6
+
+  [ Feng Zhang ]
+  * fix: add fix-Lower-the-debugging-log-level.patch
+
+  [ ZHANG Yuntian ]
+  * fix: debian/patches shares the license of its target
+  * fix: add GPLv2 license to driver source code
+  * fix: restore lost build config
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 09 Dec 2025 08:38:42 +0000
+
 aic8800 (4.0+git20250410.b99ca8b6-3) noble; urgency=medium
 
   [ dependabot[bot] ]
