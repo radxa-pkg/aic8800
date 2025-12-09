@@ -19,6 +19,7 @@ jobs:
       with:
         push: "never"
         runCmd: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y git-buildpackage
           export DEBEMAIL="dev@radxa.com"
@@ -37,11 +38,12 @@ jobs:
       with:
         push: "never"
         runCmd: |
+          set -euo pipefail
           make deb
     - id: "artifacts_path"
       name: "Workaround actions/upload-artifact#176"
       run: |
-        echo "artifacts_path=$(realpath ..)" >> "$GITHUB_OUTPUT"
+        echo "artifacts_path=$(realpath ..)" | tee -a "$GITHUB_OUTPUT"
       shell: "bash"
     - name: "Upload artifacts"
       uses: "actions/upload-artifact@v5"
@@ -56,10 +58,10 @@ jobs:
         version="${version//\~/.}"
         if [[ -n "$(git tag -l "$version")" ]]
         then
-            echo "distro=UNRELEASED" >> "$GITHUB_OUTPUT"
+            echo "distro=UNRELEASED"
         else
-            echo "distro=$(dpkg-parsechangelog -S Distribution)" >> "$GITHUB_OUTPUT"
-        fi
+            echo "distro=$(dpkg-parsechangelog -S Distribution)"
+        fi | tee -a "$GITHUB_OUTPUT"
       shell: "bash"
   release:
     if: "${{ github.event_name != 'pull_request' && needs.build.outputs.distro != 'UNRELEASED' }}"
@@ -79,16 +81,18 @@ jobs:
       run: |
         version="$(dpkg-parsechangelog -S Version)"
         version="${version//\~/.}"
-        echo "version=$version" >> $GITHUB_ENV
-        echo "changes<<EOF" >> $GITHUB_ENV
-        echo '```' >> $GITHUB_ENV
-        echo "$(dpkg-parsechangelog -S Changes)" >> $GITHUB_ENV
-        echo '```' >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
-        echo "$version" > VERSION
+        {
+            echo "version=$version"
+            echo "changes<<EOF"
+            echo '```'
+            echo "$(dpkg-parsechangelog -S Changes)"
+            echo '```'
+            echo "EOF"
+        } | tee -a "$GITHUB_ENV"
+        echo "$version" | tee VERSION
         if [[ -f pkg.conf.template ]]
         then
-            sed "s/VERSION/$version/g" pkg.conf.template > pkg.conf
+            sed "s/VERSION/$version/g" pkg.conf.template | tee pkg.conf
         fi
       shell: "bash"
     - name: "Release"
