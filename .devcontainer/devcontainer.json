@@ -14,7 +14,7 @@
       ]
     }
   },
-  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "image": "mcr.microsoft.com/devcontainers/base:bullseye",
   "features": {
     "ghcr.io/devcontainers/features/nix:1": {
       "version": "latest",

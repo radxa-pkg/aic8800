@@ -1,3 +1,5 @@
+CUSTOM_DEBUILD_ARG := -aarm64 -Pcross
+
 SRC-AICRF-TEST	:=	src/tools/aicrf_test/
 BIN-AICRF-TEST	:=	bt_test wifi_test
 BINS-AICRF-TEST	:=	$(addprefix $(SRC-AICRF-TEST),$(BIN-AICRF-TEST))
