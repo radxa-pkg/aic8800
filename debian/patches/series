@@ -21,3 +21,4 @@ fix-aic_btusb-use-bluez-by-default.patch
 fix-usbc1-controller-wifi-rate-of-sun60iw2p1.patch
 fix-linux-6.17-build.patch
 fix-Lower-the-debugging-log-level.patch
+fix-linux-6.19-build.patch
