@@ -1,3 +1,16 @@
+aic8800 (4.0+git20250410.b99ca8b6-5) noble; urgency=medium
+
+  [ dependabot[bot] ]
+  * chore(deps): bump actions/download-artifact from 6 to 7
+
+  [ CodeChenL ]
+  * feat: add pkg.conf.template
+
+  [ Jianfeng Liu ]
+  * add fix for linux v6.19
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 30 Dec 2025 08:12:48 +0000
+
 aic8800 (4.0+git20250410.b99ca8b6-4) noble; urgency=medium
 
   [ dependabot[bot] ]
