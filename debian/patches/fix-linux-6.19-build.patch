@@ -1,0 +1,206 @@
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index e390b59..f4c3a1c 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -320,7 +320,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGTRACE, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -452,7 +452,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ #ifdef AICWF_SDIO_SUPPORT
+ 	rwnx_pm_stay_awake(rwnx_hw->sdiodev);
+diff --git a/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/rwnx_msg_tx.c b/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/rwnx_msg_tx.c
+index 52d4d52..ff2c361 100644
+--- a/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/rwnx_msg_tx.c
+@@ -320,7 +320,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGTRACE, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -452,7 +452,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGINFO, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ #ifdef AICWF_SDIO_SUPPORT
+ 	rwnx_pm_stay_awake(rwnx_hw->sdiodev);
+diff --git a/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 78bf9a5..6485e5e 100644
+--- a/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -320,7 +320,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGTRACE, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -451,7 +451,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ #ifdef AICWF_SDIO_SUPPORT
+ 	rwnx_pm_stay_awake(rwnx_hw->sdiodev);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 30472ce..67dceac 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -308,7 +308,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGTRACE, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -416,7 +416,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 	rwnx_wakeup_lock(rwnx_hw->ws_tx);
+ 	msg = container_of((void *)msg_params, struct lmac_msg, param);
+diff --git a/src/SDIO/patch/for_Amlogic/905x4/Android11/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/patch/for_Amlogic/905x4/Android11/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 3b27d67..27dd319 100644
+--- a/src/SDIO/patch/for_Amlogic/905x4/Android11/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/patch/for_Amlogic/905x4/Android11/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -232,7 +232,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -337,7 +337,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 	rwnx_pm_stay_awake(rwnx_hw->sdiodev);
+ 	msg = container_of((void *)msg_params, struct lmac_msg, param);
+diff --git a/src/SDIO/patch/for_Rockchip/3128/Android4_4/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/patch/for_Rockchip/3128/Android4_4/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 71f2588..9e6a352 100644
+--- a/src/SDIO/patch/for_Rockchip/3128/Android4_4/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/patch/for_Rockchip/3128/Android4_4/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -308,7 +308,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGTRACE, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -415,7 +415,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 	rwnx_wakeup_lock(rwnx_hw->ws_tx);
+ 	msg = container_of((void *)msg_params, struct lmac_msg, param);
+diff --git a/src/SDIO/patch/for_Rockchip/3326/Android8/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/patch/for_Rockchip/3326/Android8/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 71f2588..9e6a352 100644
+--- a/src/SDIO/patch/for_Rockchip/3326/Android8/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/patch/for_Rockchip/3326/Android8/mod/kernel/drivers/net/wireless/rockchip_wlan/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -308,7 +308,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ 	//RWNX_DBG(RWNX_FN_ENTRY_STR);
+     AICWFDBG(LOGTRACE, "%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 
+ #ifdef AICWF_USB_SUPPORT
+@@ -415,7 +415,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 
+ //	RWNX_DBG(RWNX_FN_ENTRY_STR);
+     printk("%s (%d)%s reqcfm:%d in_irq:%d in_softirq:%d in_atomic:%d\r\n",
+-    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)in_irq(), (int)in_softirq(), (int)in_atomic());
++    __func__, reqid, RWNX_ID2STR(reqid), reqcfm, (int)hardirq_count(), (int)in_softirq(), (int)in_atomic());
+ 
+ 	rwnx_wakeup_lock(rwnx_hw->ws_tx);
+ 	msg = container_of((void *)msg_params, struct lmac_msg, param);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+index 513b82b..c352308 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1627,7 +1627,7 @@ void reord_deinit_sta(struct aicwf_rx_priv* rx_priv, struct reord_ctrl_info *reo
+             reord_rxframe_free(&rx_priv->freeq_lock, &rx_priv->rxframes_freequeue, &req->rxframe_list);
+         }
+ 
+-		AICWFDBG(LOGINFO, "reord dinit in_irq():%d in_atomic:%d in_softirq:%d\r\n", (int)in_irq()
++		AICWFDBG(LOGINFO, "reord dinit hardirq_count():%d in_atomic:%d in_softirq:%d\r\n", (int)hardirq_count()
+ 			,(int)in_atomic(), (int)in_softirq());
+         spin_unlock_bh(&preorder_ctrl->reord_list_lock);
+     }
+diff --git a/src/USB/patch/for_Allwinner/A40/Android7/patch/mod/lichee/linux-3.10/drivers/net/wireless/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/patch/for_Allwinner/A40/Android7/patch/mod/lichee/linux-3.10/drivers/net/wireless/aic8800/aic8800_fdrv/rwnx_rx.c
+index 866eed1..a8fc359 100644
+--- a/src/USB/patch/for_Allwinner/A40/Android7/patch/mod/lichee/linux-3.10/drivers/net/wireless/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/patch/for_Allwinner/A40/Android7/patch/mod/lichee/linux-3.10/drivers/net/wireless/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1437,7 +1437,7 @@ void reord_deinit_sta(struct aicwf_rx_priv* rx_priv, struct reord_ctrl_info *reo
+             reord_rxframe_free(&rx_priv->freeq_lock, &rx_priv->rxframes_freequeue, &req->rxframe_list);
+         }
+ 
+-		AICWFDBG(LOGINFO, "reord dinit in_irq():%d in_atomic:%d in_softirq:%d\r\n", (int)in_irq()
++		AICWFDBG(LOGINFO, "reord dinit hardirq_count():%d in_atomic:%d in_softirq:%d\r\n", (int)hardirq_count()
+ 			,(int)in_atomic(), (int)in_softirq());
+         spin_unlock_bh(&preorder_ctrl->reord_list_lock);
+     }
+diff --git a/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_rx.c
+index bbf21c9..9326e90 100644
+--- a/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/wifi_driver/aic/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1461,7 +1461,7 @@ void reord_deinit_sta(struct aicwf_rx_priv* rx_priv, struct reord_ctrl_info *reo
+             reord_rxframe_free(&rx_priv->freeq_lock, &rx_priv->rxframes_freequeue, &req->rxframe_list);
+         }
+ 
+-		AICWFDBG(LOGINFO, "reord dinit in_irq():%d in_atomic:%d in_softirq:%d\r\n", (int)in_irq()
++		AICWFDBG(LOGINFO, "reord dinit hardirq_count():%d in_atomic:%d in_softirq:%d\r\n", (int)hardirq_count()
+ 			,(int)in_atomic(), (int)in_softirq());
+         spin_unlock_bh(&preorder_ctrl->reord_list_lock);
+     }
+diff --git a/src/USB/patch/for_Hi/352/Android9/mod/device/hisilicon/bigfish/sdk/source/component/wifi/drv/usb_aic8800d/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/patch/for_Hi/352/Android9/mod/device/hisilicon/bigfish/sdk/source/component/wifi/drv/usb_aic8800d/aic8800/aic8800_fdrv/rwnx_rx.c
+index 0205629..fa07293 100644
+--- a/src/USB/patch/for_Hi/352/Android9/mod/device/hisilicon/bigfish/sdk/source/component/wifi/drv/usb_aic8800d/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/patch/for_Hi/352/Android9/mod/device/hisilicon/bigfish/sdk/source/component/wifi/drv/usb_aic8800d/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1400,7 +1400,7 @@ void reord_deinit_sta(struct aicwf_rx_priv* rx_priv, struct reord_ctrl_info *reo
+             reord_rxframe_free(&rx_priv->freeq_lock, &rx_priv->rxframes_freequeue, &req->rxframe_list);
+         }
+ 
+-		AICWFDBG(LOGINFO, "reord dinit in_irq():%d in_atomic:%d in_softirq:%d\r\n", (int)in_irq()
++		AICWFDBG(LOGINFO, "reord dinit hardirq_count():%d in_atomic:%d in_softirq:%d\r\n", (int)hardirq_count()
+ 			,(int)in_atomic(), (int)in_softirq());
+         spin_unlock_bh(&preorder_ctrl->reord_list_lock);
+     }
