@@ -11,7 +11,7 @@ jobs:
         fetch-tags: true
         submodules: "recursive"
     - name: "Set up QEMU Emulation"
-      uses: "docker/setup-qemu-action@v3"
+      uses: "docker/setup-qemu-action@v4"
       with:
         image: "tonistiigi/binfmt:latest"
     - name: "Test"
