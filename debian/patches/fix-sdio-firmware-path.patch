@@ -4,7 +4,7 @@ index 8701cdc..71685f0 100644
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/Makefile
 @@ -1,7 +1,7 @@
  CONFIG_SDIO_SUPPORT := y
- CONFIG_SDIO_PWRCTRL := y
+ CONFIG_SDIO_PWRCTRL := n
 -CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"
 -#CONFIG_AIC_FW_PATH = "/lib/firmware/aic8800D80"
 +#CONFIG_AIC_FW_PATH = "/vendor/etc/firmware"

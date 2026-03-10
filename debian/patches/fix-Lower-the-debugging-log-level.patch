@@ -20,7 +20,7 @@ index f5fc2f8..a421ac9 100644
  #endif
  
  extern uint8_t scanning;
--int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
+-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE|LOGFW;
 +int aicwf_dbg_level = LOGERROR;
  module_param(aicwf_dbg_level, int, 0660);
  #ifdef CONFIG_DYNAMIC_PWR
@@ -46,11 +46,11 @@ index 7136456..d20167b 100644
  
  
  extern uint8_t scanning;
--int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE;
+-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGDEBUG|LOGTRACE|LOGFW;
 +int aicwf_dbg_level = LOGERROR;
  module_param(aicwf_dbg_level, int, 0660);
- int testmode = 0;
- char aic_fw_path[200];
+ #ifdef CONFIG_DYNAMIC_PWR
+ int dynamic_pwr = 1;
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 index ae0e4df..c5cbb91 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
@@ -59,7 +59,7 @@ index ae0e4df..c5cbb91 100644
  struct semaphore aicwf_deinit_sem;
  atomic_t aicwf_deinit_atomic;
  
--int aicwf_dbg_level = LOGERROR|LOGINFO;
+-int aicwf_dbg_level = LOGERROR|LOGINFO|LOGFW;
 +int aicwf_dbg_level = LOGERROR;
  module_param(aicwf_dbg_level, int, 0660);
  #ifdef CONFIG_DYNAMIC_PWR

@@ -8,6 +8,7 @@ Build-Depends: debhelper (>=12~),
                dh-exec,
                dh-sequence-dkms,
                lintian,
+               dos2unix,
                crossbuild-essential-arm64 [!arm64],
                libc6:arm64 [!arm64],
 

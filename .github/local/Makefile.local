@@ -4,6 +4,25 @@ SRC-AICRF-TEST	:=	src/tools/aicrf_test/
 BIN-AICRF-TEST	:=	bt_test wifi_test
 BINS-AICRF-TEST	:=	$(addprefix $(SRC-AICRF-TEST),$(BIN-AICRF-TEST))
 
+CRLF_FILES := src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c \
+              src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_bluetooth_main.c
+
+pre_debuild: dos2unix
+
+.PHONY: dos2unix
+dos2unix: $(CRLF_FILES)
+	for i in $^; do \
+		$@ -n $$i $$i; \
+	done
+
+post_debuild: unix2dos
+
+.PHONY: unix2dos
+unix2dos: $(CRLF_FILES)
+	for i in $^; do \
+		$@ -n $$i $$i; \
+	done
+
 post_build:
 	rm -f src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/aicrf_test/wifi_test
 

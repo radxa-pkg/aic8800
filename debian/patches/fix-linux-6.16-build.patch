@@ -45,52 +45,6 @@ index 158c18b..14e3bda 100644
  #endif
  
  	printk("%s:%p\r\n", __func__, defrag_ctrl);
-diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-index 2c337d8..4d9ef8a 100644
---- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-+++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -3304,7 +3304,11 @@ void aicwf_p2p_alive_timeout(struct timer_list *t)
-     rwnx_vif = (struct rwnx_vif *)data;
-     rwnx_hw = rwnx_vif->rwnx_hw;
-     #else
-+    #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
-+    rwnx_hw = timer_container_of(rwnx_hw, t, p2p_alive_timer);
-+    #else
-     rwnx_hw = from_timer(rwnx_hw, t, p2p_alive_timer);
-+    #endif
-     rwnx_vif = rwnx_hw->p2p_dev_vif;
-     #endif
- 
-diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-index bbf21c9..22bb9cf 100644
---- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-+++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-@@ -1658,8 +1658,12 @@ void reord_timeout_handler (struct timer_list *t)
- {
- #if LINUX_VERSION_CODE < KERNEL_VERSION(4,14,0)
- 	struct reord_ctrl *preorder_ctrl = (struct reord_ctrl *)data;
-+#else
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
-+	struct reord_ctrl *preorder_ctrl = timer_container_of(preorder_ctrl, t, reord_timer);
- #else
- 	struct reord_ctrl *preorder_ctrl = from_timer(preorder_ctrl, t, reord_timer);
-+#endif
- #endif
- 
- 	AICWFDBG(LOGTRACE, "%s Enter \r\n", __func__);
-@@ -2024,8 +2028,12 @@ void defrag_timeout_cb(struct timer_list *t)
- 	struct defrag_ctrl_info *defrag_ctrl = NULL;
- #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
- 	defrag_ctrl = (struct defrag_ctrl_info *)data;
-+#else
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0)
-+	defrag_ctrl = timer_container_of(defrag_ctrl, t, defrag_timer);
- #else
- 	defrag_ctrl = from_timer(defrag_ctrl, t, defrag_timer);
-+#endif
- #endif
- 
- 	printk("%s:%p\r\n", __func__, defrag_ctrl);
 diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
 index 4a9707c..a3d0fd9 100644
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
@@ -201,33 +155,3 @@ index 3ab130a..6a936ca 100644
  #endif
  
  	if (sdiodev->bus_if->state == BUS_DOWN_ST) {
-diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_wakelock.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_wakelock.c
-index 90e7ad8..9e96057 100644
---- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_wakelock.c
-+++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_wakelock.c
-@@ -11,10 +11,14 @@
- 
- struct wakeup_source *rwnx_wakeup_init(const char *name)
- {
-+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
- 	struct wakeup_source *ws;
- 	ws = wakeup_source_create(name);
- 	wakeup_source_add(ws);
- 	return ws;
-+#else
-+	return NULL;
-+#endif
- }
- 
- void rwnx_wakeup_deinit(struct wakeup_source *ws)
-@@ -21,8 +23,10 @@ void rwnx_wakeup_deinit(struct wakeup_source *ws)
- {
- 	if (ws && ws->active)
- 		__pm_relax(ws);
-+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 16, 0)
- 	wakeup_source_remove(ws);
- 	wakeup_source_destroy(ws);
-+#endif
- }
- 
- struct wakeup_source *rwnx_wakeup_register(struct device *dev, const char *name)
