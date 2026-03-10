@@ -21,6 +21,8 @@
 #include "rwnx_events.h"
 #include "rwnx_compat.h"
 #include "aicwf_txrxif.h"
+#include "rwnx_main.h"
+
 
 /******************************************************************************
  * Power Save functions
@@ -591,6 +593,15 @@ static int rwnx_prep_dma_tx(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_tx
 		return -1;
 	}
 
+	if(ipc_hostdesc_buf->dma_addr > DMA_BIT_MASK(32))
+	{
+		dma_unmap_single(rwnx_hw->dev, ipc_hostdesc_buf->dma_addr, ipc_hostdesc_buf->size, DMA_TO_DEVICE);
+		rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
+
+		AICWFDBG(LOGERROR, "invald dma_addr for desc\n");
+		return -1;
+	}
+
 #endif
 
 
@@ -608,10 +619,11 @@ static int rwnx_prep_dma_tx(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_tx
  * Push one packet to fw. Sw desc of the packet has already been updated.
  * Only MORE_DATA flag will be set if needed.
  */
-void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags)
+void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, int flags)
 {
+	struct rwnx_txhdr *txhdr = (struct rwnx_txhdr *)skb->data;
 	struct rwnx_sw_txhdr *sw_txhdr = txhdr->sw_hdr;
-	struct sk_buff *skb = sw_txhdr->skb;
+	struct sk_buff *skb_frame = sw_txhdr->skb;
 	struct rwnx_txq *txq = sw_txhdr->txq;
 	u16 hw_queue = txq->hwq->id;
 	int user = 0;
@@ -683,13 +695,14 @@ void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags)
 	sw_txhdr->cfmd = 0;
 
     //rwnx_data_dump("tx:", skb->data + sw_txhdr->headroom, skb->len - sw_txhdr->headroom);
-	if (((sw_txhdr->desc.api.host.flags & TXU_CNTRL_MGMT) && ((*(skb->data+sw_txhdr->headroom)==0xd0) || (*(skb->data+sw_txhdr->headroom)==0x10) || (*(skb->data+sw_txhdr->headroom)==0xc0) || ((*(skb->data+sw_txhdr->headroom)==0x30)))) || \
-		(sw_txhdr->desc.api.host.ethertype == 0x8e88)) { // 0xd0:Action, 0x10:AssocRsp, 0x8e88:EAPOL
+	if (((sw_txhdr->desc.api.host.flags & TXU_CNTRL_MGMT) && ((*(skb_frame->data+sw_txhdr->headroom)==0xd0) || (*(skb_frame->data+sw_txhdr->headroom)==0x10) || (*(skb_frame->data+sw_txhdr->headroom)==0xc0) || ((*(skb_frame->data+sw_txhdr->headroom)==0x30)))) || \
+		(sw_txhdr->desc.api.host.ethertype == 0x8e88) || (sw_txhdr->desc.api.host.ethertype == 0xb488)) {
+		// 0xd0:Action, 0x10:AssocRsp, 0x8e88:EAPOL
 		sw_txhdr->need_cfm = 1;
 		sw_txhdr->desc.api.host.hostid = ((1<<31) | rwnx_hw->ipc_env->txdesc_free_idx[0]);
-		aicwf_pcie_host_txdesc_push(rwnx_hw->ipc_env, 0, (long)skb);
+		aicwf_pcie_host_txdesc_push(rwnx_hw->ipc_env, 0, (long)skb_frame);
 		AICWFDBG(LOGINFO, "need cfm ethertype:%8x,user_idx=%d, %x, skb=%p , headroom = %d \n", sw_txhdr->desc.api.host.ethertype, rwnx_hw->ipc_env->txdesc_free_idx[0], *(skb->data+sw_txhdr->headroom), skb,sw_txhdr->headroom);
-		AICWFDBG(LOGDEBUG, "skb-> data[0] = %x , data[1] = %x \n",skb->data[0],skb->data[1]);
+		AICWFDBG(LOGDEBUG, "skb-> data[0] = %x , data[1] = %x \n",skb_frame->data[0],skb_frame->data[1]);
 	} else {
 		sw_txhdr->need_cfm = 0;
 		if (sw_txhdr->raw_frame) {
@@ -706,7 +719,10 @@ void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags)
 		rwnx_hw->stats.last_tx = jiffies;
 	}
 
-	pcie_txdesc_push(rwnx_hw, sw_txhdr, skb, hw_queue);
+#ifndef CONFIG_TX_THREAD
+	pcie_txdesc_push(rwnx_hw, sw_txhdr, skb);
+#endif
+
 	aicwf_frame_tx((void *)(rwnx_hw->pcidev), skb);
 #endif
 #ifdef AICWF_SDIO_SUPPORT
@@ -1458,7 +1474,7 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct rwnx_txq *txq;
 	u8 tid;
 #ifdef CONFIG_FILTER_TCP_ACK
-	struct msg_buf *msgbuf;
+	struct msg_buf *msgbuf = NULL;
 #endif
     static u32 cnt = 0;
 	struct rwnx_vif *temp_vif;
@@ -1888,10 +1904,11 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 		desc->host.flags |= TXU_CNTRL_MGMT_ROBUST;
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))
-	if (params->no_cck) {
+	if (params->no_cck)
 #else
-	if (no_cck) {	
+	if (no_cck)
 #endif
+	{
 		desc->host.flags |= TXU_CNTRL_MGMT_NO_CCK;
 	}
 
@@ -1918,6 +1935,169 @@ int rwnx_start_mgmt_xmit(struct rwnx_vif *vif, struct rwnx_sta *sta,
 
 	return 0;
 }
+
+#if 0//def CONFIG_BAND_STEERING
+void rwnx_probersp_work(struct work_struct *work)
+{
+	struct ap_probe_rsp *rsp = container_of(work, struct ap_probe_rsp, rsp_work);
+	struct rwnx_vif *rwnx_vif = container_of(rsp, struct rwnx_vif, pb_pool[0]);
+	struct rwnx_hw *rwnx_hw = rwnx_vif->rwnx_hw;
+	struct sk_buff *skb = NULL;
+	struct rwnx_bcn *bcn = &rwnx_vif->ap.bcn;
+	u8_l *buf, *buf_rd;
+	struct ieee80211_mgmt *mgmt;
+	bool robust;
+	u16_l headroom, frame_len;
+	struct rwnx_sta *sta = NULL;
+	struct rwnx_txq *txq;
+	struct rwnx_txhdr *txhdr;
+	struct rwnx_sw_txhdr *sw_txhdr;
+	struct txdesc_api *desc;
+	headroom = sizeof(struct rwnx_txhdr);
+	frame_len = bcn->len;
+
+	if (aicwf_band_steering_block_chk(rwnx_vif, rsp->da)) {
+		AICWFDBG(LOGSTEER, "pcie %s, %d, probe_rsp refuse temp  %pM\n", __func__, rwnx_vif->ap.freq, rsp->da);
+		goto free_use;
+	}
+
+	if (frame_len == 0 || !bcn->head || bcn->head_len == 0 || bcn->head_len > frame_len) {
+		AICWFDBG(LOGSTEER, "%s bcn head NULL\n", __func__);
+		goto free_use;
+	}
+
+	skb = dev_alloc_skb(frame_len + headroom);
+	if (!skb) {
+		AICWFDBG(LOGERROR, "%s alloc skb fail\n", __func__);
+		goto free_use;
+	}
+
+	skb_reserve(skb, headroom);
+	buf = skb_put(skb, frame_len);
+	buf_rd = buf;
+
+	memcpy(buf, bcn->head, bcn->head_len);
+	buf += bcn->head_len;
+	*buf++ = WLAN_EID_TIM;
+	*buf++ = 4;
+	*buf++ = 0;
+	*buf++ = bcn->dtim;
+	*buf++ = 0;
+	*buf++ = 0;
+	if (bcn->tail) {
+		memcpy(buf, bcn->tail, bcn->tail_len);
+		buf += bcn->tail_len;
+	}
+	if (bcn->ies)
+		memcpy(buf, bcn->ies, bcn->ies_len);
+
+	mgmt = (struct ieee80211_mgmt *)skb->data;
+	mgmt->frame_control = cpu_to_le16(IEEE80211_FTYPE_MGMT | IEEE80211_STYPE_PROBE_RESP);
+	memcpy (mgmt->da, rsp->da, ETH_ALEN);
+	rsp->in_use = false;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0))
+	robust = ieee80211_is_robust_mgmt_frame(skb);
+#else
+	if (skb->len < 25)
+		robust = false;
+	robust = ieee80211_is_robust_mgmt_frame((void *)skb->data);
+#endif
+
+	sta = rwnx_retrieve_sta(rwnx_hw, rwnx_vif, mgmt->da, mgmt->frame_control, true);
+	if (sta) {
+		txq = rwnx_txq_sta_get(sta, 8, rwnx_hw);
+	} else {
+		txq = rwnx_txq_vif_get(rwnx_vif, NX_UNK_TXQ_TYPE);
+	}
+	if (txq->idx == TXQ_INACTIVE) {
+		AICWFDBG(LOGERROR, "%s TXQ inactive\n", __func__);
+		goto fail;
+	}
+
+	skb_push(skb, headroom);
+	txhdr = (struct rwnx_txhdr *)skb->data;
+	txhdr->hw_hdr.cfm.status.value = 0;
+#ifdef CONFIG_CACHE_GUARD
+	sw_txhdr = kmem_cache_alloc(rwnx_hw->sw_txhdr_cache, GFP_ATOMIC);
+#else
+	sw_txhdr = kmalloc(sizeof(struct rwnx_sw_txhdr),GFP_ATOMIC);
+#endif
+	if (unlikely(sw_txhdr == NULL)) {
+		AICWFDBG(LOGERROR, "%s cache fail\n", __func__);
+		goto fail;
+	}
+
+	sw_txhdr->txq = txq;
+	sw_txhdr->frame_len = frame_len;
+	sw_txhdr->rwnx_sta = sta;
+	sw_txhdr->rwnx_vif = rwnx_vif;
+	sw_txhdr->skb = skb;
+	sw_txhdr->headroom = headroom;
+	sw_txhdr->jiffies = jiffies;
+	//sw_txhdr->map_len = skb->len - offsetof(struct rwnx_txhdr, hw_hdr);
+#ifdef CONFIG_RWNX_AMSDUS_TX
+	sw_txhdr->amsdu.len = 0;
+	sw_txhdr->amsdu.nb = 0;
+#endif
+	sw_txhdr->raw_frame = 0;
+	sw_txhdr->fixed_rate = 0;
+
+	/* Prepare IPC buffer for DMA transfer */
+	if (unlikely(rwnx_prep_dma_tx(rwnx_hw, sw_txhdr, buf_rd))) {
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
+		dev_kfree_skb(skb);
+		return;
+	}
+
+	desc = &sw_txhdr->desc.api;
+	desc->host.ethertype = 0;
+	desc->host.staid = (sta) ? sta->sta_idx : 0xFF;
+	desc->host.vif_idx = rwnx_vif->vif_index;
+	desc->host.tid = 0xFF;
+	desc->host.flags = TXU_CNTRL_MGMT;
+	if (robust)
+		desc->host.flags |= TXU_CNTRL_MGMT_ROBUST;
+
+#if 0
+#ifdef CONFIG_RWNX_SPLIT_TX_BUF
+	desc->host.packet_len[0] = frame_len;
+#else
+	desc->host.packet_len = frame_len;
+#endif
+	desc->host.status_desc_addr = sw_txhdr->dma_addr;
+#endif
+
+	txhdr->sw_hdr = sw_txhdr;
+
+	spin_lock_bh(&rwnx_hw->tx_lock);
+	AICWFDBG(LOGSTEER, "pcie p_rsp: %pM", mgmt->da);
+	// AICWFDBG(LOGDEBUG, "%s sta:%p skb:%p desc->host.staid:%d \r\n", __func__, sta, skb, desc->host.staid);
+	if (rwnx_txq_queue_skb(skb, txq, rwnx_hw, false))
+		rwnx_hwq_process(rwnx_hw, txq->hwq);
+	spin_unlock_bh(&rwnx_hw->tx_lock);
+
+	return;
+
+fail:
+	if (sw_txhdr) {
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
+	}
+	dev_kfree_skb(skb);
+free_use:
+	if (rsp->in_use)
+		rsp->in_use = false;
+}
+#endif
+
 
 /**
  * rwnx_txdatacfm - FW callback for TX confirmation
@@ -1953,7 +2133,8 @@ int rwnx_txdatacfm(void *pthis, void *host_id, u8 free)
 	/* Check status in the header. If status is null, it means that the buffer
 	 * was not transmitted and we have to return immediately */
 	if (rwnx_txst.value == 0) {
-		return -1;
+		//return -1;
+		rwnx_txst.tx_done = 1;
 	}
 
 #ifdef AICWF_USB_SUPPORT

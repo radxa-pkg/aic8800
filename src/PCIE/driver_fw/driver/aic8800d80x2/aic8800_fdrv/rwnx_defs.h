@@ -54,6 +54,10 @@
 #include "aic_br_ext.h"
 #endif /* CONFIG_BR_SUPPORT */
 
+#ifdef CONFIG_BAND_STEERING
+#include "aicwf_steering.h"
+#endif
+
 #define WPI_HDR_LEN    18
 #define WPI_PN_LEN     16
 #define WPI_PN_OFST     2
@@ -173,6 +177,42 @@ enum nl80211_mesh_power_mode {
         __NL80211_MESH_POWER_AFTER_LAST,
         NL80211_MESH_POWER_MAX = __NL80211_MESH_POWER_AFTER_LAST - 1
 };
+#endif
+
+#ifdef CONFIG_BAND_STEERING
+//reference nl80211_band
+enum band_type {
+	BAND_ON_24G = 0,
+	BAND_ON_5G = 1,
+	BAND_ON_60G = 2,
+	BAND_ON_6G = 3,
+	BAND_MAX,
+};
+
+enum WIFI_FRAME_TYPE {
+	WIFI_MGT_TYPE  = (0),
+};
+
+enum WIFI_FRAME_SUBTYPE {
+	WIFI_ASSOCREQ       = (0 | WIFI_MGT_TYPE),
+	WIFI_PROBEREQ       = (BIT(6) | WIFI_MGT_TYPE),
+	WIFI_AUTH           = (BIT(7) | BIT(5) | BIT(4) | WIFI_MGT_TYPE),
+};
+
+struct tmp_feature_sta {
+	u8_l sta_idx;
+	u8_l supported_band;
+};
+
+#if 0
+#define MAX_PENDING_PROBES 3
+struct ap_probe_rsp {
+	u8_l da[6];
+	struct work_struct rsp_work;
+	bool in_use;
+};
+#endif
+
 #endif
 
 /**
@@ -301,6 +341,18 @@ enum rwnx_ap_flags {
     RWNX_AP_CREATE_MESH_PATH = BIT(2),
 };
 
+#ifdef CONFIG_DYNAMIC_PERPWR
+struct sta_pwrthd {
+	s8_l rssi_thd_0;      //rssi 0 (dBm)
+	s8_l rssi_thd_1;      //rssi 1 (dBm)
+	s8_l rssi_thd_2;      //rssi 2 (dBm)
+	s8_l pwr_loss_lvl_0;  //RSSI > RSSI_THD_0
+	s8_l pwr_loss_lvl_1;  //RSSI_THD_1 < RSSI <= RSSI_THD_0
+	s8_l pwr_loss_lvl_2;  //RSSI_THD_2 < RSSI <= RSSI_THD_1
+	s8_l pwr_loss_lvl_3;  //RSSI <= RSSI_THD_2
+};
+#endif
+
 /*
  * Structure used to save information relative to the managed interfaces.
  * This is also linked within the rwnx_hw vifs list.
@@ -343,6 +395,10 @@ struct rwnx_vif {
 			u8 *ft_assoc_ies;
             int ft_assoc_ies_len;
             u8 ft_target_ap[ETH_ALEN];
+			char ssid[33];//ssid max is 32, but this has one spare for '\0'
+			int ssid_len;
+			u8 bssid[ETH_ALEN];
+			bool is_roam;
 		} sta;
 		struct {
 			u32 flags;                 /* see rwnx_ap_flags */
@@ -360,6 +416,14 @@ struct rwnx_vif {
 			bool create_path;            /* Indicate if we are waiting for a MESH_CREATE_PATH_CFM
 											message */
 			int generation;              /* Increased each time the list of Mesh Paths is updated */
+											
+#ifdef CONFIG_BAND_STEERING
+			u8_l tmp_sta_idx;
+			enum band_type band;
+			u32_l freq;
+			bool start;
+#endif
+			u32_l ap_freq;
 			enum nl80211_mesh_power_mode mesh_pm; /* mesh power save mode currently set in firmware */
 			enum nl80211_mesh_power_mode next_mesh_pm; /* mesh power save mode for next peer */
 		} ap;
@@ -387,6 +451,15 @@ struct rwnx_vif {
 
 	struct br_ext_info		ethBrExtInfo;
     #endif /* CONFIG_BR_SUPPORT */
+#ifdef CONFIG_BAND_STEERING
+	struct timer_list steer_timer;
+	struct work_struct steer_work;
+	struct b_steer_priv bsteerpriv;
+#if 0
+	struct workqueue_struct *rsp_wq;
+	struct ap_probe_rsp pb_pool[MAX_PENDING_PROBES];
+#endif
+#endif
 };
 
 #define RWNX_INVALID_VIF 0xFF
@@ -512,6 +585,12 @@ struct rwnx_sta {
 	struct work_struct per_pwr_work;
 	unsigned long last_jiffies;
 #endif
+#ifdef CONFIG_BAND_STEERING
+	u32_l link_time;
+	s8_l rssi;
+	u8_l support_band;
+#endif
+
 };
 
 static inline const u8 *rwnx_sta_addr(struct rwnx_sta *rwnx_sta)
@@ -623,14 +702,23 @@ struct amsdu_subframe_hdr {
 
 
 /* rwnx driver status */
+void rwnx_set_conn_state(atomic_t *drv_conn_state, int state);
 
 enum rwnx_drv_connect_status { 
 	RWNX_DRV_STATUS_DISCONNECTED = 0,
 	RWNX_DRV_STATUS_DISCONNECTING, 
 	RWNX_DRV_STATUS_CONNECTING, 
-	RWNX_DRV_STATUS_CONNECTED, 
+	RWNX_DRV_STATUS_CONNECTED,
+	RWNX_DRV_STATUS_ROAMING,
 };
 
+static const char *const s_conn_state[] = {
+    "RWNX_DRV_STATUS_DISCONNECTED",
+    "RWNX_DRV_STATUS_DISCONNECTING",
+    "RWNX_DRV_STATUS_CONNECTING",
+    "RWNX_DRV_STATUS_CONNECTED",
+    "RWNX_DRV_STATUS_ROAMING",
+};
 
 struct rwnx_hw {
 	struct rwnx_mod_params *mod_params;
@@ -691,6 +779,7 @@ struct rwnx_hw {
     atomic_t txdata_reserved;
     atomic_t txdata_total;
     u8 fc;
+	u8 task_inited;
 
 	atomic_t rxbuf_cnt;
 	u32 tcp_pacing_shift;
@@ -770,6 +859,7 @@ struct rwnx_hw {
     u8 sta_mac_addr[6];
 
 	u8 pci_suspending;
+	u8 pci_fw_err;
 #ifdef CONFIG_TEMP_CONTROL
 	unsigned long started_jiffies;
 	s8_l temp;
@@ -781,7 +871,15 @@ struct rwnx_hw {
 	s8 pwrloss_lvl;
 	u8 sta_rssi_idx;
 #endif
-
+#ifdef CONFIG_BAND_STEERING
+	u8_l iface_idx;
+	struct tmp_feature_sta feature_table[NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX];
+#endif
+#ifdef CONFIG_DYNAMIC_PERPWR
+	struct sta_pwrthd pwrth;
+#endif
+	ktime_t last_time;
+	char last_alpha2[3];
 };
 
 u8 *rwnx_build_bcn(struct rwnx_bcn *bcn, struct cfg80211_beacon_data *new);

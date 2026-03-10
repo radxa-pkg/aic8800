@@ -6,6 +6,7 @@
 	aic8800pcie/DEBIA/control
 
 3. Execute in this directory "dpkg -b aic8800pcie aic8800pcie.deb", Generate aic8800pcie.deb
+or "dpkg-deb --root-owner-group -b -D -Zgzip aic8800pcie aic8800pcie.deb"
 
 
 

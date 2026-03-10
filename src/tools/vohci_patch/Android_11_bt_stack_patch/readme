@@ -1,6 +1,0 @@
-android/system/bt/device/src/esco_parameters.cc
-android/system/bt/stack/btm/btm_sco.cc
-android/system/bt/stack/btm/btm_main.cc
-android/system/bt/stack/btm/lowcfe_v3.cc
-android/system/bt/stack/btm/lowcfe_v3.h
-android/system/bt/stack/Android.dp

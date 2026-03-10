@@ -332,7 +332,10 @@ static int rwnx_send_msg(struct aic_usb_dev *usbdev, const void *msg_params,
     }
 
     if(!reqcfm)
+	{
         kfree(cmd);
+		rwnx_msg_free(msg, msg_params);
+	}
 
     return ret;
 }

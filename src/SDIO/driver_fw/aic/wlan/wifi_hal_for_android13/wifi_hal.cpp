@@ -105,7 +105,8 @@ typedef enum wifi_attr {
     ANDR_WIFI_ATTRIBUTE_PNO_RANDOM_MAC_OUI,
     ANDR_WIFI_ATTRIBUTE_NODFS_SET,
     ANDR_WIFI_ATTRIBUTE_COUNTRY,
-    ANDR_WIFI_ATTRIBUTE_ND_OFFLOAD_VALUE
+    ANDR_WIFI_ATTRIBUTE_ND_OFFLOAD_VALUE,
+    ANDR_WIFI_ATTRIBUTE_LATENCY_MODE, 
     // Add more attribute here
 } wifi_attr_t;
 
@@ -240,7 +241,8 @@ wifi_error init_wifi_vendor_hal_func_table(wifi_hal_fn *fn)
     fn->wifi_get_packet_filter_capabilities = wifi_get_packet_filter_capabilities;
     fn->wifi_get_wake_reason_stats = wifi_get_wake_reason_stats;
     fn->wifi_set_packet_filter = wifi_set_packet_filter;
-	fn->wifi_read_packet_filter = wifi_read_packet_filter;
+    fn->wifi_read_packet_filter = wifi_read_packet_filter;
+    fn->wifi_set_latency_mode = wifi_set_latency_mode;
 #ifdef WIFI_VIRTUAL_INTERFACE_SUPPORT
     fn->wifi_virtual_interface_create = wifi_virtual_interface_create;
     fn->wifi_virtual_interface_delete = wifi_virtual_interface_delete;
@@ -1333,6 +1335,45 @@ public:
 };
 #endif
 
+/////////////////////////////////////////////////////////////////////
+
+class SetLatencyModeCommand : public WifiCommand {
+private:
+    u32 mLatencyMode;
+public:
+    SetLatencyModeCommand(wifi_interface_handle handle, u32 LatencyMode)
+        : WifiCommand("SetLatencyModeCommand", handle, 0) {
+            mLatencyMode = LatencyMode;
+    }
+
+    virtual int create() {
+	    int ret;
+
+	    /* Check for invalid latency Mode */
+	    if ((mLatencyMode != WIFI_LATENCY_MODE_NORMAL) &&
+			    (mLatencyMode != WIFI_LATENCY_MODE_LOW)) {
+		    ALOGE("SetLatencyModeCommand: Invalid mode: %d", mLatencyMode);
+		    return WIFI_ERROR_UNKNOWN;
+	    }
+
+	    ret = mMsg.create(GOOGLE_OUI, WIFI_SUBCMD_SET_LATENCY_MODE);
+	    if (ret < 0) {
+		    ALOGE("Can't create message to send to driver - %d", ret);
+		    return ret;
+	    }
+
+	    nlattr *data = mMsg.attr_start(NL80211_ATTR_VENDOR_DATA);
+	    ret = mMsg.put_u32(ANDR_WIFI_ATTRIBUTE_LATENCY_MODE, mLatencyMode);
+	    if (ret < 0) {
+		    return ret;
+	    }
+
+	    mMsg.attr_end(data);
+	    return WIFI_SUCCESS;
+    }
+
+};
+
 static int wifi_get_multicast_id(wifi_handle handle, const char *name, const char *group)
 {
     GetMulticastIdCommand cmd(handle, name, group);
@@ -1568,6 +1609,13 @@ static wifi_error wifi_read_packet_filter(wifi_interface_handle handle,
 static wifi_error wifi_configure_nd_offload(wifi_interface_handle handle, u8 enable)
 {
     SetNdoffloadCommand command(handle, enable);
+    return (wifi_error) command.requestResponse();
+}
+
+wifi_error wifi_set_latency_mode(wifi_interface_handle handle, wifi_latency_mode mode)
+{
+    ALOGD("Setting Wifi Latency mode, halHandle = %p LatencyMode = %d\n", handle, mode);
+    SetLatencyModeCommand command(handle, mode);
     return (wifi_error) command.requestResponse();
 }
 

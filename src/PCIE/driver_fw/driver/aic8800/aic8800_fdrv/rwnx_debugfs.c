@@ -1767,7 +1767,7 @@ static void idx_to_rate_cfg1(unsigned int formatmod,
 		case FORMATMOD_NON_HT:
 		{
 			r_cfg->formatModTx = formatmod;
-			r_cfg->giAndPreTypeTx = 1;
+			r_cfg->giAndPreTypeTx = 2;
 			r_cfg->mcsIndexTx = mcs;
             break;
 		}

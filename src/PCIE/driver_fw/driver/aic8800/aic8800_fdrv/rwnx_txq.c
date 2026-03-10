@@ -193,7 +193,11 @@ void rwnx_txq_drop_skb(struct rwnx_txq *txq, struct sk_buff *skb, struct rwnx_hw
     }
 #endif
     rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
+#ifdef CONFIG_CACHE_GUARD
 	kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+	kfree(sw_txhdr);
+#endif
     if (retry_packet) {
         txq->nb_retry--;
         if (txq->nb_retry == 0) {
@@ -915,11 +919,7 @@ int rwnx_txq_queue_skb(struct sk_buff *skb, struct rwnx_txq *txq,
 	if (!retry) {
 		/* add buffer in the sk_list */
 		skb_queue_tail(&txq->sk_list, skb);
-#ifdef CONFIG_RWNX_FULLMAC
-			// to update for SOFTMAC
-			rwnx_ipc_sta_buffer(rwnx_hw, txq->sta, txq->tid,
-								((struct rwnx_txhdr *)skb->data)->sw_hdr->frame_len);
-#endif
+
 	} else {
 		if (txq->last_retry_skb)
 			rwnx_skb_append(txq->last_retry_skb, skb, &txq->sk_list);

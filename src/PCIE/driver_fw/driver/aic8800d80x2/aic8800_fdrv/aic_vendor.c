@@ -9,6 +9,7 @@
 #include <linux/rtnetlink.h>
 #include <net/netlink.h>
 #include "rwnx_version_gen.h"
+#include "rwnx_msg_tx.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
 
@@ -28,6 +29,15 @@ static struct wlan_driver_wake_reason_cnt_t wake_reason_cnt = {
 	.total_cmd_event_wake = 10,
 };
 #endif
+
+
+#ifdef CONFIG_APF
+#define AIC_APF_MEM_SIZE      2048
+#define AIC_APF_VERSION       4
+
+static char apfProgram[AIC_APF_MEM_SIZE];
+#endif
+
 
 int aic_dev_start_mkeep_alive(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
 			u8 mkeep_alive_id, u8 *ip_pkt, u16 ip_pkt_len, u8 *src_mac, u8 *dst_mac, u32 period_msec)
@@ -310,6 +320,12 @@ static int aicwf_vendor_subcmd_set_country_code(struct wiphy *wiphy, struct wire
 {
 	int ret = 0, rem, type;
 	const struct nlattr *iter;
+	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+
+	if (!rwnx_hw->mod_params->custregd) {
+		AICWFDBG(LOGERROR, "%s: invalid custregd\n", __func__);
+		return -EINVAL;
+	}
 
 	nla_for_each_attr(iter, data, len, rem) {
 		type = nla_type(iter);
@@ -578,7 +594,70 @@ out_put_fail:
 	return -EMSGSIZE;
 }
 
-static int aicwf_vendor_apf_subcmd_get_capabilities(struct wiphy *wiphy, struct wireless_dev *wdev,
+static int aicwf_vendor_logger_get_tx_pkt_fates(struct wiphy *wiphy, struct wireless_dev *wdev,
+	const void *data, int len)
+{
+#if 0
+	int ret = 0, rem, type;
+	const struct nlattr *iter;
+	int fate_num;
+	int fate_data;
+
+	AICWFDBG(LOGDEBUG, "%s Enter\r\n", __func__);
+	nla_for_each_attr(iter, data, len, rem) {
+		type = nla_type(iter);
+		switch (type) {
+		case LOGGER_ATTRIBUTE_PKT_FATE_NUM:
+			fate_num = nla_get_u32(iter);
+			break;
+		case LOGGER_ATTRIBUTE_PKT_FATE_DATA:
+			fate_data = nla_get_u64(iter);
+			break;
+		default:
+			AICWFDBG(LOGERROR, "%s(%d), Unknown type: %d\n", __func__, __LINE__, type);
+			return -EINVAL;
+		}
+	}
+#endif
+	/* TODO
+	 * Add handle in the future
+	 */
+	return 0;
+}
+
+static int aicwf_vendor_logger_get_rx_pkt_fates(struct wiphy *wiphy, struct wireless_dev *wdev,
+	const void *data, int len)
+{
+#if 0
+	int ret = 0, rem, type;
+	const struct nlattr *iter;
+	int fate_num;
+	int fate_data;
+
+	AICWFDBG(LOGDEBUG, "%s Enter\r\n", __func__);
+	nla_for_each_attr(iter, data, len, rem) {
+		type = nla_type(iter);
+		switch (type) {
+		case LOGGER_ATTRIBUTE_PKT_FATE_NUM:
+			fate_num = nla_get_u32(iter);
+			break;
+		case LOGGER_ATTRIBUTE_PKT_FATE_DATA:
+			fate_data = nla_get_u64(iter);
+			break;
+		default:
+			AICWFDBG(LOGERROR, "%s(%d), Unknown type: %d\n", __func__, __LINE__, type);
+			return -EINVAL;
+		}
+	}
+#endif
+	/* TODO
+	 * Add handle in the future
+	 */
+	return 0;
+}
+
+
+static int aicwf_vendor_logger_start_pkt_fate_monitoring(struct wiphy *wiphy, struct wireless_dev *wdev,
 	const void *data, int len)
 {
 	/* TODO
@@ -586,6 +665,124 @@ static int aicwf_vendor_apf_subcmd_get_capabilities(struct wiphy *wiphy, struct 
 	 */
 	return 0;
 }
+
+
+#ifdef CONFIG_APF
+static int aicwf_vendor_apf_subcmd_get_capabilities(struct wiphy *wiphy, struct wireless_dev *wdev,
+	const void *data, int len)
+{
+	int ret;
+	struct sk_buff *reply;
+	uint32_t payload;
+	printk("%s\n", __func__);
+
+	/* APF_ATTRIBUTE_VERSION + APF_ATTRIBUTE_MAX_LEN */
+	payload = sizeof(u32) * 2;
+	reply = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, payload);
+
+	if (!reply)
+		return -ENOMEM;
+
+	if (nla_put_u32(reply, APF_ATTRIBUTE_VERSION, AIC_APF_VERSION))
+		goto out_put_fail;
+
+	if (nla_put_u32(reply, APF_ATTRIBUTE_MAX_LEN, AIC_APF_MEM_SIZE))
+		goto out_put_fail;
+
+	ret = cfg80211_vendor_cmd_reply(reply);
+	if (ret)
+		wiphy_err(wiphy, "reply cmd error\n");
+
+	return ret;
+
+out_put_fail:
+	kfree_skb(reply);
+	return -EMSGSIZE;
+}
+
+static int aicwf_vendor_apf_set_filter(struct wiphy *wiphy, struct wireless_dev *wdev,
+	const void *data, int len)
+{
+	int ret = 0, rem, type;
+	const struct nlattr *iter;
+	unsigned int mProgramLen = 0;
+	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+
+	printk("%s\n", __func__);
+
+	nla_for_each_attr(iter, data, len, rem) {
+		type = nla_type(iter);
+		switch (type) {
+		case APF_ATTRIBUTE_PROGRAM_LEN:
+			memcpy(&mProgramLen, nla_data(iter), sizeof(unsigned int));
+			ret = (mProgramLen > 0 && mProgramLen <= AIC_APF_MEM_SIZE) ? 0 : -EINVAL;
+			break;
+		case APF_ATTRIBUTE_PROGRAM:
+			if (mProgramLen > AIC_APF_MEM_SIZE || mProgramLen == 0) {
+				printk("%s: apf program size invalid: %d (should > 0 and <= %d)\n",
+						__func__, mProgramLen, AIC_APF_MEM_SIZE);
+				return -EINVAL;
+			}
+
+			memcpy(apfProgram, nla_data(iter), mProgramLen);
+			ret = rwnx_send_set_apf_prog_req(rwnx_hw, apfProgram, mProgramLen);
+			break;
+		default:
+			pr_err("%s(%d), Unknown type: %d\n", __func__, __LINE__, type);
+			return -EINVAL;
+		}
+	}
+
+	return ret;
+}
+
+static int aicwf_vendor_apf_read_filter_data(struct wiphy *wiphy,
+	struct wireless_dev *wdev, const void *data, int len)
+{
+	struct sk_buff *reply;
+	int ret, payload, apf_mem_size;
+	struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+
+	printk("%s\n", __func__);
+
+	apf_mem_size = AIC_APF_MEM_SIZE;
+	payload = sizeof(u32) + apf_mem_size;
+
+	ret = rwnx_send_get_apf_prog_req(rwnx_hw, apfProgram, apf_mem_size);
+	if (ret != 0) {
+		pr_err("%s, Failed to read apf mem from firmware, ret = %d\n", __func__, ret);
+		return ret;
+	}
+
+	reply = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, payload);
+	if (!reply)
+		return -ENOMEM;
+
+	ret = nla_put_u32(reply, APF_ATTRIBUTE_PROGRAM_LEN, apf_mem_size);
+	if (ret < 0) {
+		pr_err("%s, Failed to put APF_ATTRIBUTE_MAX_LEN, ret = %d\n", __func__, ret);
+		goto out_put_fail;
+	}
+
+	/* copy the full apf mem */
+	ret = nla_put(reply, APF_ATTRIBUTE_PROGRAM, apf_mem_size, &apfProgram[0]);
+	if (ret < 0) {
+		pr_err("%s, Failed to put APF_ATTRIBUTE_PROGRAM, ret = %d\n", __func__, ret);
+		goto out_put_fail;
+	}
+
+	ret = cfg80211_vendor_cmd_reply(reply);
+	if (ret)
+		wiphy_err(wiphy, "reply cmd error\n");
+
+	return ret;
+
+out_put_fail:
+	kfree_skb(reply);
+	return -EMSGSIZE;
+}
+#endif
+
 
 static int aicwf_vendor_sub_cmd_set_mac(struct wiphy *wiphy, struct wireless_dev *wdev,
 	const void *data, int len)
@@ -640,6 +837,18 @@ aicwf_cfg80211_logger_policy[LOGGER_ATTRIBUTE_MAX + 1] = {
 	[LOGGER_ATTRIBUTE_LOG_MIN_DATA_SIZE] = { .type = NLA_U32 },
 	[LOGGER_ATTRIBUTE_RING_NAME] = { .type = NLA_STRING },
 };
+
+#ifdef CONFIG_APF
+static const struct nla_policy
+aicwf_cfg80211_apf_policy[APF_ATTRIBUTE_MAX + 1] = {
+	[0] = {.type = NLA_UNSPEC },
+	[APF_ATTRIBUTE_VERSION] = {.type = NLA_U32 },
+	[APF_ATTRIBUTE_MAX_LEN] = {.type = NLA_U32 },
+	[APF_ATTRIBUTE_PROGRAM] = { .type = NLA_BINARY },
+	[APF_ATTRIBUTE_PROGRAM_LEN] = { .type = NLA_U32 },
+};
+#endif
+
 
 static const struct nla_policy
 aicwf_cfg80211_subcmd_policy[GSCAN_ATTRIBUTE_MAX + 1] = {
@@ -844,20 +1053,94 @@ const struct wiphy_vendor_command aicwf_vendor_cmd[] = {
 		.policy = VENDOR_CMD_RAW_DATA,
 #endif
 	},
-	{
-		{
-			.vendor_id = GOOGLE_OUI,
-			.subcmd = APF_SUBCMD_GET_CAPABILITIES
-		},
-		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |  WIPHY_VENDOR_CMD_NEED_NETDEV,
-		.doit = aicwf_vendor_apf_subcmd_get_capabilities,
+
+#ifdef CONFIG_APF
+        {
+            {
+                .vendor_id = GOOGLE_OUI,
+                .subcmd = APF_SUBCMD_GET_CAPABILITIES
+            },
+            .flags = WIPHY_VENDOR_CMD_NEED_WDEV |  WIPHY_VENDOR_CMD_NEED_NETDEV,
+            .doit = aicwf_vendor_apf_subcmd_get_capabilities,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
-		.dumpit = aicwf_dump_interface,
+            .dumpit = aicwf_dump_interface,
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
-		.policy = VENDOR_CMD_RAW_DATA,
+            .policy = aicwf_cfg80211_apf_policy,
+            .maxattr = APF_ATTRIBUTE_MAX,
 #endif
-	},
+        },
+        {
+            {
+                .vendor_id = GOOGLE_OUI,
+                .subcmd = APF_SUBCMD_SET_FILTER
+            },
+            .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+            .doit = aicwf_vendor_apf_set_filter,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+            .policy = aicwf_cfg80211_apf_policy,
+            .maxattr = APF_ATTRIBUTE_MAX,
+#endif
+        },
+        {
+            {
+                .vendor_id = GOOGLE_OUI,
+                .subcmd = APF_SUBCMD_READ_FILTER_DATA
+            },
+            .flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+            .doit = aicwf_vendor_apf_read_filter_data,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+            .policy = aicwf_cfg80211_apf_policy,
+            .maxattr = APF_ATTRIBUTE_MAX
+#endif /* LINUX_VERSION >= 5.3 */
+        },
+#endif
+        {
+            {
+                .vendor_id = GOOGLE_OUI,
+                .subcmd = LOGGER_START_PKT_FATE_MONITORING
+            },
+            .flags = WIPHY_VENDOR_CMD_NEED_WDEV |  WIPHY_VENDOR_CMD_NEED_NETDEV,
+            .doit = aicwf_vendor_logger_start_pkt_fate_monitoring,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+            .dumpit = aicwf_dump_interface,
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+            .policy = VENDOR_CMD_RAW_DATA,
+#endif
+        },
+
+        {
+            {
+                .vendor_id = GOOGLE_OUI,
+                .subcmd = LOGGER_GET_TX_PKT_FATES
+            },
+            .flags = WIPHY_VENDOR_CMD_NEED_WDEV |  WIPHY_VENDOR_CMD_NEED_NETDEV,
+            .doit = aicwf_vendor_logger_get_tx_pkt_fates,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+            .dumpit = aicwf_dump_interface,
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+            .policy = VENDOR_CMD_RAW_DATA,
+#endif
+        },
+        {
+            {
+                .vendor_id = GOOGLE_OUI,
+                .subcmd = LOGGER_GET_RX_PKT_FATES
+            },
+            .flags = WIPHY_VENDOR_CMD_NEED_WDEV |  WIPHY_VENDOR_CMD_NEED_NETDEV,
+            .doit = aicwf_vendor_logger_get_rx_pkt_fates,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+            .dumpit = aicwf_dump_interface,
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)
+            .policy = VENDOR_CMD_RAW_DATA,
+#endif
+        },
+
+
+
 	{
 		{
 			.vendor_id = GOOGLE_OUI,

@@ -132,6 +132,7 @@ typedef enum {
     GSCAN_SUBCMD_ANQPO_CONFIG,                          /* 0x1015 */
     WIFI_SUBCMD_SET_RSSI_MONITOR,                       /* 0x1016 */
     WIFI_SUBCMD_CONFIG_ND_OFFLOAD,                      /* 0x1017 */
+    WIFI_SUBCMD_SET_LATENCY_MODE,                       /* 0x1018 */
     /* Add more sub commands here */
 
     GSCAN_SUBCMD_MAX,

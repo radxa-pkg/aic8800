@@ -332,7 +332,11 @@ void rwnx_task(unsigned long data)
                 if(!sw_txhdr->need_cfm || sw_txhdr->cfmd) {
                     rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
                     dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
-                    kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#ifdef CONFIG_CACHE_GUARD
+					kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+					kfree(sw_txhdr);
+#endif
                     skb_pull(skb_tmp, RWNX_TX_HEADROOM);
                     consume_skb(skb_tmp);
                 }

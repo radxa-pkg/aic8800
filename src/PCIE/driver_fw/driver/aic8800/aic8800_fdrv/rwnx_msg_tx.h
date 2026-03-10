@@ -65,8 +65,8 @@ int rwnx_send_rf_config_req(struct rwnx_hw *rwnx_hw, u8_l ofst, u8_l sel, u8_l *
 int rwnx_send_rf_calib_req(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_cfm *cfm);
 int rwnx_send_get_macaddr_req(struct rwnx_hw *rwnx_hw, struct mm_get_mac_addr_cfm *cfm);
 
-#ifdef CONFIG_TEMP_COMP
 int rwnx_send_get_temp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
+#ifdef CONFIG_TEMP_COMP
 int rwnx_send_set_temp_comp_req(struct rwnx_hw *rwnx_hw, struct mm_set_vendor_swconfig_cfm *cfm);
 #endif
 
@@ -184,6 +184,9 @@ int rwnx_send_txpwr_ofst_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_ofst2x_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_txpwr_lvl_v3_req(struct rwnx_hw *rwnx_hw);
+#ifdef CONFIG_DYNAMIC_PERPWR
+int rwnx_send_txpwr_per_sta_req(struct rwnx_hw *rwnx_hw, struct rwnx_sta *sta);
+#endif
 int rwnx_send_txpwr_lvl_adj_req(struct rwnx_hw *rwnx_hw);
 int rwnx_send_resume_restore(struct rwnx_hw *rwnx_hw, u8_l on, u8_l efuse_valid, u8_l set_vendor_info,
 					u8_l fwtrace_redir_en, struct rwnx_vif *vif);

@@ -49,6 +49,7 @@ struct aic_pci_dev {
 
 	spinlock_t txmsg_lock;
 	spinlock_t ws_lock;
+    spinlock_t irq_lock;
 
 	u8 chip_id;
 
@@ -107,6 +108,10 @@ int patch_config(struct rwnx_hw *rwnx_hw);
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr);
 int pcie_rxbuf_rep_thread(void *data);
 int pcie_rxbuf_process_thread(void *data);
+int pcie_irq_process_thread(void *data);
+#ifdef CONFIG_TX_THREAD
+int pcie_txbuf_process_thread(void *data);
+#endif
 
 #ifdef CONFIG_WS
 void rwnx_pm_stay_awake_pc(struct rwnx_hw *rwnx_hw);

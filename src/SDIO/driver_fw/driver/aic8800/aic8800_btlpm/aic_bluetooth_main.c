@@ -63,6 +63,7 @@ err2:
 	rfkill_bluetooth_remove(aicbt_pdev);
 err1:
 	platform_device_del(aicbt_pdev);
+    platform_device_put(aicbt_pdev);
 err0:
 	platform_driver_unregister(&aicbt_driver);
 	return ret;
@@ -76,6 +77,7 @@ static void __exit aic_bluetooth_mod_exit(void)
 #endif
 	rfkill_bluetooth_remove(aicbt_pdev);
 	platform_device_del(aicbt_pdev);
+    platform_device_put(aicbt_pdev);
 	platform_driver_unregister(&aicbt_driver);
 }
 

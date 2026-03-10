@@ -222,6 +222,27 @@ const struct aicbsp_firmware fw_8800d80x2[] = {
 	},
 };
 
+const struct aicbsp_firmware fw_8800d80n_u02[] = {
+	[AICBSP_CPMODE_WORK] = {
+		.desc          = "normal work mode(8800d80n sdio u02)",
+		.bt_adid       = "fw_adid_8800d80n_u02.bin",
+		.bt_patch      = "fw_patch_8800d80n_u02.bin",
+		.bt_table      = "fw_patch_table_8800d80n_u02.bin",
+		.wl_fw         = "fmacfw_8800d80.bin",
+		.bt_ext_patch  = "fw_patch_8800d80n_u02_ext"
+	},
+
+	[AICBSP_CPMODE_TEST] = {
+		.desc          = "rf test mode(8800d80n sdio u02)",
+		.bt_adid       = "fw_adid_8800d80n_u02.bin",
+		.bt_patch      = "fw_patch_8800d80n_rf_u02.bin",
+		.bt_table      = "fw_patch_table_8800d80n_rf_u02.bin",
+		.wl_fw         = "lmacfw_rf_8800d80n.bin",
+		.bt_ext_patch  = "fw_patch_8800d80n_rf_u02_ext"
+	},
+};
+
+
 struct aicbsp_info_t aicbsp_info = {
 	.hwinfo_r = AICBSP_HWINFO_DEFAULT,
 	.hwinfo   = AICBSP_HWINFO_DEFAULT,
@@ -438,6 +459,7 @@ static void __exit aicbsp_exit(void)
 #endif
 	sysfs_remove_group(&(aicbsp_pdev->dev.kobj), &aicbsp_attribute_group);
 	platform_device_del(aicbsp_pdev);
+	platform_device_put(aicbsp_pdev);
 	platform_driver_unregister(&aicbsp_driver);
 	mutex_destroy(&aicbsp_power_lock);
 	aicbsp_resv_mem_deinit();

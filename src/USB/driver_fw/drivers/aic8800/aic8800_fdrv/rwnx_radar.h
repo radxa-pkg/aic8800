@@ -32,6 +32,34 @@ enum rwnx_radar_detector {
                                       radar to upper layer. */
 };
 
+
+/**
+ * struct pri_sequence - sequence of pulses matching one PRI
+ * @head: list_head
+ * @pri: pulse repetition interval (PRI) in usecs
+ * @dur: duration of sequence in usecs
+ * @count: number of pulses in this sequence
+ * @count_falses: number of not matching pulses in this sequence
+ * @first_ts: time stamp of first pulse in usecs
+ * @last_ts: time stamp of last pulse in usecs
+ * @deadline_ts: deadline when this sequence becomes invalid (first_ts + dur)
+ * @ppb_thresh: Number of pulses to validate detection
+ *              (need for weather radar whose value depends of pri)
+ */
+struct pri_sequence {
+    struct list_head head;
+    u32 pri;
+    u32 dur;
+    u32 count;
+    u32 count_falses;
+    u64 first_ts;
+    u64 last_ts;
+    u64 deadline_ts;
+    u8 ppb_thresh;
+};
+
+
+
 #ifdef CONFIG_RWNX_RADAR
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
@@ -82,11 +110,33 @@ struct rwnx_radar_detected {
     s16 freq[NX_NB_RADAR_DETECTED];
 };
 
-
+#define RWNX_RADAR_DUMP_EN  1
+#ifdef RWNX_RADAR_DUMP_EN
+#define RWNX_RADARR_DUMP_NB 32
+struct rwnx_radar_dump {
+    u32 cnt;
+    u32 idx;
+    u32 ps[RWNX_RADARR_DUMP_NB];
+    u64 tm[RWNX_RADARR_DUMP_NB];
+    u64 ts[RWNX_RADARR_DUMP_NB];
+};
+#endif
+enum rwnx_radar_status {
+    RWNX_RADAR_IDLE             = 0,
+    RWNX_RADAR_CAC_BUSY         = 1,
+    RWNX_RADAR_CAC_DONE         = 2,
+    RWNX_RADAR_INSERVICE_BUSY   = 3,
+    RWNX_RADAR_INSERVICE_DONE   = 4
+};
 struct rwnx_radar {
     struct rwnx_radar_pulses pulses[RWNX_RADAR_LAST];
     struct dfs_pattern_detector *dpd[RWNX_RADAR_LAST];
     struct rwnx_radar_detected detected[RWNX_RADAR_LAST];
+    #ifdef RWNX_RADAR_DUMP_EN
+    struct rwnx_radar_dump *rmem;
+    #endif
+    u16     status;
+    u16     sta_num;
     struct work_struct detection_work;  /* Work used to process radar pulses */
     spinlock_t lock;                    /* lock for pulses processing */
 
@@ -96,6 +146,10 @@ struct rwnx_radar {
     struct rwnx_vif *cac_vif;           /* vif on which we started CAC */
 #endif
 };
+
+void rwnx_radar_reset_rmem(struct rwnx_radar *radar);
+void rwnx_radar_init_rmem(struct rwnx_radar *radar);
+void rwnx_radar_deinit_rmem(struct rwnx_radar *radar);
 
 bool rwnx_radar_detection_init(struct rwnx_radar *radar);
 void rwnx_radar_detection_deinit(struct rwnx_radar *radar);
@@ -111,6 +165,9 @@ int  rwnx_radar_dump_pattern_detector(char *buf, size_t len,
                                       struct rwnx_radar *radar, u8 chain);
 int  rwnx_radar_dump_radar_detected(char *buf, size_t len,
                                     struct rwnx_radar *radar, u8 chain);
+struct pri_detector *pri_detector_init(struct dfs_pattern_detector *dpd,
+                                       u16 radar_type, u16 freq);
+void print_radar_detect_info(struct pri_detector *pde, struct pri_sequence *ps);
 
 #else
 

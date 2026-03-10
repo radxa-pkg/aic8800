@@ -149,6 +149,10 @@ struct rwnx_txhdr {
 	struct rwnx_hw_txhdr hw_hdr;
 };
 
+#ifdef CONFIG_BAND_STEERING
+void rwnx_probersp_work(struct work_struct *work);
+#endif
+
 u16 rwnx_select_txq(struct rwnx_vif *rwnx_vif, struct sk_buff *skb);
 netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0))

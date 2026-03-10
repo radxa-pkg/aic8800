@@ -77,6 +77,7 @@ struct snd_sco_cap_timer {
 	struct uart_sco_data *snd_data;
 	int snd_sco_length;
 	int sco_wr_length;
+	int cap_timer_en;
 };
 static struct snd_sco_cap_timer snd_cap_timer;
 static struct uart_sco_data p_uart_sco;
@@ -209,7 +210,7 @@ static bool sco_copy_capture_data_to_alsa(struct uart_sco_data *data, uint8_t* p
 static void sco_send_to_alsa_ringbuffer(uint8_t* p_data, int sco_length)
 {
     AIC_sco_card_t  *pSCOSnd = p_uart_sco.pSCOSnd;
-    int input_frames_num;
+    int input_frames_num = 0;
 #if AIC_SCO_PRINT
     printk("%s, alsa sco len %d\n", __func__,sco_length);
 #endif
@@ -245,7 +246,7 @@ void aic_snd_capture_timeout(struct timer_list *t)
 	uint8_t null_data[480];
 	struct uart_sco_data *p_data; 
 	AIC_sco_card_t  *pSCOSnd = p_uart_sco.pSCOSnd;
-	int input_frames_num;
+	int input_frames_num = 0;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
     p_data = (struct uart_sco_data *)data;
 #else
@@ -265,11 +266,13 @@ void aic_snd_capture_timeout(struct timer_list *t)
 #if AIC_SCO_PRINT
 	printk("%s enter\r\n", __func__);
 #endif
+	if(snd_cap_timer.cap_timer_en){
 #if USB_OR_UART
 	mod_timer(&snd_cap_timer.cap_timer,jiffies + msecs_to_jiffies(3));
 #else
 	mod_timer(&snd_cap_timer.cap_timer,jiffies + usecs_to_jiffies(7500));
 #endif
+	}
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
@@ -378,7 +381,7 @@ static int snd_sco_capture_pcm_open(struct snd_pcm_substream * substream)
 static int snd_sco_capture_pcm_close(struct snd_pcm_substream *substream)
 {
 	AIC_sco_card_t *pSCOSnd = substream->private_data;
-
+	snd_cap_timer.cap_timer_en = 0;
 	del_timer(&snd_cap_timer.cap_timer);
 	clear_bit(ALSA_CAPTURE_OPEN, &pSCOSnd->states);
 	return 0;
@@ -752,7 +755,7 @@ static ssize_t ioctl_read(struct file *file_p,
         loff_t *pos_p)
 {
     ssize_t ret = 0;
-    unsigned short temp_data[1024];
+    unsigned short temp_data[912];
     unsigned short *temp_ptr = NULL;
 
 	struct uart_sco_data *data = file_p->private_data;
@@ -863,6 +866,7 @@ static ssize_t ioctl_write(struct file *file_p,
 				//btchr_external_write(&data[1], (int)data[0]);
 				set_bit(USB_CAPTURE_RUNNING, &data->pSCOSnd->states);
 				set_bit(USB_PLAYBACK_RUNNING, &data->pSCOSnd->states);
+				snd_cap_timer.cap_timer_en = 0;
 				break;
 			case SET_UART_SCO_CLOSE:
 				printk("sco_uart_close\r\n");
@@ -875,6 +879,7 @@ static ssize_t ioctl_write(struct file *file_p,
 				}
 				if (test_bit(ALSA_CAPTURE_RUNNING, &data->pSCOSnd->states)) {
 					printk("%s: cap_timer start", __func__);
+					snd_cap_timer.cap_timer_en = 1;
 #if USB_OR_UART
 					mod_timer(&snd_cap_timer.cap_timer,jiffies + msecs_to_jiffies(3));
 #else

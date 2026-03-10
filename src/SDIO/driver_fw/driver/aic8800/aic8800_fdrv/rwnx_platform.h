@@ -58,6 +58,7 @@ typedef enum {
 	REGIONS_FCC,
 	REGIONS_ETSI,
 	REGIONS_JP,
+	REGIONS_KCC,
 	REGIONS_DEFAULT,
 } Regions_code;
 
@@ -140,7 +141,7 @@ u8 get_region_index(char * name);
 
 #ifdef CONFIG_POWER_LIMIT
 int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name);
-void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
+void rwnx_plat_powerlimit_parsing(char *buffer, int size);
 int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx);
 int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw);
 #endif

@@ -300,7 +300,11 @@ static int aicwf_sw_resume(void)
 
 			rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
 			dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
 			kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+			kfree(sw_txhdr);
+#endif
 			skb_pull(skb_tmp, RWNX_TX_HEADROOM);
 			consume_skb(skb_tmp);
 			rwnx_hw->ipc_env->txcfm[i] = NULL;
@@ -336,19 +340,29 @@ static int aicwf_resume_access(void)
 	struct rwnx_cmd *cur = NULL;
 	struct rwnx_cmd *nxt = NULL;
 #ifdef CONFIG_USB_BT
-    struct aicbt_patch_table *head = NULL;
-    struct aicbt_patch_info_t patch_info = {
-        .info_len          = 0,
-        .adid_addrinf      = 0,
-        .addr_adid         = 0,
-        .patch_addrinf     = 0,
-        .addr_patch        = 0,
-        .reset_addr        = 0,
-        .reset_val         = 0,
-        .adid_flag_addr    = 0,
-        .adid_flag         = 0,
-    };
+	struct aicbt_patch_table *head = NULL;
+	struct aicbt_patch_info_t patch_info = {
+		.info_len		   = 0,
+		.adid_addrinf	   = 0,
+		.addr_adid		   = 0,
+		.patch_addrinf	   = 0,
+		.addr_patch 	   = 0,
+		.reset_addr 	   = 0,
+		.reset_val		   = 0,
+		.adid_flag_addr    = 0,
+		.adid_flag		   = 0,
+	};
+#endif
 
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2 || rwnx_hw->pcidev->bar_count == 1) {
+		ret = aicwf_pcie_setst(rwnx_hw->pcidev);
+		if(ret) {
+			printk("%s: pci set&tst fail\n", __func__);
+		    //goto free;
+		}
+	}
+
+#ifdef CONFIG_USB_BT
     head = aicbt_patch_table_alloc(rwnx_hw, FW_PATCH_TABLE_NAME_8800D80_U02);
     if (head == NULL){
         printk("aicbt_patch_table_alloc fail\n");
@@ -374,20 +388,51 @@ static int aicwf_resume_access(void)
 		printk("%s load patch fail 2\n", __func__);
 		return -1;
 	}
+    if (aicbt_ext_patch_data_load(rwnx_hw, &patch_info)) {
+        return -1;
+    }
 	if (aicbt_patch_table_load(rwnx_hw, head)) {
         return -1;
     }
 	mdelay(15);
 #endif
 
-	ret = rwnx_plat_bin_fw_upload_2(rwnx_hw, RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_NAME);
-	if (ret) {
+	#ifndef CONFIG_ROM_PATCH_EN
+	#ifdef CONFIG_DOWNLOAD_FW
+    if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80) {
+        if (testmode == 0)
+            #ifdef CONFIG_USB_BT
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_BT_NAME);
+            #else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_FW_NAME);
+            #endif
+        else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_PCIE_RF_FW_NAME);
+    } else {
+        if (testmode == 0)
+            #ifdef CONFIG_USB_BT
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FW_BT_NAME);
+            #else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_FW_NAME);
+            #endif
+        else
+            ret = rwnx_plat_bin_fw_upload_2(rwnx_hw,RAM_FMAC_FW_ADDR, RWNX_8800D80X2_PCIE_RF_FW_NAME);
+    }
+	if (ret){
 		printk("resume fw load fail\n");
 		return ret;
 	}
 
-	patch_config(rwnx_hw);
+	if(rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)
+		patch_config(rwnx_hw);
+	else {
+		// tbd
+	}
+
 	pcie_reset_firmware(rwnx_hw, RAM_FMAC_FW_ADDR);
+
+	#endif /* !CONFIG_ROM_PATCH_EN */
+	#endif
 
 	aicwf_sw_resume();
 
@@ -408,10 +453,10 @@ static int aicwf_resume_access(void)
 
 	list_for_each_entry(rwnx_vif, &rwnx_hw->vifs, list) {
 		if (rwnx_vif->up) {
-			printk("find vif_up\n");
+			AICWFDBG(LOGINFO, "find vif_up vif_idx %d \n",rwnx_vif->vif_index);
 			rwnx_vif_param = rwnx_vif;
 			spin_lock_bh(&rwnx_hw->cb_lock);
-			rwnx_vif->vif_index = 0;
+			//rwnx_vif->vif_index = 0;
 			rwnx_hw->vif_table[0] = rwnx_vif;
 			spin_unlock_bh(&rwnx_hw->cb_lock);
 		}
@@ -716,7 +761,6 @@ static void aicwf_pcie_txdata_db(struct aic_pci_dev *pciedev)
 		writel(2, pciedev->emb_tpci + 0x0ec);
 	}
 }
-
 static int aicwf_pcie_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 {
 	int ret = -ENODEV;
@@ -728,14 +772,16 @@ static int aicwf_pcie_probe(struct pci_dev *pci_dev, const struct pci_device_id 
 	bus_if = kzalloc(sizeof(struct aicwf_bus), GFP_KERNEL);
 	if (!bus_if) {
 	 printk("alloc bus fail\n");
-	 return -ENOMEM;
+	 ret = -ENOMEM;
+	 goto out;
 	}
 
 	pciedev = kzalloc(sizeof(struct aic_pci_dev), GFP_KERNEL);
 	if (!pciedev) {
 	 printk("alloc pciedev fail\n");
 	 kfree(bus_if);
-	 return -ENOMEM;
+	 ret = -ENOMEM;
+	 goto out;
 	}
 
 	printk("pci_dev vendor:%04x device:%04x subvendor:%04x subdevice:%04x\n", pci_dev->vendor, pci_dev->device, pci_dev->subsystem_vendor, pci_dev->subsystem_device);
@@ -756,24 +802,54 @@ static int aicwf_pcie_probe(struct pci_dev *pci_dev, const struct pci_device_id 
 	ret = aicwf_pcie_init(pciedev);
 	if(ret) {
 		printk("%s: pci init fail\n", __func__);
-		return ret;
+		goto free;
 	}
 
 	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80X2 || pciedev->bar_count == 1) {
 		ret = aicwf_pcie_setst(pciedev);
 		if(ret) {
 			printk("%s: pci set&tst fail\n", __func__);
-			return ret;
+		    goto free;
 		}
 	}
 
-	aicwf_pcie_bus_init(pciedev);
+	ret = aicwf_pcie_bus_init(pciedev);
+	if(ret) {
+		printk("%s: pci bus init fail\n", __func__);
+		goto free;
+	}
 
 	ret = aicwf_pcie_platform_init(pciedev);
+	if(ret) {
+		printk("%s: pci plat init fail\n", __func__);
+		goto free;
+	}
 
-	if(!ret)
-		aicwf_hostif_ready();
+	aicwf_hostif_ready();
+	goto out;
 
+free:
+#ifdef CONFIG_WS
+	unregister_ws();
+#endif
+	free_irq(pci_dev->irq, pciedev);
+	pci_disable_device(pci_dev);
+	iounmap(pciedev->pci_bar0_vaddr);
+	if(pciedev->chip_id == PRODUCT_ID_AIC8800D80) {
+		iounmap(pciedev->pci_bar1_vaddr);
+		iounmap(pciedev->pci_bar2_vaddr);
+	}
+	pci_release_regions(pci_dev);
+	pci_clear_master(pci_dev);
+	pci_disable_msi(pci_dev);
+
+	if(pciedev->rx_priv)
+		aicwf_rx_deinit(pciedev->rx_priv);
+	kfree(bus_if);
+	if(g_rwnx_plat)
+		kfree(g_rwnx_plat);
+	kfree(pciedev);
+out:
 	return ret;
 }
 
@@ -829,8 +905,8 @@ static void aicwf_pcie_remove(struct pci_dev *pci_dev)
 #endif
 
 	kfree(bus_if);
-    if(g_rwnx_plat)
-        kfree(g_rwnx_plat);
+	if(g_rwnx_plat)
+		kfree(g_rwnx_plat);
 	kfree(pci);
 }
 
@@ -1098,7 +1174,7 @@ static struct aicwf_bus_ops aicwf_pcie_bus_ops = {
     .txmsg = aicwf_pcie_bus_txmsg,
 };
 
-void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
+int aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
 {
 	struct aicwf_bus *bus_if = pciedev->bus_if;
 	int ret;
@@ -1111,7 +1187,7 @@ void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
     rx_priv = aicwf_rx_init(pciedev);
     if(!rx_priv) {
         txrx_err("rx init failed\n");
-        //ret = -1;
+        ret = -1;
         //goto out_free_bus;
     }
     pciedev->rx_priv = rx_priv;
@@ -1148,6 +1224,7 @@ void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev)
 	ret = aicwf_bus_init(0, &pciedev->pci_dev->dev);
 	if(ret)
 		printk("%s fail\n", __func__);
+	return ret;
 }
 
 #endif

@@ -13,6 +13,7 @@
 
 #include <linux/pci.h>
 #include "lmac_msg.h"
+#include "aicwf_pcie.h"
 
 #define RWNX_CONFIG_FW_NAME             "rwnx_settings.ini"
 #define RWNX_PHY_CONFIG_TRD_NAME        "rwnx_trident.ini"
@@ -42,6 +43,7 @@
 #define RWNX_PCIE_FW_BT_NAME                "fmacfwbt_8800D80_pcie.bin"
 #define RWNX_PCIE_RF_FW_NAME                "lmacfw_rf_pcie.bin"
 #define FW_PATCH_BASE_NAME_8800D80_U02      "fw_patch_8800d80_u02.bin"
+#define FW_EXT_PATCH_BASE_NAME_8800D80_U02  "fw_patch_8800d80_u02_ext"
 #define FW_ADID_BASE_NAME_8800D80_U02       "fw_adid_8800d80_u02.bin"
 #define FW_PATCH_TABLE_NAME_8800D80_U02     "fw_patch_table_8800d80_u02.bin"
 
@@ -75,6 +77,7 @@ typedef enum {
 	REGIONS_FCC,
 	REGIONS_ETSI,
 	REGIONS_JP,
+	REGIONS_KCC,
 	REGIONS_DEFAULT,
 } Regions_code;
 
@@ -167,6 +170,14 @@ static inline unsigned int rwnx_platform_get_irq(struct rwnx_plat *rwnx_plat)
 }
 
 #ifdef CONFIG_USB_BT
+
+struct bt_patch_file_name{
+        const char *fw_adid;
+        const char *fw_patch;
+        const char *fw_patch_table;
+        const char *bt_ext_patch;
+};
+
 struct aicbt_patch_table {
 	char     *name;
 	uint32_t type;
@@ -185,15 +196,22 @@ struct aicbt_info_t {
 };
 
 struct aicbt_patch_info_t {
-       uint32_t info_len;
-       uint32_t adid_addrinf;
-	uint32_t addr_adid;
-       uint32_t patch_addrinf;
-	uint32_t addr_patch;
-	uint32_t reset_addr;
-	uint32_t reset_val;
-	uint32_t adid_flag_addr;
-	uint32_t adid_flag;
+    uint32_t info_len;
+//base len start
+    uint32_t adid_addrinf;
+    uint32_t addr_adid;
+    uint32_t patch_addrinf;
+    uint32_t addr_patch;
+    uint32_t reset_addr;
+    uint32_t reset_val;
+    uint32_t adid_flag_addr;
+    uint32_t adid_flag;
+//base len end
+//ext patch nb
+    uint32_t ext_patch_nb_addr;
+    uint32_t ext_patch_nb;
+    uint32_t *ext_patch_param;
+
 };
 
 struct aicbsp_info_t {
@@ -277,6 +295,7 @@ int aicbt_patch_table_free(struct aicbt_patch_table *head);
 struct aicbt_patch_table *aicbt_patch_table_alloc(struct rwnx_hw *rwnx_hw, const char *filename);
 int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *_head);
 int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_patch_table *head_t);
+int aicbt_ext_patch_data_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_info_t *patch_info);
 int rwnx_plat_bin_fw_patch_table_upload_android(struct rwnx_hw *rwnx_hw, char *filename);
 int patch_config(struct rwnx_hw *rwnx_hw);
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr);
@@ -287,7 +306,7 @@ u8 get_region_index(char * name);
 
 #ifdef CONFIG_POWER_LIMIT
 int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit, char *name);
-void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc);
+void rwnx_plat_powerlimit_parsing(char *buffer, int size);
 int8_t get_powerlimit_by_freq(uint8_t band, uint16_t freq, uint8_t r_idx);
 int8_t get_powerlimit_by_chnum(uint8_t chnum, uint8_t r_idx, uint8_t bw);
 #endif

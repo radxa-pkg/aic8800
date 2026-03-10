@@ -49,7 +49,24 @@ extern char aic_fw_path_8800d80x2[FW_PATH_MAX_LEN];
 #define PRINT 2
 #define GET_VALUE 3
 
-
+#ifdef CONFIG_USB_BT
+struct bt_patch_file_name bt_patch_name[] = {
+    [PRODUCT_ID_AIC8800D80-PRODUCT_ID_AIC8800D80] = {
+        .fw_adid           = FW_ADID_BASE_NAME_8800D80_U02,
+        .fw_patch          = FW_PATCH_BASE_NAME_8800D80_U02,
+        .fw_patch_table    = FW_PATCH_TABLE_NAME_8800D80_U02,
+        .bt_ext_patch      = FW_EXT_PATCH_BASE_NAME_8800D80_U02,
+    },
+/*
+    [PRODUCT_ID_AIC8800D80X2-PRODUCT_ID_AIC8800D80] = {
+        .fw_adid           = FW_ADID_BASE_NAME_8800D80X2_U05,
+        .fw_patch          = FW_PATCH_BASE_NAME_8800D80X2_U05,
+        .fw_patch_table    = FW_PATCH_TABLE_NAME_8800D80X2_U05,
+        .bt_ext_patch      = FW_EXT_PATCH_BASE_NAME_8800D80X2_U05,
+    },
+*/
+};
+#endif
 
 struct rwnx_plat *g_rwnx_plat;
 
@@ -200,6 +217,7 @@ reg_table reg_tables[] = {
 	{.ccode = "CL", .region = REGIONS_ETSI},
 	{.ccode = "CO", .region = REGIONS_FCC},
 	{.ccode = "CR", .region = REGIONS_FCC},
+	{.ccode = "CU", .region = REGIONS_FCC},
 	{.ccode = "CX", .region = REGIONS_FCC},
 	{.ccode = "CY", .region = REGIONS_ETSI},
 	{.ccode = "CZ", .region = REGIONS_ETSI},
@@ -224,7 +242,7 @@ reg_table reg_tables[] = {
 	{.ccode = "GL", .region = REGIONS_ETSI},
 	{.ccode = "GP", .region = REGIONS_ETSI},
 	{.ccode = "GR", .region = REGIONS_ETSI},
-	{.ccode = "GT", .region = REGIONS_FCC},
+	{.ccode = "GT", .region = REGIONS_DEFAULT},
 	{.ccode = "GU", .region = REGIONS_FCC},
 	{.ccode = "GY", .region = REGIONS_DEFAULT},
 	{.ccode = "HK", .region = REGIONS_ETSI},
@@ -237,7 +255,7 @@ reg_table reg_tables[] = {
 	{.ccode = "IL", .region = REGIONS_ETSI},
 	{.ccode = "IN", .region = REGIONS_ETSI},
 	{.ccode = "IQ", .region = REGIONS_ETSI},
-	{.ccode = "IR", .region = REGIONS_JP},
+	{.ccode = "IR", .region = REGIONS_ETSI},
 	{.ccode = "IS", .region = REGIONS_ETSI},
 	{.ccode = "IT", .region = REGIONS_ETSI},
 	{.ccode = "JM", .region = REGIONS_FCC},
@@ -247,7 +265,7 @@ reg_table reg_tables[] = {
 	{.ccode = "KH", .region = REGIONS_ETSI},
 	{.ccode = "KN", .region = REGIONS_ETSI},
 	{.ccode = "KP", .region = REGIONS_JP},
-	{.ccode = "KR", .region = REGIONS_ETSI},
+	{.ccode = "KR", .region = REGIONS_KCC},
 	{.ccode = "KW", .region = REGIONS_ETSI},
 	{.ccode = "KY", .region = REGIONS_FCC},
 	{.ccode = "KZ", .region = REGIONS_DEFAULT},
@@ -291,7 +309,7 @@ reg_table reg_tables[] = {
 	{.ccode = "PF", .region = REGIONS_ETSI},
 	{.ccode = "PG", .region = REGIONS_FCC},
 	{.ccode = "PH", .region = REGIONS_FCC},
-	{.ccode = "PK", .region = REGIONS_ETSI},
+	{.ccode = "PK", .region = REGIONS_DEFAULT},
 	{.ccode = "PL", .region = REGIONS_ETSI},
 	{.ccode = "PM", .region = REGIONS_ETSI},
 	{.ccode = "PR", .region = REGIONS_FCC},
@@ -313,7 +331,7 @@ reg_table reg_tables[] = {
 	{.ccode = "SN", .region = REGIONS_FCC},
 	{.ccode = "SR", .region = REGIONS_ETSI},
 	{.ccode = "SV", .region = REGIONS_FCC},
-	{.ccode = "SY", .region = REGIONS_DEFAULT},
+	{.ccode = "SY", .region = REGIONS_ETSI},
 	{.ccode = "TC", .region = REGIONS_FCC},
 	{.ccode = "TD", .region = REGIONS_ETSI},
 	{.ccode = "TG", .region = REGIONS_ETSI},
@@ -324,6 +342,7 @@ reg_table reg_tables[] = {
 	{.ccode = "TR", .region = REGIONS_ETSI},
 	{.ccode = "TT", .region = REGIONS_FCC},
 	{.ccode = "TW", .region = REGIONS_FCC},
+	{.ccode = "TZ", .region = REGIONS_ETSI},
 	{.ccode = "UA", .region = REGIONS_ETSI},
 	{.ccode = "UG", .region = REGIONS_FCC},
 	{.ccode = "UY", .region = REGIONS_FCC},
@@ -334,10 +353,13 @@ reg_table reg_tables[] = {
 	{.ccode = "VN", .region = REGIONS_JP},
 	{.ccode = "VU", .region = REGIONS_FCC},
 	{.ccode = "WF", .region = REGIONS_ETSI},
+	{.ccode = "WS", .region = REGIONS_ETSI},
 	{.ccode = "YE", .region = REGIONS_DEFAULT},
 	{.ccode = "YT", .region = REGIONS_ETSI},
 	{.ccode = "ZA", .region = REGIONS_ETSI},
 	{.ccode = "ZM", .region = REGIONS_ETSI},
+	{.ccode = "FO", .region = REGIONS_ETSI},
+	{.ccode = "FK", .region = REGIONS_ETSI},
 	{.ccode = "ZW", .region = REGIONS_ETSI},
 };
 
@@ -369,11 +391,14 @@ u8 get_region_index(char * name)
 		return REGIONS_ETSI;
 	else if (strncmp(name, "JP", 2) == 0)
 		return REGIONS_JP;
+	else if (strncmp(name, "KCC", 3) == 0)
+		return REGIONS_KCC;
 	else if (strncmp(name, "UNSET", 5) == 0)
 		return REGIONS_DEFAULT;
 
 	return REGIONS_DEFAULT;
 }
+
 
 
 #ifdef CONFIG_POWER_LIMIT
@@ -383,7 +408,7 @@ u8 get_region_index(char * name)
 
 #define MAX_2_4G_BW_NUM    2
 #define MAX_5G_BW_NUM      3
-#define MAX_REGION_NUM            5
+#define MAX_REGION_NUM     6
 
 
 typedef struct
@@ -429,17 +454,22 @@ typedef struct {
 #define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
 #define USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG    (0x01U << 3)
 #define USER_HE_MU_EDCA_UPDATE_DISABLE_FLAG     (0x01U << 4)
+#define USER_LOFT_CALIB_DISABLE_FLAG    (0x01U << 6)
+#define USER_CAPA_CALIB_DISABLE_FLAG    (0x01U << 7)
+#define USER_PWR_CALIB_DISABLE_FLAG     (0x01U << 8)
+#define USER_IPA_CALIB_DISABLE_FLAG     (0x01U << 13)
 
-#define CFG_PWROFST_COVER_CALIB     1
-#ifdef CONFIG_POWER_LIMIT
-#define CFG_USER_CHAN_MAX_TXPWR_EN  1
-#else
-#define CFG_USER_CHAN_MAX_TXPWR_EN  0
-#endif
-#define CFG_USER_TX_USE_ANA_F       0
-#define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE	0
+#define USER_EXT_FLAGS_DEFAULT_D80      (USER_PWROFST_COVER_CALIB_FLAG)
 
-#define CFG_USER_EXT_FLAGS_EN   (CFG_PWROFST_COVER_CALIB || CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F || CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE)
+#define CFG_USER_PWROFST_COVER_CALIB_EN     (1)
+#define CFG_USER_CHAN_MAX_TXPWR_EN          (defined(CONFIG_POWER_LIMIT))
+#define CFG_USER_TX_USE_ANA_F_EN            (0)
+#define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE (defined(CONFIG_PRBREQ_REPORT))
+#define CFG_USER_HE_MU_EDCA_UPDATE_DISABLE  (0)
+#define CFG_USER_LOFT_CALIB_DISABLE_DISABLE (0)
+#define CFG_USER_CAPA_CALIB_DISABLE_DISABLE (0)
+#define CFG_USER_PWR_CALIB_DISABLE_DISABLE  (0)
+#define CFG_USER_IPA_CALIB_DISABLE_DISABLE  (0)
 
 u32 adaptivity_patch_tbl_8800d80[][2] = {
 	{0x000C, 0x0000320A}, //linkloss_thd
@@ -453,29 +483,45 @@ u32 adaptivity_patch_tbl_8800d80_tp[][2] = {
 };
 
 u32 patch_tbl_8800d80[][2] = {
-#if CFG_USER_EXT_FLAGS_EN
-	{0x0188, 0x00000000
-#if CFG_PWROFST_COVER_CALIB
-		| USER_PWROFST_COVER_CALIB_FLAG
-#endif
-#if CFG_USER_CHAN_MAX_TXPWR_EN
-		| USER_CHAN_MAX_TXPWR_EN_FLAG
-#endif
-#if CFG_USER_TX_USE_ANA_F
-		| USER_TX_USE_ANA_F_FLAG
-#endif
-#if CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE
-		| USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG
-#endif
-	}, // user_ext_flags
+    {0x0188,
+        (USER_EXT_FLAGS_DEFAULT_D80 |
+            #if CFG_USER_CHAN_MAX_TXPWR_EN
+            USER_CHAN_MAX_TXPWR_EN_FLAG |
+            #endif
+            #if CFG_USER_TX_USE_ANA_F_EN
+            USER_TX_USE_ANA_F_FLAG |
+            #endif
+            #if CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE
+            USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_HE_MU_EDCA_UPDATE_DISABLE
+            USER_HE_MU_EDCA_UPDATE_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_LOFT_CALIB_DISABLE_DISABLE
+            USER_LOFT_CALIB_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_CAPA_CALIB_DISABLE_DISABLE
+            USER_CAPA_CALIB_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_PWR_CALIB_DISABLE_DISABLE
+            USER_PWR_CALIB_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_IPA_CALIB_DISABLE_DISABLE
+            USER_IPA_CALIB_DISABLE_FLAG |
+            #endif
+        0) & ~(
+            #if !CFG_USER_PWROFST_COVER_CALIB_EN
+            USER_PWROFST_COVER_CALIB_FLAG |
+            #endif
+        0)
+    }, // user_ext_flags
 #ifdef CONFIG_LOWPOWER
     {0x01a0, 0x00000100}
 #endif
-#endif
 
-	#ifdef CONFIG_RADAR_OR_IR_DETECT
-	{0x0019c,0x00000100},
-	#endif
+#ifdef CONFIG_RADAR_OR_IR_DETECT
+	{0x0019c,0x00000900}, //0x00000500 or 0x00004B00
+#endif
 };
 
 u32 patch_tbl_8800d80_tp[][2] = {
@@ -706,7 +752,7 @@ static int rwnx_load_firmware(struct rwnx_hw *rwnx_hw, u32 **fw_buf, const char 
     }
 
     /* start to read from firmware file */
-    buffer = kzalloc(size, GFP_KERNEL);
+    buffer = kzalloc(size + 1, GFP_KERNEL);
     if (!buffer) {
         *fw_buf = NULL;
         __putname(path);
@@ -721,6 +767,7 @@ static int rwnx_load_firmware(struct rwnx_hw *rwnx_hw, u32 **fw_buf, const char 
     rdlen = kernel_read(fp, fp->f_pos, buffer, size);
     #endif
 
+    *((char*)buffer + size) = 0;
     if (size != rdlen) {
         AICWFDBG(LOGERROR, "%s: %s file rdlen invalid %d\n", __func__, name, (int)rdlen);
         *fw_buf = NULL;
@@ -2797,7 +2844,7 @@ int8_t rwnx_plat_powerlimit_save(u8_l band, char *channel, u8_l bw, char *limit,
 	return 0;
 }
 
-void rwnx_plat_powerlimit_parsing(char *buffer, int size, char *cc)
+void rwnx_plat_powerlimit_parsing(char *buffer, int size)
 {
 #define LD_STAGE_EXC_MAPPING    0
 #define LD_STAGE_TAB_DEFINE     1
@@ -3255,7 +3302,7 @@ int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *_h
 			*(data + 9) = aicbt_info.btport;
 			*(data + 11) = aicbt_info.uart_baud;
 			*(data + 13) = aicbt_info.uart_flowctrl;
-			*(data + 15) = aicbt_info.lpm_enable;
+			*(data + 15) = (aicbsp_info.cpmode == AICBSP_CPMODE_WORK?aicbt_info.lpm_enable:0);
 			*(data + 17) = aicbt_info.txpwr_lvl;
 
 		}
@@ -3294,7 +3341,8 @@ int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *_h
 			data += 2;
 		}
 		if (p->type == AICBT_PT_PWRON)
-			udelay(500);
+			mdelay(100);
+		//	udelay(500);
 	}
 
 exit:
@@ -3302,15 +3350,110 @@ exit:
 	return ret;
 }
 
+
+int aicbt_ext_patch_data_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_info_t *patch_info)
+{
+	int ret = 0;
+	uint32_t ext_patch_nb = patch_info->ext_patch_nb;
+	char ext_patch_file_name[50];
+	int index = 0;
+	uint32_t id = 0;
+	uint32_t addr = 0;
+	u8  rem = 1;
+	uint32_t mem_w_add = 0;
+	uint32_t mem_w_data = 0;
+
+	if (ext_patch_nb > 0){
+		if ((rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80X2) || (rwnx_hw->pcidev->chip_id == PRODUCT_ID_AIC8800D80)) {
+				AICWFDBG(LOGDEBUG, "[0x40480000]: 0x00040220\n");
+				mem_w_add = 0x40580000;
+				mem_w_data = 0x00040220;
+				volatile u32 *mem_addr;
+				int bar_index;
+				AICWFDBG(LOGDEBUG, "%s addr:0x%x data:0x%x \n", __func__, mem_w_add, mem_w_data);
+				if (rwnx_hw->pcidev->bar_count == 1) {
+					ret = aicwf_pcie_tran(rwnx_hw->pcidev, (void*)mem_w_add, &mem_w_data, 4, AIC_TRAN_DRV2EMB, rem);
+					if (ret) {
+						printk("%s fail: %x, err:%d\r\n", __func__, mem_w_add, ret);
+						return ret;
+					}
+				} else {
+					if (mem_w_add < 0x40000000) {
+						mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar0_vaddr + mem_w_add - 0);
+						bar_index = 0;
+					} else if (mem_w_add < 0x40700000) {
+						mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar1_vaddr + mem_w_add - 0x40000000);
+						bar_index = 1;
+					} else {
+						mem_addr = (volatile u32 *) (rwnx_hw->pcidev->pci_bar2_vaddr + mem_w_add - 0x40700000);
+						bar_index = 2;
+					}
+					//printk("%s addr:0x%x data:0x%x bar%d\n", __func__, mem_w_add, mem_w_data, bar_index);
+					*mem_addr = (uint32_t) &mem_w_data;
+				}
+		}
+		for (index = 0; index < patch_info->ext_patch_nb; index++){
+			id = *(patch_info->ext_patch_param + (index * 2));
+			addr = *(patch_info->ext_patch_param + (index * 2) + 1);
+			memset(ext_patch_file_name, 0, sizeof(ext_patch_file_name));
+			sprintf(ext_patch_file_name,"%s%d.bin",
+					bt_patch_name[rwnx_hw->pcidev->chip_id - PRODUCT_ID_AIC8800D80].bt_ext_patch,
+					id);
+			AICWFDBG(LOGDEBUG, "%s ext_patch_file_name:%s ext_patch_id:%x ext_patch_addr:%x \r\n",
+					__func__,ext_patch_file_name, id, addr);
+
+			if (rwnx_plat_bin_fw_upload_2(rwnx_hw, addr, ext_patch_file_name)) {
+				ret = -1;
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
 int aicbt_patch_info_unpack(struct aicbt_patch_info_t *patch_info, struct aicbt_patch_table *head_t)
 {
+    uint8_t *patch_info_array = (uint8_t*)patch_info;
+    int base_len = 0;
+    int memcpy_len = 0;
+
     if (AICBT_PT_INF == head_t->type) {
-        patch_info->info_len = head_t->len;
-        if(patch_info->info_len == 0)
+        base_len = ((offsetof(struct aicbt_patch_info_t,  ext_patch_nb_addr) - offsetof(struct aicbt_patch_info_t,  adid_addrinf) )/sizeof(uint32_t))/2;
+        AICWFDBG(LOGDEBUG, "%s head_t->len:%d base_len:%d \r\n", __func__, head_t->len, base_len);
+
+        if (head_t->len > base_len){
+            patch_info->info_len = base_len;
+            memcpy_len = patch_info->info_len + 1;//include ext patch nb
+        } else{
+            patch_info->info_len = head_t->len;
+            memcpy_len = patch_info->info_len;
+        }
+        head_t->len = patch_info->info_len;
+        AICWFDBG(LOGDEBUG, "%s memcpy_len:%d \r\n", __func__, memcpy_len);
+
+        if (patch_info->info_len == 0)
             return 0;
-        memcpy(&patch_info->adid_addrinf, head_t->data, patch_info->info_len * sizeof(uint32_t) * 2);
+
+        memcpy(((patch_info_array) + sizeof(patch_info->info_len)),
+            head_t->data,
+            memcpy_len * sizeof(uint32_t) * 2);
+        AICWFDBG(LOGDEBUG, "%s adid_addrinf:%x addr_adid:%x \r\n", __func__,
+            ((struct aicbt_patch_info_t *)patch_info_array)->adid_addrinf,
+            ((struct aicbt_patch_info_t *)patch_info_array)->addr_adid);
+
+        if (patch_info->ext_patch_nb > 0){
+            int index = 0;
+            patch_info->ext_patch_param = (uint32_t *)(head_t->data + ((memcpy_len) * 2));
+            for(index = 0; index < patch_info->ext_patch_nb; index++){
+                AICWFDBG(LOGDEBUG, "%s id:%x addr:%x \r\n", __func__,
+                    *(patch_info->ext_patch_param + (index * 2)),
+                    *(patch_info->ext_patch_param + (index * 2) + 1));
+            }
+        }
+
     }
     return 0;
+
 }
 
 int rwnx_plat_bin_fw_patch_table_upload_android(struct rwnx_hw *rwnx_hw, char *filename)
@@ -3579,6 +3722,9 @@ int rwnx_platform_on(struct rwnx_hw *rwnx_hw, void *config)
             return -1;
         }
         if(rwnx_plat_bin_fw_upload_2(rwnx_hw, patch_info.addr_patch, FW_PATCH_BASE_NAME_8800D80_U02)) {
+            return -1;
+        }
+        if (aicbt_ext_patch_data_load(rwnx_hw, &patch_info)) {
             return -1;
         }
         if (aicbt_patch_table_load(rwnx_hw, head)) {

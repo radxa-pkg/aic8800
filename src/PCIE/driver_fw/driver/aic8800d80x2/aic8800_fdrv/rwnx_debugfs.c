@@ -1804,7 +1804,7 @@ static void idx_to_rate_cfg1(unsigned int formatmod,
 		case FORMATMOD_NON_HT:
 		{
 			r_cfg->formatModTx = formatmod;
-			r_cfg->giAndPreTypeTx = 1;
+			r_cfg->giAndPreTypeTx = 2;
 			r_cfg->mcsIndexTx = mcs;
             break;
 		}
@@ -1828,6 +1828,7 @@ static void idx_to_rate_cfg1(unsigned int formatmod,
         }
         case FORMATMOD_VHT:
         case FORMATMOD_HE_SU:
+		case FORMATMOD_HE_ER:
         {
 			union rwnx_mcs_index *r = (union rwnx_mcs_index *)r_cfg;
 

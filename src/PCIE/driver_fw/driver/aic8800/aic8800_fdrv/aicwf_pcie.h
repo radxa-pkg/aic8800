@@ -100,7 +100,7 @@ void aicwf_netif_ctrl(struct aic_pci_dev *pcidev, int val);
 
 int aicwf_pcie_register_drv(void);
 void aicwf_pcie_unregister_drv(void);
-void aicwf_pcie_bus_init(struct aic_pci_dev *pciedev);
+int aicwf_pcie_bus_init(struct aic_pci_dev *pciedev);
 int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr, char *filename);
 int patch_config(struct rwnx_hw *rwnx_hw);
 int pcie_reset_firmware(struct rwnx_hw *rwnx_hw, u32 fw_addr);

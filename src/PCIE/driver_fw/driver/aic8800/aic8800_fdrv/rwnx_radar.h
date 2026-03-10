@@ -19,17 +19,17 @@ struct rwnx_vif;
 struct rwnx_hw;
 
 enum rwnx_radar_chain {
-	RWNX_RADAR_RIU = 0,
-	RWNX_RADAR_FCU,
-	RWNX_RADAR_LAST
+    RWNX_RADAR_RIU = 0,
+    RWNX_RADAR_FCU,
+    RWNX_RADAR_LAST
 };
 
 enum rwnx_radar_detector {
-	RWNX_RADAR_DETECT_DISABLE = 0, /* Ignore radar pulses */
-	RWNX_RADAR_DETECT_ENABLE  = 1, /* Process pattern detection but do not
-									  report radar to upper layer (for test) */
-	RWNX_RADAR_DETECT_REPORT  = 2  /* Process pattern detection and report
-									  radar to upper layer. */
+    RWNX_RADAR_DETECT_DISABLE = 0, /* Ignore radar pulses */
+    RWNX_RADAR_DETECT_ENABLE  = 1, /* Process pattern detection but do not
+                                      report radar to upper layer (for test) */
+    RWNX_RADAR_DETECT_REPORT  = 2  /* Process pattern detection and report
+                                      radar to upper layer. */
 };
 
 #ifdef CONFIG_RWNX_RADAR
@@ -45,10 +45,10 @@ enum rwnx_radar_detector {
  * @buffer: buffer of pulses
  */
 struct rwnx_radar_pulses {
-	/* Last radar pulses received */
-	int index;
-	int count;
-	u32 buffer[RWNX_RADAR_PULSE_MAX];
+    /* Last radar pulses received */
+    int index;
+    int count;
+    u32 buffer[RWNX_RADAR_PULSE_MAX];
 };
 
 /**
@@ -61,13 +61,13 @@ struct rwnx_radar_pulses {
  * @channel_detectors: list connecting channel_detector elements
  */
 struct dfs_pattern_detector {
-	u8 enabled;
-	enum nl80211_dfs_regions region;
-	u8 num_radar_types;
-	u64 last_pulse_ts;
-	u32 prev_jiffies;
-	const struct radar_detector_specs *radar_spec;
-	struct list_head detectors[];
+    u8 enabled;
+    enum nl80211_dfs_regions region;
+    u8 num_radar_types;
+    u64 last_pulse_ts;
+    u32 prev_jiffies;
+    const struct radar_detector_specs *radar_spec;
+    struct list_head detectors[];
 };
 
 #define NX_NB_RADAR_DETECTED 4
@@ -76,41 +76,67 @@ struct dfs_pattern_detector {
  * struct rwnx_radar_detected - List of radar detected
  */
 struct rwnx_radar_detected {
-	u16 index;
-	u16 count;
-	s64 time[NX_NB_RADAR_DETECTED];
-	s16 freq[NX_NB_RADAR_DETECTED];
+    u16 index;
+    u16 count;
+    s64 time[NX_NB_RADAR_DETECTED];
+    s16 freq[NX_NB_RADAR_DETECTED];
 };
 
-
+#define RWNX_RADAR_DUMP_EN  1
+#ifdef RWNX_RADAR_DUMP_EN
+#define RWNX_RADARR_DUMP_NB 32
+struct rwnx_radar_dump {
+    u32 cnt;
+    u32 idx;
+    u32 ps[RWNX_RADARR_DUMP_NB];
+    u64 tm[RWNX_RADARR_DUMP_NB];
+    u64 ts[RWNX_RADARR_DUMP_NB];
+};
+#endif
+enum rwnx_radar_status {
+    RWNX_RADAR_IDLE             = 0,
+    RWNX_RADAR_CAC_BUSY         = 1,
+    RWNX_RADAR_CAC_DONE         = 2,
+    RWNX_RADAR_INSERVICE_BUSY   = 3,
+    RWNX_RADAR_INSERVICE_DONE   = 4
+};
 struct rwnx_radar {
-	struct rwnx_radar_pulses pulses[RWNX_RADAR_LAST];
-	struct dfs_pattern_detector *dpd[RWNX_RADAR_LAST];
-	struct rwnx_radar_detected detected[RWNX_RADAR_LAST];
-	struct work_struct detection_work;  /* Work used to process radar pulses */
-	spinlock_t lock;                    /* lock for pulses processing */
+    struct rwnx_radar_pulses pulses[RWNX_RADAR_LAST];
+    struct dfs_pattern_detector *dpd[RWNX_RADAR_LAST];
+    struct rwnx_radar_detected detected[RWNX_RADAR_LAST];
+    #ifdef RWNX_RADAR_DUMP_EN
+    struct rwnx_radar_dump *rmem;
+    #endif
+    u16     status;
+    u16     sta_num;
+    struct work_struct detection_work;  /* Work used to process radar pulses */
+    spinlock_t lock;                    /* lock for pulses processing */
 
-	/* In softmac cac is handled by mac80211 */
+    /* In softmac cac is handled by mac80211 */
 #ifdef CONFIG_RWNX_FULLMAC
-	struct delayed_work cac_work;       /* Work used to handle CAC */
-	struct rwnx_vif *cac_vif;           /* vif on which we started CAC */
+    struct delayed_work cac_work;       /* Work used to handle CAC */
+    struct rwnx_vif *cac_vif;           /* vif on which we started CAC */
 #endif
 };
+
+void rwnx_radar_reset_rmem(struct rwnx_radar *radar);
+void rwnx_radar_init_rmem(struct rwnx_radar *radar);
+void rwnx_radar_deinit_rmem(struct rwnx_radar *radar);
 
 bool rwnx_radar_detection_init(struct rwnx_radar *radar);
 void rwnx_radar_detection_deinit(struct rwnx_radar *radar);
 bool rwnx_radar_set_domain(struct rwnx_radar *radar,
-						   enum nl80211_dfs_regions region);
+                           enum nl80211_dfs_regions region);
 void rwnx_radar_detection_enable(struct rwnx_radar *radar, u8 enable, u8 chain);
 bool rwnx_radar_detection_is_enable(struct rwnx_radar *radar, u8 chain);
 void rwnx_radar_start_cac(struct rwnx_radar *radar, u32 cac_time_ms,
-						  struct rwnx_vif *vif);
+                          struct rwnx_vif *vif);
 void rwnx_radar_cancel_cac(struct rwnx_radar *radar);
 void rwnx_radar_detection_enable_on_cur_channel(struct rwnx_hw *rwnx_hw);
 int  rwnx_radar_dump_pattern_detector(char *buf, size_t len,
-									  struct rwnx_radar *radar, u8 chain);
+                                      struct rwnx_radar *radar, u8 chain);
 int  rwnx_radar_dump_radar_detected(char *buf, size_t len,
-									struct rwnx_radar *radar, u8 chain);
+                                    struct rwnx_radar *radar, u8 chain);
 
 #else
 
@@ -124,19 +150,19 @@ static inline void rwnx_radar_detection_deinit(struct rwnx_radar *radar)
 {}
 
 static inline bool rwnx_radar_set_domain(struct rwnx_radar *radar,
-										 enum nl80211_dfs_regions region)
+                                         enum nl80211_dfs_regions region)
 {return true; }
 
 static inline void rwnx_radar_detection_enable(struct rwnx_radar *radar,
-											   u8 enable, u8 chain)
+                                               u8 enable, u8 chain)
 {}
 
 static inline bool rwnx_radar_detection_is_enable(struct rwnx_radar *radar,
-												 u8 chain)
+                                                 u8 chain)
 {return false; }
 
 static inline void rwnx_radar_start_cac(struct rwnx_radar *radar,
-										u32 cac_time_ms, struct rwnx_vif *vif)
+                                        u32 cac_time_ms, struct rwnx_vif *vif)
 {}
 
 static inline void rwnx_radar_cancel_cac(struct rwnx_radar *radar)
@@ -146,13 +172,13 @@ static inline void rwnx_radar_detection_enable_on_cur_channel(struct rwnx_hw *rw
 {}
 
 static inline int rwnx_radar_dump_pattern_detector(char *buf, size_t len,
-												   struct rwnx_radar *radar,
-												   u8 chain)
+                                                   struct rwnx_radar *radar,
+                                                   u8 chain)
 {return 0; }
 
 static inline int rwnx_radar_dump_radar_detected(char *buf, size_t len,
-												 struct rwnx_radar *radar,
-												 u8 chain)
+                                                 struct rwnx_radar *radar,
+                                                 u8 chain)
 {return 0; }
 
 #endif /* CONFIG_RWNX_RADAR */

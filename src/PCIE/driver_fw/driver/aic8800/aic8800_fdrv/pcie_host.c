@@ -150,7 +150,11 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 		struct sk_buff *skb_tmp = sw_txhdr->skb;
 		rwnx_ipc_buf_a2e_release(rwnx_hw, txcfm_buf);
 		//dma_unmap_single(rwnx_hw->dev, sw_txhdr->ipc_hostdesc.dma_addr, sw_txhdr->ipc_hostdesc.size, DMA_TO_DEVICE);
+#ifdef CONFIG_CACHE_GUARD
 		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
 		skb_pull(skb_tmp, RWNX_TX_HEADROOM);
 		consume_skb(skb_tmp);
 		atomic_dec(&rwnx_hw->txdata_cnt);

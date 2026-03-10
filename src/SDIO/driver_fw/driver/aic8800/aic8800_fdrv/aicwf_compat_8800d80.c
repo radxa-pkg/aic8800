@@ -4,8 +4,11 @@
 #include "aicwf_compat_8800d80.h"
 
 #define FW_USERCONFIG_NAME_8800D80         "aic_userconfig_8800d80.txt"
+#define FW_USERCONFIG_NAME_8800D80N        "aic_userconfig_8800d80n.txt"
 #define FW_USERCONFIG_NAME_8800D80X2       "aic_userconfig_8800d80x2.txt"
+
 #define FW_POWERLIMIT_NAME_8800D80         "aic_powerlimit_8800d80.txt"
+#define FW_POWERLIMIT_NAME_8800D80N        "aic_powerlimit_8800d80n.txt"
 
 
 int rwnx_request_firmware_common(struct rwnx_hw *rwnx_hw,
@@ -20,7 +23,9 @@ int aicwf_set_rf_config_8800d80(struct rwnx_hw *rwnx_hw, struct mm_set_rf_calib_
 {
 	int ret = 0;
 
-	if(rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80){
+	if(rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
+		rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80N ||
+		rwnx_hw->sdiodev->chipid == PRODUCT_ID_AIC8800D80WN){
 		if ((ret = rwnx_send_txpwr_lvl_v3_req(rwnx_hw))) {
 			return -1;
 		}
@@ -68,6 +73,33 @@ int	rwnx_plat_userconfig_load_8800d80(struct rwnx_hw *rwnx_hw)
     AICWFDBG(LOGINFO, "### Load file done: %s, size=%d\n", filename, size);
 
 	rwnx_plat_userconfig_parsing3((char *)dst, size);
+
+    rwnx_release_firmware_common(&dst);
+
+    AICWFDBG(LOGINFO, "userconfig download complete\n\n");
+    return 0;
+
+}
+
+int	rwnx_plat_userconfig_load_8800d80n(struct rwnx_hw *rwnx_hw){
+    int size;
+    u32 *dst=NULL;
+    char *filename = FW_USERCONFIG_NAME_8800D80N;
+
+    AICWFDBG(LOGINFO, "userconfig file path:%s \r\n", filename);
+
+    /* load file */
+    size = rwnx_request_firmware_common(rwnx_hw, &dst, filename);
+    if (size <= 0) {
+            AICWFDBG(LOGERROR, "wrong size of firmware file\n");
+            dst = NULL;
+            return 0;
+    }
+
+    /* Copy the file on the Embedded side */
+    AICWFDBG(LOGINFO, "### Load file done: %s, size=%d\n", filename, size);
+
+    rwnx_plat_userconfig_parsing3((char *)dst, size);
 
     rwnx_release_firmware_common(&dst);
 
@@ -125,12 +157,39 @@ int rwnx_plat_powerlimit_load_8800d80(struct rwnx_hw *rwnx_hw)
 	AICWFDBG(LOGDEBUG, "### Load file done: %s, size=%d\n", filename, size);
 
 	/* parsing the file */
-	rwnx_plat_powerlimit_parsing((char *)dst, size, country_code);
+	rwnx_plat_powerlimit_parsing((char *)dst, size);
 
 	rwnx_release_firmware_common(&dst);
 
 	AICWFDBG(LOGDEBUG, "powerlimit download complete\n\n");
 	return 0;
+}
+
+int rwnx_plat_powerlimit_load_8800d80n(struct rwnx_hw *rwnx_hw)
+{
+    int size;
+    u32 *dst=NULL;
+    char *filename = FW_POWERLIMIT_NAME_8800D80N;
+
+    AICWFDBG(LOGINFO, "powerlimit file path:%s \r\n", filename);
+
+    /* load file */
+    size = rwnx_request_firmware_common(rwnx_hw, &dst, filename);
+    if (size <= 0) {
+        AICWFDBG(LOGERROR, "wrong size of cfg file\n");
+        dst = NULL;
+        return 0;
+    }
+
+    AICWFDBG(LOGINFO, "### Load file done: %s, size=%d\n", filename, size);
+
+    /* parsing the file */
+    rwnx_plat_powerlimit_parsing((char *)dst, size);
+
+    rwnx_release_firmware_common(&dst);
+
+    AICWFDBG(LOGINFO, "powerlimit download complete\n\n");
+    return 0;
 }
 
 int rwnx_plat_powerlimit_load_8800d80x2(struct rwnx_hw *rwnx_hw)
@@ -152,7 +211,7 @@ int rwnx_plat_powerlimit_load_8800d80x2(struct rwnx_hw *rwnx_hw)
 	AICWFDBG(LOGDEBUG, "### Load file done: %s, size=%d\n", filename, size);
 
 	/* parsing the file */
-	rwnx_plat_powerlimit_parsing((char *)dst, size, country_code);
+	rwnx_plat_powerlimit_parsing((char *)dst, size);
 
 	rwnx_release_firmware_common(&dst);
 

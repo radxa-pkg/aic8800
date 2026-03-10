@@ -1,6 +1,7 @@
 #include "rwnx_main.h"
 #include "rwnx_msg_tx.h"
 #include "reg_access.h"
+#include "aicwf_compat_8800d80.h"
 
 #define FW_USERCONFIG_NAME_8800D80         "aic_userconfig_8800d80.txt"
 #define FW_POWERLIMIT_NAME_8800D80         "aic_powerlimit_8800d80.txt"
@@ -85,7 +86,7 @@ int rwnx_plat_powerlimit_load_8800d80(struct rwnx_hw *rwnx_hw)
     AICWFDBG(LOGINFO, "### Load file done: %s, size=%d\n", filename, size);
 
     /* parsing the file */
-    rwnx_plat_powerlimit_parsing((char *)dst, size, country_code);
+    rwnx_plat_powerlimit_parsing((char *)dst, size);
 
     rwnx_release_firmware_common(&dst);
 
@@ -93,4 +94,38 @@ int rwnx_plat_powerlimit_load_8800d80(struct rwnx_hw *rwnx_hw)
     return 0;
 }
 #endif
+
+int system_config_8800d80(struct rwnx_hw *rwnx_hw)
+{
+	int ret;
+	const u32 mem_addr = 0x40500000;
+	const u32 read_mem_addr = 0x40241014;
+	struct dbg_mem_read_cfm rd_mem_addr_cfm;
+	ret = rwnx_send_dbg_mem_read_req(rwnx_hw, mem_addr, &rd_mem_addr_cfm);
+	if (ret) {
+		AICWFDBG(LOGINFO, "%x rd fail: %d\n", mem_addr, ret);
+		return ret;
+	}
+	if (((rd_mem_addr_cfm.memdata >> 25) & 0x01UL) == 0x00UL) {
+		chip_mcu_id = 1;
+	}
+	chip_id = (u8)(rd_mem_addr_cfm.memdata >> 16);
+	AICWFDBG(LOGINFO, "chip_id=%x, chip_mcu_id = %d\n", chip_id, chip_mcu_id);
+	if (testmode == 1 && (IS_CHIP_ID_H()))
+	{
+		struct dbg_mem_read_cfm rd_mem_addr_cfm;
+		ret = rwnx_send_dbg_mem_read_req(rwnx_hw, read_mem_addr, &rd_mem_addr_cfm);
+		AICWFDBG(LOGINFO, "%s 0x%08x=0x%08x\n", __func__, read_mem_addr, rd_mem_addr_cfm.memdata);
+		if (ret) {
+			AICWFDBG(LOGERROR, "%x rd fail: %d\n", read_mem_addr, ret);
+			return ret;
+		} else {
+			if (rd_mem_addr_cfm.memdata != 1) {
+				AICWFDBG(LOGERROR, "check fail: %x\n", rd_mem_addr_cfm.memdata);
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
 

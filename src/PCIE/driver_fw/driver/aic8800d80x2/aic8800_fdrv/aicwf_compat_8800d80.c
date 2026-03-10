@@ -91,7 +91,6 @@ int	rwnx_plat_userconfig_load_8800d80(struct rwnx_hw *rwnx_hw)
 }
 
 #ifdef CONFIG_POWER_LIMIT
-extern char country_code[4];
 int rwnx_plat_powerlimit_load_8800d80(struct rwnx_hw *rwnx_hw)
 {
 	int size;
@@ -111,7 +110,7 @@ int rwnx_plat_powerlimit_load_8800d80(struct rwnx_hw *rwnx_hw)
 	AICWFDBG(LOGDEBUG, "### Load file done: %s, size=%d\n", filename, size);
 
 	/* parsing the file */
-	rwnx_plat_powerlimit_parsing((char *)dst, size, country_code);
+	rwnx_plat_powerlimit_parsing((char *)dst, size);
 
 	rwnx_release_firmware_common(&dst);
 
@@ -138,7 +137,7 @@ int rwnx_plat_powerlimit_load_8800d80x2(struct rwnx_hw *rwnx_hw)
 	AICWFDBG(LOGDEBUG, "### Load file done: %s, size=%d\n", filename, size);
 
 	/* parsing the file */
-	rwnx_plat_powerlimit_parsing((char *)dst, size, country_code);
+	rwnx_plat_powerlimit_parsing((char *)dst, size);
 
 	rwnx_release_firmware_common(&dst);
 

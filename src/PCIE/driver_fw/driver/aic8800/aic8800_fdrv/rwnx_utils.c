@@ -1117,7 +1117,11 @@ void rwnx_ipc_tx_drain(struct rwnx_hw *rwnx_hw)
         }
 #endif
         rwnx_ipc_buf_a2e_release(rwnx_hw, &sw_txhdr->ipc_data);
-        kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#ifdef CONFIG_CACHE_GUARD
+		kmem_cache_free(rwnx_hw->sw_txhdr_cache, sw_txhdr);
+#else
+		kfree(sw_txhdr);
+#endif
         skb_pull(skb, RWNX_TX_HEADROOM);
         dev_kfree_skb_any(skb);
     }

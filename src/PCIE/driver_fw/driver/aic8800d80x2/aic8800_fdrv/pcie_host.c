@@ -108,21 +108,38 @@ int pcie_host_msg_push(struct ipc_host_env_tag *env, void *msg_buf, uint16_t len
 extern u8 debug_print;
 uint32_t total = 0;
 unsigned long jiffies_record;
-void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
-                          struct sk_buff *skb, int hw_queue)
+void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr, struct sk_buff *skb)
 {
-    struct txdesc_host *txdesc_host = &sw_txhdr->desc;
-    struct rwnx_ipc_buf *ipc_hostdesc_buf = &sw_txhdr->ipc_hostdesc;
-	uint32_t dma_idx = rwnx_hw->ipc_env->txdmadesc_idx;
+    struct txdesc_host *txdesc_host;
+    struct rwnx_ipc_buf *ipc_hostdesc_buf;
+	uint32_t dma_idx;
+    volatile uint32_t *src = NULL;
+    volatile struct txdesc_host *dst;
+    volatile uint32_t *dst_addr;
 	//int i;
     //unsigned long flags;
 
+	if (!rwnx_hw || !sw_txhdr || !skb) {
+		AICWFDBG(LOGERROR, "Invalid parameters\n");
+		return;
+	}
+
+	if (!rwnx_hw->ipc_env || !rwnx_hw->ipc_env->shared) {
+		AICWFDBG(LOGERROR, "IPC env not initialized\n");
+		return;
+	}
+
+	txdesc_host = &sw_txhdr->desc;
+	ipc_hostdesc_buf = &sw_txhdr->ipc_hostdesc;
+	dma_idx = rwnx_hw->ipc_env->txdmadesc_idx;
+
+	if (dma_idx >= IPC_TXDMA_DESC_CNT) {
+		AICWFDBG(LOGERROR, "Invalid DMA index: %u\n", dma_idx);
+		return;
+	}
+
 	//printk("txdesc_host=%p, dma_idx=%d, pkt_addr=%x\n", txdesc_host, dma_idx, txdesc_host->api.host.packet_addr[0]);
-    volatile uint32_t *src;
-    volatile struct txdesc_host *dst;
-    volatile uint32_t *dst_addr;
 	src = (volatile uint32_t *)txdesc_host;
-	dst = &rwnx_hw->ipc_env->shared->txdesc[dma_idx];
 
     ///txdesc_host->ctrl.hwq = hw_queue;
 	txdesc_host->pattern = 0xAC123456;
@@ -130,6 +147,7 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
     txdesc_host->api.host.flags_ext = 0;
 
     txdesc_host->ready = 0;
+	wmb();
     //txdesc_host->packet_dma_addr = sw_txhdr->ipc_data.dma_addr;//0;
 
 	//rwnx_data_dump("dhcp2", skb->data, 128);
@@ -173,6 +191,11 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
          
 	dma_sync_single_for_device(rwnx_hw->dev, ipc_hostdesc_buf->dma_addr, sizeof(struct txdesc_host), DMA_TO_DEVICE);
 
+	if (dma_mapping_error(rwnx_hw->dev, ipc_hostdesc_buf->dma_addr)) {
+		AICWFDBG(LOGERROR, "DMA sync failed for txdesc\n");
+		return;
+	}
+
 	//printk("dma_idx=%d,dma is 0x%lx,  desc_dma=%x, sw_txhdr=%p,len=%d\n", dma_idx, txdesc_host->api.host.packet_addr[0], ipc_hostdesc_buf->dma_addr, sw_txhdr,txdesc_host->api.host.packet_len[0]);
 
 //    dst->api.host.packet_len = sw_txhdr->ipc_desc.size;
@@ -180,12 +203,11 @@ void pcie_txdesc_push(struct rwnx_hw *rwnx_hw, struct rwnx_sw_txhdr *sw_txhdr,
 
 //	wmb();
 
+	dst = &rwnx_hw->ipc_env->shared->txdesc[dma_idx];
 	dst->ready = ipc_hostdesc_buf->dma_addr;
-    *dst_addr = ipc_hostdesc_buf->dma_addr;
-
-	wmb();
-
+	*dst_addr = ipc_hostdesc_buf->dma_addr;
 	rwnx_hw->ipc_env->txcfm[dma_idx] = (struct rwnx_ipc_buf *)sw_txhdr;
+	wmb();
 	//printk("push:%d, %x, %d , %x ,offset=%lx\n", dma_idx, ipc_hostdesc_buf->dma_addr, sw_txhdr->ipc_desc.size, dst->ready,  (unsigned long)dst - (unsigned long)rwnx_hw->ipc_env->shared);
 	//printk("push:%d, sw_txhdr=%p, skb=%p\n", dma_idx, sw_txhdr, sw_txhdr->skb);
     //dst->api.host.packet_addr[0]= sw_txhdr->ipc_desc.dma_addr;

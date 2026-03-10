@@ -295,7 +295,9 @@ int usb_bustx_thread(void *data)
 			usb_err("usb bustx thread stop\n");
 			break;
 		}
-		if (!wait_for_completion_interruptible(&bus->bustx_trgg)) {
+		//if (!wait_for_completion_interruptible(&bus->bustx_trgg)) {
+		wait_for_completion(&bus->bustx_trgg));
+		{
 			if (usbdev->bus_if->state == BUS_DOWN_ST)
 				continue;
 			if (usbdev->tx_post_count > 0)
@@ -316,7 +318,9 @@ int usb_busrx_thread(void *data)
 			usb_err("usb busrx thread stop\n");
 			break;
 		}
-		if (!wait_for_completion_interruptible(&bus_if->busrx_trgg)) {
+		//if (!wait_for_completion_interruptible(&bus_if->busrx_trgg)) 
+        wait_for_completion(&bus_if->busrx_trgg);
+        {
 			if (bus_if->state == BUS_DOWN_ST)
 				continue;
 			aicwf_process_rxframes(rx_priv);

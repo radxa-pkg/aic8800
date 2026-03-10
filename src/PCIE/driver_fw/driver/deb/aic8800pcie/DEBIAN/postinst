@@ -9,12 +9,13 @@ cp -rf /AIC8800/fw/aic8800D80 /lib/firmware/aic8800D80
 cd /AIC8800/drivers/aic8800/aic8800_fdrv
 make
 make install
+modprobe cfg80211
 #insmod /AIC8800/drivers/aic8800/aic8800_fdrv/aic8800D80_fdrv.ko
 insmod aic8800D80_fdrv.ko
 
-cd /AIC8800/aicrf_test/
-make
-make install
+#cd /AIC8800/aicrf_test/
+#make
+#make install
 
 #cd /etc
 #mkdir pm

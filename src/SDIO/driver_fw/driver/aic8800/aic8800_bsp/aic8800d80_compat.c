@@ -47,18 +47,27 @@ u32 adaptivity_patch_tbl_8800d80[][2] = {
 	{0x0168, 0x00010000}, //tx_adaptivity_en
 };
 
-#define USER_PWROFST_COVER_CALIB_FLAG	0x01U
+#define USER_PWROFST_COVER_CALIB_FLAG   (0x01U << 0)
 #define USER_CHAN_MAX_TXPWR_EN_FLAG     (0x01U << 1)
 #define USER_TX_USE_ANA_F_FLAG          (0x01U << 2)
-#define USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG	(0x01U << 3)
+#define USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG    (0x01U << 3)
+#define USER_HE_MU_EDCA_UPDATE_DISABLE_FLAG     (0x01U << 4)
+#define USER_LOFT_CALIB_DISABLE_FLAG    (0x01U << 6)
+#define USER_CAPA_CALIB_DISABLE_FLAG    (0x01U << 7)
+#define USER_PWR_CALIB_DISABLE_FLAG     (0x01U << 8)
+#define USER_IPA_CALIB_DISABLE_FLAG     (0x01U << 13)
 
-#define CFG_PWROFST_COVER_CALIB     1
-#define CFG_USER_CHAN_MAX_TXPWR_EN  1
-#define CFG_USER_TX_USE_ANA_F       0
-#define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE	0
+#define USER_EXT_FLAGS_DEFAULT_D80      (USER_PWROFST_COVER_CALIB_FLAG)
 
-
-#define CFG_USER_EXT_FLAGS_EN   (CFG_PWROFST_COVER_CALIB || CFG_USER_CHAN_MAX_TXPWR_EN || CFG_USER_TX_USE_ANA_F || CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE)
+#define CFG_USER_PWROFST_COVER_CALIB_EN     (1)
+#define CFG_USER_CHAN_MAX_TXPWR_EN          (defined(CONFIG_POWER_LIMIT))
+#define CFG_USER_TX_USE_ANA_F_EN            (0)
+#define CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE (defined(CONFIG_PRBREQ_REPORT))
+#define CFG_USER_HE_MU_EDCA_UPDATE_DISABLE  (0)
+#define CFG_USER_LOFT_CALIB_DISABLE_DISABLE (0)
+#define CFG_USER_CAPA_CALIB_DISABLE_DISABLE (0)
+#define CFG_USER_PWR_CALIB_DISABLE_DISABLE  (0)
+#define CFG_USER_IPA_CALIB_DISABLE_DISABLE  (0)
 
 u32 patch_tbl_8800d80[][2] = {
 	#ifdef USE_5G
@@ -73,25 +82,41 @@ u32 patch_tbl_8800d80[][2] = {
 	{0x00000170, 0x0000010a}, //irqf
 #endif
 
-	#if CFG_USER_EXT_FLAGS_EN
-	{0x0188, 0x00000000
-	#if CFG_PWROFST_COVER_CALIB
-		| USER_PWROFST_COVER_CALIB_FLAG
-	#endif
-	#if CFG_USER_CHAN_MAX_TXPWR_EN
-		| USER_CHAN_MAX_TXPWR_EN_FLAG
-	#endif
-	#if CFG_USER_TX_USE_ANA_F
-		| USER_TX_USE_ANA_F_FLAG
-	#endif
-	#if CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE
-		| USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG
-	#endif
-	}, // user_ext_flags
-	#endif
+    {0x0188,
+        (USER_EXT_FLAGS_DEFAULT_D80 |
+            #if CFG_USER_CHAN_MAX_TXPWR_EN
+            USER_CHAN_MAX_TXPWR_EN_FLAG |
+            #endif
+            #if CFG_USER_TX_USE_ANA_F_EN
+            USER_TX_USE_ANA_F_FLAG |
+            #endif
+            #if CFG_USER_APM_PRBRSP_OFFLOAD_DISABLE
+            USER_APM_PRBRSP_OFFLOAD_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_HE_MU_EDCA_UPDATE_DISABLE
+            USER_HE_MU_EDCA_UPDATE_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_LOFT_CALIB_DISABLE_DISABLE
+            USER_LOFT_CALIB_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_CAPA_CALIB_DISABLE_DISABLE
+            USER_CAPA_CALIB_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_PWR_CALIB_DISABLE_DISABLE
+            USER_PWR_CALIB_DISABLE_FLAG |
+            #endif
+            #if CFG_USER_IPA_CALIB_DISABLE_DISABLE
+            USER_IPA_CALIB_DISABLE_FLAG |
+            #endif
+        0) & ~(
+            #if !CFG_USER_PWROFST_COVER_CALIB_EN
+            USER_PWROFST_COVER_CALIB_FLAG |
+            #endif
+        0)
+    }, // user_ext_flags
 
 #ifdef CONFIG_RADAR_OR_IR_DETECT
-	{0x019c, 0x00000100}, //enable radar detect
+	{0x019c, 0x00000900}, //enable radar detect
 #endif
 };
 

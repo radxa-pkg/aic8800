@@ -405,6 +405,9 @@ enum mm_msg_tag {
 	MM_GET_APF_PROG_REQ,
 	MM_GET_APF_PROG_CFM,
 
+	MM_SET_TXPWR_PER_STA_REQ,
+	MM_SET_TXPWR_PER_STA_CFM,
+
     /// MAX number of messages
     MM_MAX,
 };
@@ -1190,6 +1193,16 @@ struct mm_set_rf_config_req {
 	u32_l tx_gain[32];
 };
 #endif
+
+typedef struct
+{
+	u32_l magic_num; /*“GWCR” or ’SWCR”*/
+	u32_l info_flag;
+	u32_l calib_flag;
+	u32_l reserved0;
+	u32_l res_data[224/sizeof(u32_l)];
+}wf_rf_calib_res_drv_v3_t;
+
 struct mm_set_rf_config_req
 {
     u8_l table_sel;
@@ -1207,6 +1220,11 @@ struct mm_set_rf_calib_req {
 	u32_l bt_calib_param;
 	u8_l xtal_cap;
     u8_l xtal_cap_fine;
+//#ifdef RF_WRITE_FILE
+#if 1
+	u8_l reserved0[2];
+	wf_rf_calib_res_drv_v3_t cal_res;
+#endif
 };
 
 struct mm_set_rf_calib_cfm {
@@ -2061,6 +2079,12 @@ struct mm_set_vendor_swconfig_cfm
         struct mm_get_ext_flags_cfm ext_flags_get_cfm;
         struct mm_mask_set_ext_flags_cfm ext_flags_mask_set_cfm;
     };
+};
+
+struct mm_set_txpwr_lvl_per_sta_req
+{
+	u8_l sta_idx;
+	s8_l tx_pwr_offset;
 };
 
 /// Structure containing the parameters of the @ref ME_RC_STATS_REQ message.

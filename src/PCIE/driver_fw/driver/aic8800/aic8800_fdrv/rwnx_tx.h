@@ -152,7 +152,9 @@ struct rwnx_sw_txhdr {
  */
 struct rwnx_txhdr {
 	struct rwnx_sw_txhdr *sw_hdr;
+#ifdef CONFIG_CACHE_GUARD
 	char cache_guard[L1_CACHE_BYTES];
+#endif
 	struct rwnx_hw_txhdr hw_hdr;
 };
 
@@ -219,6 +221,10 @@ struct rwnx_txhdr {
  *
  */
 
+
+#ifdef CONFIG_BAND_STEERING
+void rwnx_probersp_work(struct work_struct *work);
+#endif
 
 u16 rwnx_select_txq(struct rwnx_vif *rwnx_vif, struct sk_buff *skb);
 netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev);

@@ -42,6 +42,7 @@ enum AICWF_IC{
     PRODUCT_ID_AIC8800D80X2,
     PRODUCT_ID_AIC8800D81X2,
     PRODUCT_ID_AIC8800D89X2,
+    PRODUCT_ID_AIC8800D40X2,
 };
 
 
@@ -90,6 +91,7 @@ enum AICWF_IC{
 #define FW_RAM_PATCH_BASE_ADDR          0x00100000
 #define FW_RAM_PATCH_BASE_ADDR_U03      0x00100000
 #define FW_PATCH_TEST_BASE_ADDR         0x00100000
+#define RAM_FW_BLE_WAKEUP_OUT_ADDR		0x0015f000
 
 enum {
     FW_NORMAL_MODE,
@@ -232,6 +234,8 @@ extern void aicwf_usb_tx_flowctrl(struct aic_usb_dev *usb_dev, bool state);
 int usb_bustx_thread(void *data);
 int usb_busrx_thread(void *data);
 int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv);
+int aicfw_download_fw_8800(struct aic_usb_dev *usb_dev);
+int aicfw_download_fw(struct aic_usb_dev *usb_dev);
 
 #endif /* AICWF_USB_SUPPORT */
 #endif /* _AICWF_USB_H_       */

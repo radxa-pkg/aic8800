@@ -16,7 +16,7 @@
 #include "aic_btsdio.h"
 #include "rwnx_msg_tx.h"
 
-#if CONFIG_BLUEDROID == 1
+#if CONFIG_BLUEDROID
 static spinlock_t queue_lock;
 static inline struct sk_buff *bt_skb_alloc(unsigned int len, gfp_t how)
 {

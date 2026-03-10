@@ -261,7 +261,11 @@ int rwnx_dbgfs_print_sta(char *buf, size_t size, struct rwnx_sta *sta,
 						 struct rwnx_hw *rwnx_hw);
 void rwnx_txq_credit_update(struct rwnx_hw *rwnx_hw, int sta_idx, u8 tid,
 							s8 update);
-void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct rwnx_txhdr *txhdr, int flags);
+void rwnx_tx_push(struct rwnx_hw *rwnx_hw, struct sk_buff *skb, int flags);
 int intf_tx(struct rwnx_hw *priv,struct msg_buf *msg);
+
+#ifdef CONFIG_BAND_STEERING
+void rwnx_probersp_work(struct work_struct *work);
+#endif
 
 #endif /* _RWNX_TX_H_ */

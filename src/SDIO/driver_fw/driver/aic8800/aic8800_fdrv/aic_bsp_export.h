@@ -12,11 +12,11 @@ enum aicbsp_pwr_state {
 };
 
 struct aicbsp_feature_t {
-	int      hwinfo;
-	uint32_t sdio_clock;
-	uint8_t  sdio_phase;
-	int fwlog_en;
-	uint8_t irqf;
+        int      hwinfo;
+        uint32_t sdio_clock;
+        uint8_t  sdio_phase;
+        bool     fwlog_en;
+        uint8_t  irqf;
 };
 
 enum skb_buff_id {

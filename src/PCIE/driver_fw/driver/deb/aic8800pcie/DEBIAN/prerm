@@ -8,8 +8,8 @@ cd /AIC8800/drivers/aic8800/aic8800_fdrv/
 make clean
 make uninstall
 
-cd /AIC8800/aicrf_test
-make clean
+#cd /AIC8800/aicrf_test
+#make clean
 #make uninstall
 
 #cd /AIC8800/drivers/aic8800/aic_btusb/
