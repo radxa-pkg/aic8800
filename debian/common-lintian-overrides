@@ -21,3 +21,4 @@ improbable-bug-number-in-closes
 # DO NOT EDIT IT DIRECTLY!
 # Custom rules should be placed in debian/<package-name>.lintian-overrides
 # or debian/source/<source-name>.lintian-overrides
+

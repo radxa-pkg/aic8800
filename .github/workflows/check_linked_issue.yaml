@@ -1,5 +1,6 @@
 jobs:
   check_pull_requests:
+    if: "github.actor != 'dependabot[bot]'"
     name: "Check linked issues"
     permissions:
       issues: "write"

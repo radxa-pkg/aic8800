@@ -1,4 +1,9 @@
-{ pkgs, lib, config, ... }:
+{
+  pkgs,
+  lib,
+  config,
+  ...
+}:
 
 {
   imports = lib.optional (builtins.pathExists ./.github/local/devenv.nix) ./.github/local/devenv.nix;
@@ -6,6 +11,7 @@
   # https://devenv.sh/packages/
   packages = with pkgs; [
     bash-completion
+    git-buildpackage
     mdbook
     mdbook-admonish
     mdbook-cmdrun
@@ -39,3 +45,4 @@
 
   starship.enable = true;
 }
+
