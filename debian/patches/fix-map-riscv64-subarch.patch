@@ -1,0 +1,104 @@
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+index 08aa4bb..f9dfc63 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+@@ -378,7 +378,7 @@ KDIR  ?= /lib/modules/$(shell uname -r)/build
+ PWD   ?= $(shell pwd)
+ KVER ?= $(shell uname -r)
+ MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800D80/
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE ?=
+ endif
+diff --git a/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/Makefile b/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/Makefile
+index 38002f5..9eddf35 100644
+--- a/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/Makefile
++++ b/src/PCIE/driver_fw/driver/deb/aic8800pcie/AIC8800/drivers/aic8800/aic8800_fdrv/Makefile
+@@ -342,7 +342,7 @@ KDIR  ?= /lib/modules/$(shell uname -r)/build
+ PWD   ?= $(shell pwd)
+ KVER ?= $(shell uname -r)
+ MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800D80/
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE ?=
+ endif
+diff --git a/src/SDIO/driver_fw/driver/aic8800/Makefile b/src/SDIO/driver_fw/driver/aic8800/Makefile
+index 6f02ee9..0d2d6d0 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/Makefile
++++ b/src/SDIO/driver_fw/driver/aic8800/Makefile
+@@ -61,7 +61,7 @@ KDIR  = /lib/modules/$(shell uname -r)/build
+ PWD   = $(shell pwd)
+ KVER = $(shell uname -r)
+ MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE ?=
+ endif
+diff --git a/src/USB/driver_fw/drivers/aic8800/Makefile b/src/USB/driver_fw/drivers/aic8800/Makefile
+index dfb30d9..38d2844 100644
+--- a/src/USB/driver_fw/drivers/aic8800/Makefile
++++ b/src/USB/driver_fw/drivers/aic8800/Makefile
+@@ -51,7 +51,7 @@ KDIR  = /lib/modules/$(shell uname -r)/build
+ PWD   = $(shell pwd)
+ KVER = $(shell uname -r)
+ MODDESTDIR = /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/loongarch64/loongarch/ -e s/loong64/loongarch/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/loongarch64/loongarch/ -e s/loong64/loongarch/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE ?=
+ endif
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile
+index 7f60d6c..8ca2728 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile
+@@ -394,7 +394,7 @@ KDIR  ?= /lib/modules/$(shell uname -r)/build
+ PWD   ?= $(shell pwd)
+ KVER ?= $(shell uname -r)
+ MODDESTDIR ?= /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE ?=
+ endif
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/Makefile b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/Makefile
+index 0c0e373..21a046d 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/Makefile
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/Makefile
+@@ -101,7 +101,7 @@ KDIR  := /lib/modules/$(shell uname -r)/build
+ PWD   := $(shell pwd)
+ KVER := $(shell uname -r)
+ MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE :=
+ endif
+diff --git a/src/USB/driver_fw/drivers/aic_btusb/Makefile b/src/USB/driver_fw/drivers/aic_btusb/Makefile
+index 61ec3d0..104b393 100644
+--- a/src/USB/driver_fw/drivers/aic_btusb/Makefile
++++ b/src/USB/driver_fw/drivers/aic_btusb/Makefile
+@@ -57,7 +57,7 @@ KDIR  := /lib/modules/$(shell uname -r)/build
+ PWD   := $(shell pwd)
+ KVER := $(shell uname -r)
+ MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE :=
+ endif
+diff --git a/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/amlogic/common/wifi_bt/bluetooth/aic/aic_btusb/Makefile b/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/amlogic/common/wifi_bt/bluetooth/aic/aic_btusb/Makefile
+index d15f41a..ffc81b3 100644
+--- a/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/amlogic/common/wifi_bt/bluetooth/aic/aic_btusb/Makefile
++++ b/src/USB/patch/for_Amlogic/950/Android13/mod/vendor/amlogic/common/wifi_bt/bluetooth/aic/aic_btusb/Makefile
+@@ -52,7 +52,7 @@ KDIR  := /lib/modules/$(shell uname -r)/build
+ PWD   := $(shell pwd)
+ KVER := $(shell uname -r)
+ MODDESTDIR := /lib/modules/$(KVER)/kernel/drivers/net/wireless/aic8800
+-SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/)
++SUBARCH = $(shell uname -m | sed -e s/i.86/i386/ -e s/armv.l/arm/ -e s/aarch64/arm64/ -e s/riscv64/riscv/)
+ ARCH ?= $(SUBARCH)
+ CROSS_COMPILE :=
+ endif
