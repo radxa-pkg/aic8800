@@ -1,3 +1,19 @@
+aic8800 (5.0+git20260123.5f7be68d-1) noble; urgency=medium
+
+  [ dependabot[bot] ]
+  * chore(deps): bump actions/upload-artifact from 5 to 7
+  * chore(deps): bump docker/setup-qemu-action from 3 to 4
+  * chore(deps): bump cachix/cachix-action from 16 to 17
+  * chore(deps): bump actions/deploy-pages from 4 to 5
+  * chore(deps): bump actions/configure-pages from 5 to 6
+  * chore(deps): bump actions/download-artifact from 7 to 8
+
+  [ ZHANG Yuntian ]
+  * feat: update to aic8800d_linux_sdk_V5.0_2026_0123_5f7be68d
+  * fix: update patchset
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 07 Apr 2026 14:29:01 +0800
+
 aic8800 (4.0+git20250410.b99ca8b6-5) noble; urgency=medium
 
   [ dependabot[bot] ]
