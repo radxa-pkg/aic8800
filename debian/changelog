@@ -1,3 +1,14 @@
+aic8800 (5.0+git20260123.5f7be68d-2) noble; urgency=medium
+
+  [ Vladislav Tatjanin ]
+  * add riscv64 -> riscv SUBARCH mapping
+
+  [ Chongbiao Chen ]
+  * fix: update patchset
+  * fix: fix vmalloc.h not include
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Wed, 08 Apr 2026 11:45:24 +0000
+
 aic8800 (5.0+git20260123.5f7be68d-1) noble; urgency=medium
 
   [ dependabot[bot] ]
