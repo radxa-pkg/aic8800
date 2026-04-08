@@ -1,8 +1,8 @@
-diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-index a787214..b739e18 100644
---- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-+++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -515,8 +515,8 @@ int testmode = 0;
+Index: aic8800/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+===================================================================
+--- aic8800.orig/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ aic8800/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -535,8 +535,8 @@ int wifi_fail = 0;
  module_param(testmode, int, 0660);
  module_param(adap_test, int, 0660);
  module_param(wifi_fail, int, 0660);
