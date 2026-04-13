@@ -10,6 +10,18 @@ index d0970cb..656af12 100644
  
  RWNX_VERS_NUM := 6.4.3.0
  
+
+diff --git a/src/USB/driver_fw/drivers/aic_btusb/Makefile b/src/USB/driver_fw/drivers/aic_btusb/Makefile
+index 61ec3d0..0966f67 100644
+--- a/src/USB/driver_fw/drivers/aic_btusb/Makefile
++++ b/src/USB/driver_fw/drivers/aic_btusb/Makefile
+@@ -1,3 +1,5 @@
++EXTRA_CFLAGS += -Wno-unused-variable
++
+ MODULE_NAME = aic_btusb
+ 
+ CONFIG_AIC8800_BTUSB_SUPPORT = m
+
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c
 index f78ca5f..3e7891f 100644
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_mod_params.c
