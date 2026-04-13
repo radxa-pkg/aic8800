@@ -1,3 +1,10 @@
+aic8800 (5.0+git20260123.5f7be68d-4) noble; urgency=medium
+
+  [ Chongbiao Chen ]
+  * fix: fix usb build error
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Mon, 13 Apr 2026 06:31:43 +0000
+
 aic8800 (5.0+git20260123.5f7be68d-3) noble; urgency=medium
 
   [ ZHANG Yuntian ]
