@@ -20,3 +20,4 @@ fix-linux-6.17-build.patch
 fix-Lower-the-debugging-log-level.patch
 fix-linux-6.19-build.patch
 fix-vmalloc-not-include.patch
+fix-build-on-low-memory-devices.patch

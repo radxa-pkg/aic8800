@@ -1,0 +1,76 @@
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+index 08aa4bb..0cce880 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+@@ -324,8 +324,6 @@ CONFIG_PLATFORM_UBUNTU ?= y
+ 
+ ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
+ 
+-MAKEFLAGS +=-j$(shell nproc)
+-
+ ifeq ($(CONFIG_PLATFORM_ROCKCHIP), y)
+ #KDIR ?= /home/yaya/E/Rockchip/3229/Android7/RK3229_ANDROID7.1_v1.01_20170914/rk3229_Android7.1_v1.01_xml0914/kernel
+ #ARCH ?= arm
+diff --git a/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/Makefile b/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/Makefile
+index 2542655..12ad5c5 100644
+--- a/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/Makefile
++++ b/src/PCIE/driver_fw/driver/aic8800d80x2/aic8800_fdrv/Makefile
+@@ -364,8 +364,6 @@ ccflags-$(CONFIG_RX_NETIF_RECV_SKB) += -DCONFIG_RX_NETIF_RECV_SKB
+ ccflags-$(CONFIG_USB_BT) += -DCONFIG_USB_BT
+ ccflags-$(CONFIG_USE_BT) += -DCONFIG_USE_BT
+ 
+-MAKEFLAGS +=-j$(shell nproc)
+-
+ # Platform support list
+ CONFIG_PLATFORM_ROCKCHIP ?= n
+ CONFIG_PLATFORM_ALLWINNER ?= n
+diff --git a/src/SDIO/driver_fw/driver/aic8800/Makefile b/src/SDIO/driver_fw/driver/aic8800/Makefile
+index 6f02ee9..c18dd83 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/Makefile
++++ b/src/SDIO/driver_fw/driver/aic8800/Makefile
+@@ -6,8 +6,6 @@ obj-$(CONFIG_AIC8800_BTLPM_SUPPORT) += aic8800_btlpm/
+ obj-$(CONFIG_AIC8800_WLAN_SUPPORT) += aic8800_fdrv/
+ obj-$(CONFIG_AIC_WLAN_SUPPORT) += aic8800_bsp/
+ 
+-MAKEFLAGS +=-j$(shell nproc)
+-
+ ########## config option ##########
+ export CONFIG_USE_FW_REQUEST = n
+ export CONFIG_PREALLOC_RX_SKB = y
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+index 033b8b4..6014760 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/Makefile
+@@ -356,7 +356,6 @@ ccflags-$(CONFIG_APF) += -DCONFIG_APF
+ ccflags-$(CONFIG_AUTO_POWERSAVE) += -DCONFIG_AUTO_POWERSAVE
+ 
+ ccflags-y += -DAIC_TRACE_INCLUDE_PATH=$(src)
+-MAKEFLAGS +=-j$(shell nproc)
+ 
+ ########## Platform support list ##########
+ CONFIG_PLATFORM_ROCKCHIP ?= n
+diff --git a/src/USB/driver_fw/drivers/aic8800/Makefile b/src/USB/driver_fw/drivers/aic8800/Makefile
+index dfb30d9..9805bd3 100644
+--- a/src/USB/driver_fw/drivers/aic8800/Makefile
++++ b/src/USB/driver_fw/drivers/aic8800/Makefile
+@@ -58,8 +58,6 @@ endif
+ 
+ ###########################################
+ 
+-MAKEFLAGS +=-j$(shell nproc)
+-
+ all: modules
+ modules:
+ 	make -C $(KDIR) M=$(PWD) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) modules
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile
+index 7f60d6c..e2b4480 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/Makefile
+@@ -349,7 +349,6 @@ ccflags-$(CONFIG_TEMP_CONTROL) += -DCONFIG_TEMP_CONTROL
+ ccflags-$(CONFIG_POWER_LIMIT) += -DCONFIG_POWER_LIMIT
+ ccflags-$(CONFIG_EXT_FEM_8800DCDW) += -DCONFIG_EXT_FEM_8800DCDW
+ ccflags-$(CONFIG_WOWLAN) += -DCONFIG_WOWLAN
+-MAKEFLAGS +=-j$(shell nproc)
+ 
+ # Platform support list
+ CONFIG_PLATFORM_ROCKCHIP ?= n
