@@ -4513,6 +4513,12 @@ int radio_idx,
 static int rwnx_cfg80211_get_tx_power(struct wiphy *wiphy,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
  struct wireless_dev *wdev,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 14, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 17, 0)
+ int radio_idx,
+#endif
+ unsigned int link_id,
+#endif
 #endif
 	int *mbm)
 {
