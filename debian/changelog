@@ -1,3 +1,13 @@
+aic8800 (5.0+git20260123.5f7be68d-5) noble; urgency=medium
+
+  [ Chongbiao Chen ]
+  * fix: use bluez by default
+
+  [ ZHANG Yuntian ]
+  * fix: workaround OOM build failure
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Wed, 29 Apr 2026 10:34:22 +0000
+
 aic8800 (5.0+git20260123.5f7be68d-4) noble; urgency=medium
 
   [ Chongbiao Chen ]
