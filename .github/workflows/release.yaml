@@ -96,7 +96,7 @@ jobs:
         fi
       shell: "bash"
     - name: "Release"
-      uses: "softprops/action-gh-release@v2"
+      uses: "softprops/action-gh-release@v3"
       with:
         body_path: "README.md"
         draft: false
@@ -110,7 +110,7 @@ jobs:
         target_commitish: "${{ github.sha }}"
         token: "${{ secrets.GITHUB_TOKEN }}"
     - name: "Append changelog"
-      uses: "softprops/action-gh-release@v2"
+      uses: "softprops/action-gh-release@v3"
       with:
         append_body: true
         body: |
@@ -121,7 +121,7 @@ jobs:
       uses: "RadxaOS-SDK/rsdk/.github/actions/infra-repo-update@main"
       with:
         test-repo: true
-        token: "${{ secrets.RADXA_APT_TEST_REPO_TOKEN }}"
+        token: "${{ secrets.RSDK_APT_REPOSITORY_TOKEN }}"
 name: "Build & Release"
 "on":
   merge_group: {}
