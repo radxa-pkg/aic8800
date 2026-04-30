@@ -2,7 +2,8 @@ PACKAGE_VARIANT="usb"
 PACKAGE_NAME="aic8800-usb"
 PACKAGE_VERSION="#MODULE_VERSION#"
 CLEAN="make clean"
-MAKE[0]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/USB/driver_fw/drivers/aic8800 &&
+MAKE[0]="make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/USB/driver_fw/drivers/aic8800/aic_load_fw modules &&
+make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/USB/driver_fw/drivers/aic8800/aic8800_fdrv KBUILD_EXTRA_SYMBOLS=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/USB/driver_fw/drivers/aic8800/aic_load_fw/Module.symvers modules &&
 make -C $kernel_source_dir M=$dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build/USB/driver_fw/drivers/aic_btusb"
 
 BUILT_MODULE_NAME[0]="aic_load_fw"
