@@ -1,0 +1,164 @@
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 6bef648..7199d3f 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -4131,7 +4131,17 @@ rwnx_cfg80211_remain_on_channel_(struct wiphy *wiphy, struct wireless_dev *wdev,
+ static int
+ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+ 								struct ieee80211_channel *chan,
+-								unsigned int duration, u64 *cookie)
++								unsigned int duration, u64 *cookie
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 2, 0)
++								/*
++								 * 7.2 added an optional receive address filter for the off-channel
++								 * period. cfg80211 refuses a non-NULL one unless the driver sets
++								 * NL80211_EXT_FEATURE_ROC_ADDR_FILTER, which this one does not, so it
++								 * is always NULL here. mac80211 ignores it in the same way.
++								 */
++								, const u8 *rx_addr
++#endif
++								)
+ {
+ 	return rwnx_cfg80211_remain_on_channel_(wiphy, wdev, chan, duration, cookie, false);
+ }
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index aee98cb..29dc4ff 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -3671,7 +3671,13 @@ int rwnx_send_dbg_trigger_req(struct rwnx_hw *rwnx_hw, char *msg)
+ 		return -ENOMEM;
+ 
+ 	/* Set parameters for the MM_DBG_TRIGGER_REQ message */
+-	strncpy(req->error, msg, sizeof(req->error));
++	/*
++	 * strncpy() is gone in 7.2. req->error is a fixed 64-byte field of a
++	 * firmware message that is not NUL-terminated, and the message came
++	 * from kzalloc(), so copying at most the field size is all strncpy()
++	 * did here.
++	 */
++	memcpy(req->error, msg, strnlen(msg, sizeof(req->error)));
+ 
+ 	/* Send the MM_DBG_TRIGGER_REQ message to LMAC FW */
+ 	return rwnx_send_msg(rwnx_hw, req, 0, -1, NULL);
+diff --git a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+index d25c745..82b6765 100644
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+@@ -1272,7 +1272,12 @@ static int parse_key_val(const char *str, const char *key, char *val)
+ 		p--;
+ 
+ 	p++;
+-	strncpy(val, dst, p -dst);
++	/*
++	 * strncpy() is gone in 7.2. dst..p is a known-length run inside a
++	 * longer string, so strncpy() never reached its NUL and never padded;
++	 * the terminator is the line below. That is a plain memcpy().
++	 */
++	memcpy(val, dst, p - dst);
+ 	val[p - dst] = 0;
+ 	return 0;
+ }
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index 35543ee..3602d2f 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -4053,7 +4053,17 @@ rwnx_cfg80211_remain_on_channel_(struct wiphy *wiphy, struct wireless_dev *wdev,
+ static int
+ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy, struct wireless_dev *wdev,
+ 								struct ieee80211_channel *chan,
+-								unsigned int duration, u64 *cookie)
++								unsigned int duration, u64 *cookie
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 2, 0)
++								/*
++								 * 7.2 added an optional receive address filter for the off-channel
++								 * period. cfg80211 refuses a non-NULL one unless the driver sets
++								 * NL80211_EXT_FEATURE_ROC_ADDR_FILTER, which this one does not, so it
++								 * is always NULL here. mac80211 ignores it in the same way.
++								 */
++								, const u8 *rx_addr
++#endif
++								)
+ {
+ 	return rwnx_cfg80211_remain_on_channel_(wiphy, wdev, chan, duration, cookie, false);
+ }
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index c9acbd0..4902ced 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -4614,7 +4614,13 @@ int rwnx_send_dbg_trigger_req(struct rwnx_hw *rwnx_hw, char *msg)
+ 		return -ENOMEM;
+ 
+ 	/* Set parameters for the MM_DBG_TRIGGER_REQ message */
+-	strncpy(req->error, msg, sizeof(req->error));
++	/*
++	 * strncpy() is gone in 7.2. req->error is a fixed 64-byte field of a
++	 * firmware message that is not NUL-terminated, and the message came
++	 * from kzalloc(), so copying at most the field size is all strncpy()
++	 * did here.
++	 */
++	memcpy(req->error, msg, strnlen(msg, sizeof(req->error)));
+ 
+ 	/* Send the MM_DBG_TRIGGER_REQ message to LMAC FW */
+ 	return rwnx_send_msg(rwnx_hw, req, 0, -1, NULL);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+index 64d97a3..0bde1fa 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_platform.c
+@@ -1232,7 +1232,12 @@ static int parse_key_val(const char *str, const char *key, char *val)
+ 		p--;
+ 
+ 	p++;
+-	strncpy(val, dst, p -dst);
++	/*
++	 * strncpy() is gone in 7.2. dst..p is a known-length run inside a
++	 * longer string, so strncpy() never reached its NUL and never padded;
++	 * the terminator is the line below. That is a plain memcpy().
++	 */
++	memcpy(val, dst, p - dst);
+ 	val[p - dst] = 0;
+ 	return 0;
+ }
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+index bc547a0..14e0f39 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -4858,7 +4858,17 @@ rwnx_cfg80211_remain_on_channel(struct wiphy *wiphy,
+                             #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+                                 enum nl80211_channel_type channel_type,
+                             #endif
+-                                unsigned int duration, u64 *cookie)
++                                unsigned int duration, u64 *cookie
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 2, 0)
++                                /*
++                                 * 7.2 added an optional receive address filter for the off-channel
++                                 * period. cfg80211 refuses a non-NULL one unless the driver sets
++                                 * NL80211_EXT_FEATURE_ROC_ADDR_FILTER, which this one does not, so it
++                                 * is always NULL here. mac80211 ignores it in the same way.
++                                 */
++                                , const u8 *rx_addr
++#endif
++                                )
+ {
+ 	return rwnx_cfg80211_remain_on_channel_(wiphy,
+                             #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index b977555..6c54759 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -4849,7 +4849,13 @@ int rwnx_send_dbg_trigger_req(struct rwnx_hw *rwnx_hw, char *msg)
+         return -ENOMEM;
+ 
+     /* Set parameters for the MM_DBG_TRIGGER_REQ message */
+-    strncpy(req->error, msg, sizeof(req->error));
++    /*
++     * strncpy() is gone in 7.2. req->error is a fixed 64-byte field of a
++     * firmware message that is not NUL-terminated, and the message came
++     * from kzalloc(), so copying at most the field size is all strncpy()
++     * did here.
++     */
++    memcpy(req->error, msg, strnlen(msg, sizeof(req->error)));
+ 
+     /* Send the MM_DBG_TRIGGER_REQ message to LMAC FW */
+     return rwnx_send_msg(rwnx_hw, req, 0, -1, NULL);
+-- 
+2.54.0

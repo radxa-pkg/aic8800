@@ -23,3 +23,4 @@ fix-vmalloc-not-include.patch
 fix-build-on-low-memory-devices.patch
 fix-linux-7.1-build.patch
 fix-usb-suspend-reboot-hang.patch
+fix-linux-7.2-build.patch
