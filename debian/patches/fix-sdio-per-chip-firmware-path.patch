@@ -1,0 +1,131 @@
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic8800dc_compat.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic8800dc_compat.c
+index 64fbb01..60b9b6f 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic8800dc_compat.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic8800dc_compat.c
+@@ -5,6 +5,7 @@
+ u8 chip_sub_id = 0;
+ u8 chip_mcu_id = 0;
+ extern int testmode;
++extern void get_fw_path(char* fw_path);
+ 
+ u32 syscfg_tbl_8800dc[][2] = {
+     {0x40500010, 0x00000004},
+@@ -2482,6 +2483,7 @@ int aicwf_dpd_result_write_8800dc(void *buf, int buf_len)
+     int sum = 0, len = 0;
+     char *path = NULL;
+     struct file *fp = NULL;
++    char fw_dir[FW_PATH_MAX_LEN];
+     loff_t pos = 0;
+     mm_segment_t fs;
+ 
+@@ -2493,7 +2495,8 @@ int aicwf_dpd_result_write_8800dc(void *buf, int buf_len)
+         return -1;
+     }
+ 
+-    len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", AICBSP_FW_PATH, FW_DPDRESULT_NAME_8800DC);
++    get_fw_path(fw_dir);
++    len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", fw_dir, FW_DPDRESULT_NAME_8800DC);
+     printk("%s\n", path);
+ 
+     fp = filp_open(path, O_RDWR | O_CREAT, 0644);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+index 138c8d3..194c0c2 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+@@ -34,6 +34,7 @@
+ 
+ extern int adap_test;
+ extern char aic_fw_path[FW_PATH_MAX];
++extern void get_fw_path(char* fw_path);
+ extern struct aic_sdio_dev *aicbsp_sdiodev;
+ 
+ static void cmd_dump(const struct rwnx_cmd *cmd)
+@@ -537,6 +538,7 @@ int rwnx_load_firmware(u32 **fw_buf, const char *name, struct device *device)
+ 	void *buffer = NULL;
+ 	char *path = NULL;
+ 	struct file *fp = NULL;
++	char fw_dir[AICBSP_FW_PATH_MAX];
+ 	int size = 0, len = 0;// i = 0;
+ 	ssize_t rdlen = 0;
+ 	//u32 *src = NULL, *dst = NULL;
+@@ -561,11 +563,8 @@ int rwnx_load_firmware(u32 **fw_buf, const char *name, struct device *device)
+ 		return -1;
+ 	}
+ 
+-    if(strlen(aic_fw_path) > 0){
+-        len = snprintf(path, AICBSP_FW_PATH_MAX, "%s/%s", aic_fw_path, name);
+-    }else{
+-	    len = snprintf(path, AICBSP_FW_PATH_MAX, "%s/%s", AICBSP_FW_PATH, name);
+-    }
++	get_fw_path(fw_dir);
++	len = snprintf(path, AICBSP_FW_PATH_MAX, "%s/%s", fw_dir, name);
+ 	if (len >= AICBSP_FW_PATH_MAX) {
+ 		printk("%s: %s file's path too long\n", __func__, name);
+ 		*fw_buf = NULL;
+@@ -1093,6 +1092,7 @@ int is_file_exist(char* name)
+ {
+     char *path = NULL;
+     struct file *fp = NULL;
++    char fw_dir[FW_PATH_MAX_LEN];
+     int len;
+ 
+     path = __getname();
+@@ -1101,7 +1101,8 @@ int is_file_exist(char* name)
+         return -1;
+     }
+ 
+-    len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", AICBSP_FW_PATH, name);
++    get_fw_path(fw_dir);
++    len = snprintf(path, FW_PATH_MAX_LEN, "%s/%s", fw_dir, name);
+ 
+     fp = filp_open(path, O_RDONLY, 0);
+     if (IS_ERR(fp)) {
+@@ -2237,7 +2238,7 @@ int aicbsp_get_feature(struct aicbsp_feature_t *feature, char *fw_path)
+ 	feature->fwlog_en   = aicbsp_info.fwlog_en;
+ 	feature->irqf       = aicbsp_info.irqf;
+ 	if(fw_path != NULL){
+-		sprintf(fw_path,"%s", AICBSP_FW_PATH);
++		get_fw_path(fw_path);
+ 	}
+     
+     sdio_dbg("%s, set FEATURE_SDIO_CLOCK %d MHz\n", __func__, feature->sdio_clock/1000000);
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
+index 15e5469..c873db9 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.c
+@@ -2066,11 +2066,34 @@ fail:
+ 	return NULL;
+ }
+ 
++static const char* aicbsp_chip_fw_subdir(void)
++{
++	if (aicbsp_sdiodev) {
++		switch (aicbsp_sdiodev->chipid) {
++		case PRODUCT_ID_AIC8801:
++			return "/aic8800";
++		case PRODUCT_ID_AIC8800DC:
++		case PRODUCT_ID_AIC8800DW:
++			return "/aic8800DC";
++		case PRODUCT_ID_AIC8800D80:
++			return "/aic8800D80";
++		case PRODUCT_ID_AIC8800D80N:
++		case PRODUCT_ID_AIC8800D80WN:
++			return "/aic8800D80N";
++		case PRODUCT_ID_AIC8800D80X2:
++			return "/aic8800D80X2";
++		default:
++			break;
++		}
++	}
++	return "";
++}
++
+ void get_fw_path(char* fw_path){
+ 	if (strlen(aic_fw_path) > 0) {
+ 		memcpy(fw_path, aic_fw_path, strlen(aic_fw_path));
+ 	}else{
+-		memcpy(fw_path, aic_default_fw_path, strlen(aic_default_fw_path));
++		snprintf(fw_path, FW_PATH_MAX, "%s%s", aic_default_fw_path, aicbsp_chip_fw_subdir());
+ 	}
+ }
+ 
