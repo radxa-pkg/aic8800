@@ -25,3 +25,4 @@ fix-linux-7.1-build.patch
 fix-usb-suspend-reboot-hang.patch
 fix-linux-7.2-build.patch
 fix-sdio-per-chip-firmware-path.patch
+fix-linux-7.3-build.patch
