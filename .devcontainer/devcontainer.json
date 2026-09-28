@@ -29,7 +29,7 @@
             "version": "latest"
         }
     },
-    "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+    "image": "mcr.microsoft.com/devcontainers/base:bookworm",
     "mounts": [
         {
             "source": "${localWorkspaceFolder}/.devcontainer/.devenv",
