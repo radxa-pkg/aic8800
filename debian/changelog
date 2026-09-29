@@ -1,3 +1,17 @@
+aic8800 (5.0+git20260123.5f7be68d-9) noble; urgency=medium
+
+  [ Jianfeng Liu ]
+  * fix aic8800 sdio firmware load issue
+
+  [ lukaszsobala ]
+  * fix building on kernel 7.3
+  * chore: bump devcontainer to bookworm
+
+  [ ZHANG Yuntian ]
+  * chore: remove unsupported distros
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Tue, 29 Sep 2026 11:49:04 +0000
+
 aic8800 (5.0+git20260123.5f7be68d-8) noble; urgency=medium
 
   [ lukaszsobala ]
