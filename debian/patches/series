@@ -21,6 +21,7 @@ fix-Lower-the-debugging-log-level.patch
 fix-linux-6.19-build.patch
 fix-vmalloc-not-include.patch
 fix-build-on-low-memory-devices.patch
+fix-linux-7.0-build.patch
 fix-linux-7.1-build.patch
 fix-usb-suspend-reboot-hang.patch
 fix-linux-7.2-build.patch

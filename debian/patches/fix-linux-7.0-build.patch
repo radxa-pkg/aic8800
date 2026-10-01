@@ -1,0 +1,49 @@
+Description: Fix USB DKMS build against Linux 7.0
+ Linux 7.0 adds a radio_idx argument to cfg80211_ops.get_tx_power and no
+ longer exposes in_irq() to this out-of-tree driver. Add the new argument
+ conditionally and drop the in_irq() value from a debug-only log message.
+ .
+ Tested with Ubuntu 26.04.1 / Linux 7.0.0-31-generic on an AIC8800 USB
+ adapter; DKMS builds and the aic8800_fdrv/aic_load_fw modules load after
+ reboot.
+Author: Amne-Dev <amdev.email@gmail.com>
+Forwarded: no
+Last-Update: 2026-09-13
+
+Index: aic8800/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+===================================================================
+--- aic8800.orig/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ aic8800/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -4513,12 +4513,19 @@ static int rwnx_cfg80211_set_tx_power(st
+ static int rwnx_cfg80211_get_tx_power(struct wiphy *wiphy,
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+  struct wireless_dev *wdev,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
++ int radio_idx,
++#endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 14, 0)
+  unsigned int link_id,
+ #endif
+ #endif
+ 	int *mbm)
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
++	(void)radio_idx;
++#endif
+     #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+     struct wireless_dev *wdev = NULL;
+     #endif
+Index: aic8800/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+===================================================================
+--- aic8800.orig/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ aic8800/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1638,8 +1638,8 @@ void reord_deinit_sta(struct aicwf_rx_pr
+             reord_rxframe_free(&rx_priv->freeq_lock, &rx_priv->rxframes_freequeue, &req->rxframe_list);
+         }
+ 
+-		AICWFDBG(LOGINFO, "reord dinit in_irq():%d in_atomic:%d in_softirq:%d\r\n", (int)in_irq()
+-			,(int)in_atomic(), (int)in_softirq());
++		AICWFDBG(LOGINFO, "reord dinit in_atomic:%d in_softirq:%d\r\n",
++			(int)in_atomic(), (int)in_softirq());
+         spin_unlock_bh(&preorder_ctrl->reord_list_lock);
+     }
