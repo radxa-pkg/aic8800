@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Pranav0-0Aggarwal <96537779+Pranav0-0Aggarwal@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 22:12:58 +0530
+Subject: [PATCH] fix: usb: drop trace_printk from mgmt tx cfm
+
+trace_printk in rwnx_txdatacfm() prints a DEBUG kernel banner and
+allocates trace buffers when the module loads.
+
+Signed-off-by: Pranav0-0Aggarwal <96537779+Pranav0-0Aggarwal@users.noreply.github.com>
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
+index 8d2ab4a..9a8a97e 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_tx.c
+@@ -2376,9 +2376,6 @@ int rwnx_txdatacfm(void *pthis, void *host_id)
+ 
+     /* Update txq and HW queue credits */
+     if (sw_txhdr->desc.host.flags & TXU_CNTRL_MGMT) {
+-        trace_printk("done=%d retry_required=%d sw_retry_required=%d acknowledged=%d\n",
+-                     rwnx_txst.tx_done, rwnx_txst.retry_required,
+-                     rwnx_txst.sw_retry_required, rwnx_txst.acknowledged);
+ #ifdef CREATE_TRACE_POINTS
+         trace_mgmt_cfm(sw_txhdr->rwnx_vif->vif_index,
+                        (sw_txhdr->rwnx_sta) ? sw_txhdr->rwnx_sta->sta_idx : 0xFF,
