@@ -1,3 +1,10 @@
+aic8800 (5.0+git20260123.5f7be68d-10) noble; urgency=medium
+
+  [ Mecid Urganci ]
+  * fix USB build when sprintf overlaps aic_fw_path
+
+ -- "Radxa Computer Co., Ltd" <dev@radxa.com>  Mon, 12 Oct 2026 10:15:06 +0000
+
 aic8800 (5.0+git20260123.5f7be68d-9) noble; urgency=medium
 
   [ Jianfeng Liu ]
