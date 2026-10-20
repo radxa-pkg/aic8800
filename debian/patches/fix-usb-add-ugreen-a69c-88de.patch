@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Misaka0x272F <324347816+Misaka0x272F@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 00:00:00 +0800
+Subject: [PATCH] usb: support UGREEN a69c:88de (AIC8800DC variant)
+
+The UGREEN AX300 (CM760) leaves USB mass-storage mode as
+a69c:88de and reports "Product: AIC8800DC". That PID is absent from
+aicwf_usb_id_table[], so the driver never probes it.
+
+Add it the same way shenmintao/aic8800dc commit 46003a1 does: append it
+to the existing AIC8800DC branch in aicwf_usb_chipmatch() and to its
+USB_DEVICE_AND_INTERFACE_INFO entry, rather than adding a separate case
+with plain USB_DEVICE. The interface-class match stays consistent with
+the sibling entries, which matters because the device exposes more than
+one interface.
+
+The PID define is placed after 0x88dd so the list stays ordered by hex
+value, and is added to both CONFIG_USB_BT branches: aicwf_usb_chipmatch()
+is not guarded by that option and references the symbol unconditionally,
+so it has to be defined whichever branch the build selects.
+
+Firmware: no new files are needed. The 8800DC path uses fixed names
+(aic_userconfig_8800dc.txt, aic_powerlimit_8800dc.txt,
+fmacfw_patch_8800dc*.bin, fmacfw_calib_8800dc*.bin), not per-VID
+calibration, and all of them are already shipped under
+src/USB/driver_fw/fw/aic8800DC/. Mapping 0x88de to PRODUCT_ID_AIC8800DC
+therefore reuses the existing firmware set.
+
+Signed-off-by: Misaka0x272F <324347816+Misaka0x272F@users.noreply.github.com>
+---
+.../drivers/aic8800/aic8800_fdrv/aicwf_usb.c       |    3 ++-
+ .../drivers/aic8800/aic8800_fdrv/aicwf_usb.h       |    2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+---
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+index b3e194b..e677d06 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -2339,7 +2339,7 @@ static int aicwf_usb_chipmatch(struct aic_usb_dev *usb_dev, u16_l vid, u16_l pid
+ 		usb_dev->chipid = PRODUCT_ID_AIC8801;
+ 		AICWFDBG(LOGINFO, "%s USE AIC8801\r\n", __func__);
+ 		return 0;
+-	}else if(pid == USB_PRODUCT_ID_AIC8800DC){
++	}else if(pid == USB_PRODUCT_ID_AIC8800DC || pid == USB_PRODUCT_ID_AIC8800DE){
+ 		usb_dev->chipid = PRODUCT_ID_AIC8800DC;
+ 		AICWFDBG(LOGINFO, "%s USE AIC8800DC\r\n", __func__);
+ 		return 0;
+@@ -2657,6 +2657,7 @@ static struct usb_device_id aicwf_usb_id_table[] = {
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800D81, 0xff, 0xff, 0xff)},
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800D41, 0xff, 0xff, 0xff)},
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800DC, 0xff, 0xff, 0xff)},
++    {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800DE, 0xff, 0xff, 0xff)},
+     {USB_DEVICE(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800DW)},
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D81X2, 0xff, 0xff, 0xff)},
+     {USB_DEVICE(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D89X2)},
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
+index 7353999..d9e4b35 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
+@@ -23,6 +23,7 @@
+ #define USB_PRODUCT_ID_AIC8801          0x8801
+ #define USB_PRODUCT_ID_AIC8800DC        0x88dc
+ #define USB_PRODUCT_ID_AIC8800DW        0x88dd
++#define USB_PRODUCT_ID_AIC8800DE        0x88de
+ #define USB_PRODUCT_ID_AIC8800D81       0x8d81
+ #define USB_PRODUCT_ID_AIC8800D81X2     0x8d91
+ #define USB_PRODUCT_ID_AIC8800D89X2     0x8d99
+@@ -30,6 +31,7 @@
+ #define USB_PRODUCT_ID_AIC8801          0x8801
+ #define USB_PRODUCT_ID_AIC8800DC        0x88dc
+ #define USB_PRODUCT_ID_AIC8800DW        0x88dd
++#define USB_PRODUCT_ID_AIC8800DE        0x88de
+ #define USB_PRODUCT_ID_AIC8800D81       0x8d81
+ #define USB_PRODUCT_ID_AIC8800D41       0x8d41
+ #define USB_PRODUCT_ID_AIC8800D81X2     0x8d91
