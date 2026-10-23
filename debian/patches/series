@@ -33,3 +33,4 @@ fix-usb-aic8800dc-mcu-variant.patch
 fix-linux-7.4-build.patch
 fix-usb-cmd-timeout-reset.patch
 fix-usb-reset-limit-per-port.patch
+fix-usb-reboot-chip-after-reset.patch
