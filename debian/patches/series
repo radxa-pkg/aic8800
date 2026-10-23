@@ -42,3 +42,4 @@ fix-usb-ap-start-waits-for-join.patch
 fix-usb-stall-watch-per-device.patch
 fix-usb-state-read-never-resets.patch
 fix-usb-stall-watch-init-at-probe.patch
+fix-usb-cmd-mgr-quiesce.patch
