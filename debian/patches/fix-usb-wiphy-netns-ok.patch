@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Fri, 23 Oct 2026 00:00:00 +0100
+Subject: [PATCH] usb: allow the wiphy to move into another network namespace
+
+Without WIPHY_FLAG_NETNS_OK, 'iw phy <phy> set netns ...' is refused
+with EOPNOTSUPP, so the interface can't be used from a network
+namespace (as test rigs do to pair two radios in one machine).
+
+The driver keeps nothing per namespace. Its only uses of init_net are
+in two optional parts, both off in the default build: the bridge
+extension (CONFIG_BR_SUPPORT) looks its bridge up by name in init_net,
+and band steering (CONFIG_BAND_STEERING) keeps its netlink socket
+there. So the flag is set only when neither is built in.
+
+The same change, with the gate by Shen Mintao, is merged in
+shenmintao/aic8800d80 as 2e305e8 and 051b623 (#114).
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -9226,6 +9226,11 @@
+         WIPHY_FLAG_4ADDR_STATION |
+         WIPHY_FLAG_4ADDR_AP;
+ 
++#if !defined(CONFIG_BR_SUPPORT) && !defined(CONFIG_BAND_STEERING)
++    /* The optional bridge and steering paths still use init_net. */
++    wiphy->flags |= WIPHY_FLAG_NETNS_OK;
++#endif
++
+     #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
+     wiphy->max_num_csa_counters = BCN_MAX_CSA_CPT;
+     #endif
