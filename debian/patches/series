@@ -37,3 +37,4 @@ fix-usb-reboot-chip-after-reset.patch
 fix-usb-reset-counters.patch
 fix-usb-fw-state-at-timeout.patch
 fix-usb-stall-watch.patch
+fix-usb-fw-state-at-deferred-timeout.patch
