@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Fri, 23 Oct 2026 00:00:00 +0100
+Subject: [PATCH] usb: count the driver's resets in sysfs
+
+When the firmware stops answering, the driver resets the device and the link
+comes back by itself seconds later. Software watching the link from user space
+can't tell that from a fault of its own, and may act on top of the recovery.
+Two read-only parameters now say so: recoveries (resets asked for since the
+module was loaded) and recovered_at (the last, in seconds since boot as in
+/proc/uptime; 0 for none).
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+@@ -89,6 +89,14 @@ bool aicwf_reboot_chip_on_probe(struct usb_device *udev)
+ }
+ #endif
+ 
++/* Read-only: lets user space tell the driver's own reset from a fault, and wait for the device to come back. */
++static unsigned int recoveries;
++module_param(recoveries, uint, 0444);
++MODULE_PARM_DESC(recoveries, "How many device resets have been asked for on a command timeout");
++static long recovered_at;
++module_param(recovered_at, long, 0444);
++MODULE_PARM_DESC(recovered_at, "When the last reset was asked for, in seconds since boot as in /proc/uptime (0: none)");
++
+ #define RESET_INTERVAL	(30 * HZ)
+ 
+ /* The firmware stopped answering: reset the USB device, so the driver probes again and loads the firmware afresh.
+@@ -112,6 +120,8 @@ static void cmd_mgr_reset_device(struct rwnx_cmd_mgr *cmd_mgr)
+         port->reboot_on_probe = true;
+     }
+     spin_unlock_bh(&aicwf_ports_lock);
++    recoveries++;
++    recovered_at = (long)ktime_get_boottime_seconds();
+     printk(KERN_CRIT "aic8800: firmware not answering: resetting the device to load it afresh\n");
+     usb_queue_reset_device(usbdev->intf);
+ #endif
