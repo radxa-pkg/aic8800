@@ -1,0 +1,121 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Fri, 23 Oct 2026 00:00:00 +0100
+Subject: [PATCH] usb: log the patch table and overheard 4-address frames at debug level
+
+The USB driver logs two routine things at LOGERROR, so they show at this
+package's default aicwf_dbg_level (LOGERROR only) and fill the kernel log:
+
+- every entry of the firmware patch table, at every firmware load (111 lines
+  on an AIC8800DC);
+- every 4-address frame overheard from another network, with a hex dump of
+  it, which in a busy area is all the time.
+
+Now:
+
+- The patch table: each entry at LOGDEBUG; one line at LOGINFO with the file
+  and the number of entries written; a failure at LOGERROR, as before.
+- 4-address frames dropped by a build without CONFIG_SUPPORT_4ADDR: counted
+  per device and said at LOGINFO, the first at once and then at most once a
+  minute; each frame and its dump at LOGDEBUG.
+
+Both by aicwf_dbg_level, so neither needs a rebuild or dynamic debug:
+0x2 (INFO) for the summaries, 0x8 (DEBUG) for the detail, e.g.
+"options aic8800_fdrv_usb aicwf_dbg_level=11" in /etc/modprobe.d/, or
+/sys/module/aic8800_fdrv_usb/parameters/aicwf_dbg_level at run time (the
+patch table is written when the adapter starts).
+
+The same change is merged in shenmintao/aic8800d80 (#115).
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c |  7 ++++++-
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.c   |  7 ++++++-
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h             |  4 ++++
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c               | 13 +++++++++++--
+ 4 files changed, 27 insertions(+), 4 deletions(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c
+@@ -176,16 +176,21 @@ int aicwf_plat_patch_table_load_8800d80n(struct rwnx_hw *rwnx_hw)
+     AICWFDBG(LOGINFO, "tbl size = %d \n", size);
+ 
+     if (!err) {
++        int written = 0;
++
+         for (i = 0; i < (size / 4); i += 2) {
+             if ((dst[i] == 0x0) || (dst[i] == 0xFFFFFFFF)) {
+                 break; // end of tbl
+             }
+-            AICWFDBG(LOGERROR, "patch_tbl:  %x  %x\n", dst[i], dst[i+1]);
++            AICWFDBG(LOGDEBUG, "patch_tbl:  %x  %x\n", dst[i], dst[i+1]);
+             err = rwnx_send_dbg_mem_write_req(rwnx_hw, dst[i], dst[i+1]);
++            if (!err)
++                written++;
+         }
+         if (err) {
+             AICWFDBG(LOGERROR, "tbl bin upload fail: %x, err:%d\r\n", dst[i], err);
+         }
++        AICWFDBG(LOGINFO, "patch_tbl: %s: %d entries written (each at debug level)\n", filename, written);
+     }
+ 
+     if (dst) {
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.c
+@@ -2748,13 +2748,18 @@ int aicwf_patch_table_load(struct rwnx_hw *rwnx_hw, char *filename)
+ 	}
+ 
+     if (!err && (i < size)) {
++        int written = 0;
++
+         for (i =(128/4); i < (size/4); i +=2) {
+-            AICWFDBG(LOGERROR, "patch_tbl:  %x  %x\n", dst[i], dst[i+1]);
++            AICWFDBG(LOGDEBUG, "patch_tbl:  %x  %x\n", dst[i], dst[i+1]);
+             err = rwnx_send_dbg_mem_write_req(rwnx_hw, dst[i], dst[i+1]);
++            if (!err)
++                written++;
+         }
+         if (err) {
+             AICWFDBG(LOGERROR, "bin upload fail: %x, err:%d\r\n", dst[i], err);
+         }
++        AICWFDBG(LOGINFO, "patch_tbl: %s: %d entries written (each at debug level)\n", filename, written);
+     }
+ 
+     if (dst) {
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h
+@@ -935,6 +935,10 @@ struct rwnx_hw {
+ 	ktime_t last_time;
+ 	char last_alpha2[3];
+ 
++	/* 4-address frames dropped (a build without CONFIG_SUPPORT_4ADDR): counted, and said at most once a minute. */
++	unsigned int fouraddr_dropped;
++	unsigned long fouraddr_said;
++
+ };
+ 
+ u8 *rwnx_build_bcn(struct rwnx_bcn *bcn, struct cfg80211_beacon_data *new);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2427,8 +2427,17 @@ check_len_update:
+ 
+ #ifndef CONFIG_SUPPORT_4ADDR
+ 		if (hw_rxhdr->flags_is_4addr) {
+-					dev_err(rwnx_hw->dev, "4addr Frame received (%d), skb->len:%u\n", hw_rxhdr->flags_vif_idx, skb->len);
+-					print_hex_dump(KERN_ERR,"4addr ",DUMP_PREFIX_NONE, 16, 1, skb->data, skb->len, false);
++					rwnx_hw->fouraddr_dropped++;
++					if (!rwnx_hw->fouraddr_said || time_after(jiffies, rwnx_hw->fouraddr_said + 60 * HZ)) {
++						AICWFDBG(LOGINFO, "4addr frames dropped (this build has no CONFIG_SUPPORT_4ADDR): %u since the last count; "
++							 "aicwf_dbg_level with 0x8 (debug) logs each one\n", rwnx_hw->fouraddr_dropped);
++						rwnx_hw->fouraddr_dropped = 0;
++						rwnx_hw->fouraddr_said = jiffies ? jiffies : 1;
++					}
++					if (aicwf_dbg_level & LOGDEBUG) {
++						AICWFDBG(LOGDEBUG, "4addr Frame received (%d), skb->len:%u\n", hw_rxhdr->flags_vif_idx, skb->len);
++						print_hex_dump(KERN_DEBUG, "4addr ", DUMP_PREFIX_NONE, 16, 1, skb->data, skb->len, false);
++					}
+ 					dev_kfree_skb(skb);
+ 					goto end;
+ 		}
