@@ -1,0 +1,106 @@
+Description: aic_load_fw/bsp: handle command allocation failure in send path
+ kzalloc and the command pool can both return NULL. Free the lmac
+ message and return -ENOMEM instead of dereferencing the command.
+ The SDIO send path drops the wakeup lock it took before the allocation.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../driver/aic8800/aic8800_bsp/aic_bsp_driver.c    |  5 +++++
+ .../driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c      | 14 ++++++++++++++
+ .../drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c     | 10 ++++++++++
+ .../aic8800/aic_load_fw/aicbluetooth_cmds.c        |  5 +++++
+ 4 files changed, 34 insertions(+)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+index 5d5c223..512f7e1 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+@@ -350,6 +350,11 @@ static int rwnx_send_msg_sz(struct aic_sdio_dev *sdiodev, const void *msg_params
+ 
+ 	nonblock = 0;
+ 	cmd = kzalloc(sizeof(struct rwnx_cmd), nonblock ? GFP_ATOMIC : GFP_KERNEL);
++	if (!cmd) {
++		printk(KERN_CRIT "%s: cmd allocation failed\n", __func__);
++		rwnx_msg_free(msg, msg_params);
++		return -ENOMEM;
++	}
+ 	cmd->result  = -EINTR;
+ 	cmd->id      = msg->id;
+ 	cmd->reqid   = reqid;
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index a336b32..9663028 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -365,6 +365,14 @@ static int rwnx_send_msg_sz(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 	//nonblock = is_non_blocking_msg(msg->id);
+ 	nonblock = 0;
+ 	cmd = rwnx_cmd_malloc();//kzalloc(sizeof(struct rwnx_cmd), nonblock ? GFP_ATOMIC : GFP_KERNEL);
++	if (!cmd) {
++		AICWFDBG(LOGERROR, "%s: cmd allocation failed\n", __func__);
++		rwnx_msg_free(rwnx_hw, msg_params);
++#ifdef AICWF_SDIO_SUPPORT
++		rwnx_wakeup_unlock(rwnx_hw->ws_tx);
++#endif
++		return -ENOMEM;
++	}
+ 	cmd->result  = -EINTR;
+ 	cmd->id      = msg->id;
+ 	cmd->reqid   = reqid;
+@@ -438,6 +446,12 @@ static int rwnx_send_msg1_sz(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ 	//nonblock = is_non_blocking_msg(msg->id);
+ 	nonblock = 0;
+ 	cmd = rwnx_cmd_malloc();//kzalloc(sizeof(struct rwnx_cmd), nonblock ? GFP_ATOMIC : GFP_KERNEL);
++	if (!cmd) {
++		printk("%s: cmd allocation failed\n", __func__);
++		rwnx_msg_free(rwnx_hw, msg_params);
++		rwnx_wakeup_unlock(rwnx_hw->ws_tx);
++		return -ENOMEM;
++	}
+ 	cmd->result  = -EINTR;
+ 	cmd->id      = msg->id;
+ 	cmd->reqid   = reqid;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index c98f806..d12fc4d 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -444,6 +444,11 @@ static int rwnx_send_msg_sz(struct rwnx_hw *rwnx_hw, const void *msg_params,
+     //nonblock = is_non_blocking_msg(msg->id);
+     nonblock = 0;//AIDEN
+     cmd = rwnx_cmd_malloc();//kzalloc(sizeof(struct rwnx_cmd), nonblock ? GFP_ATOMIC : GFP_KERNEL);
++    if (!cmd) {
++        AICWFDBG(LOGERROR, "%s: cmd allocation failed\n", __func__);
++        rwnx_msg_free(rwnx_hw, msg_params);
++        return -ENOMEM;
++    }
+     cmd->result  = -EINTR;
+     cmd->id      = msg->id;
+     cmd->reqid   = reqid;
+@@ -522,6 +527,11 @@ static int rwnx_send_msg1_sz(struct rwnx_hw *rwnx_hw, const void *msg_params,
+     //nonblock = is_non_blocking_msg(msg->id);
+ 	nonblock = 0;
+     cmd = rwnx_cmd_malloc();//kzalloc(sizeof(struct rwnx_cmd), nonblock ? GFP_ATOMIC : GFP_KERNEL);
++    if (!cmd) {
++        AICWFDBG(LOGERROR, "%s: cmd allocation failed\n", __func__);
++        rwnx_msg_free(rwnx_hw, msg_params);
++        return -ENOMEM;
++    }
+     cmd->result  = -EINTR;
+     cmd->id      = msg->id;
+     cmd->reqid   = reqid;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
+index 774e889..a890a05 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
+@@ -323,6 +323,11 @@ static int rwnx_send_msg_sz(struct aic_usb_dev *usbdev, const void *msg_params,
+ 
+     nonblock = 0;
+     cmd = kzalloc(sizeof(struct rwnx_cmd), nonblock ? GFP_ATOMIC : GFP_KERNEL);
++    if (!cmd) {
++        printk(KERN_CRIT "%s: cmd allocation failed\n", __func__);
++        rwnx_msg_free(msg, msg_params);
++        return -ENOMEM;
++    }
+     cmd->result  = -EINTR;
+     cmd->id      = msg->id;
+     cmd->reqid   = reqid;

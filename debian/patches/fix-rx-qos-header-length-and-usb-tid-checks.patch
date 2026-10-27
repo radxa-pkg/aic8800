@@ -1,0 +1,148 @@
+Description: fdrv: check QoS/4-address header length before reading it; port TID and rx length checks to USB
+ Follow-up to "fdrv/sdio: drop rx frames with TID >= NX_NB_TID_PER_STA
+ and check 802.11 header length":
+ - drop frames shorter than the 802.11 header (30 bytes for 4-address
+   frames) before the RA/TA copies, and shorter than the QoS control
+   field (byte 24, or 30 for 4-address frames) before the TID read
+ - include CCMP256/GCMP128/GCMP256 in the ethertype length check
+ - apply the same checks and the TID >= NX_NB_TID_PER_STA drop to the
+   USB driver's rwnx_rxdataind_aicwf()
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../driver/aic8800/aic8800_fdrv/rwnx_rx.c     | 16 ++++++-
+ .../drivers/aic8800/aic8800_fdrv/rwnx_rx.c    | 46 +++++++++++++++++++
+ 2 files changed, 61 insertions(+), 1 deletion(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index ee4eaa2..b1eb8a4 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2434,6 +2434,12 @@ check_len_update:
+ 		}
+ #endif
+ 
++		/* 4-address frames: addr4 (and the TA copied below) ends at byte 30 */
++		if (unlikely(skb->len < hdr_len)) {
++			pr_warn_ratelimited("rwnx: rx frame %u < 802.11 hdr %u, drop\n", skb->len, hdr_len);
++			dev_kfree_skb(skb);
++			goto end;
++		}
+ 		frame_ctrl = (skb->data[1] << 8) | skb->data[0];
+ 		seq_num = ((skb->data[22] & 0xf0) >> 4) | (skb->data[23] << 4);
+ 		frag_num = (skb->data[22] & 0x0f);
+@@ -2442,6 +2448,12 @@ check_len_update:
+ 		if ((skb->data[0] & 0x0f) == 0x08) {
+ 			if ((skb->data[0] & 0x80) == 0x80) {//qos data
+ 				hdr_len += 2;
++				/* QoS control is at byte 24 (30 for 4-address frames) */
++				if (unlikely(skb->len < hdr_len)) {
++					pr_warn_ratelimited("rwnx: rx qos frame %u < %u, drop\n", skb->len, hdr_len);
++					dev_kfree_skb(skb);
++					goto end;
++				}
+ #ifdef CONFIG_SUPPORT_4ADDR
+ 				tid = b_4addr ? (skb->data[30] & 0x0F) : (skb->data[24] & 0x0F);
+ #else
+@@ -2524,7 +2536,9 @@ check_len_update:
+ 			{	/* everything up to the ethertype must be in the frame */
+ 				u32 need = hdr_len + 8;
+ 				switch (hw_rxhdr->hwvect.decr_status) {
+-				case RWNX_RX_HD_DECR_CCMP128: case RWNX_RX_HD_DECR_TKIP: need += 8; break;
++				case RWNX_RX_HD_DECR_CCMP128: case RWNX_RX_HD_DECR_CCMP256:
++				case RWNX_RX_HD_DECR_GCMP128: case RWNX_RX_HD_DECR_GCMP256:
++				case RWNX_RX_HD_DECR_TKIP: need += 8; break;
+ 				case RWNX_RX_HD_DECR_WEP: need += 4; break;
+ 				case RWNX_RX_HD_DECR_WAPI: need += 18; break;
+ 				default: break;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+index 6a72cc3..7f93013 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2261,6 +2261,12 @@ u8 rwnx_rxdataind_aicwf(struct rwnx_hw *rwnx_hw, void *hostid, void *rx_priv)
+ 	struct rwnx_sta *cur_sta;
+ #endif
+     REG_SW_SET_PROFILING(rwnx_hw, SW_PROF_RWNXDATAIND);
++    /* the rx descriptor and padding must be present before they are read */
++    if (unlikely(skb->len < msdu_offset + 2)) {
++        pr_warn_ratelimited("rwnx: rx frame %u < hdr %d, drop\n", skb->len, msdu_offset);
++        dev_kfree_skb(skb);
++        return 0;
++    }
+     hw_rxhdr = (struct hw_rxhdr *)skb->data;
+ 
+ #ifdef AICWF_RX_REORDER
+@@ -2409,6 +2415,12 @@ check_len_update:
+ #endif
+ 
+         skb_pull(skb, msdu_offset + 2); //+2 since sdio allign 58->60
++		/* 802.11 header bytes are read below without checks */
++		if (unlikely(skb->len < 24)) {
++			pr_warn_ratelimited("rwnx: rx 802.11 frame %u too short, drop\n", skb->len);
++			dev_kfree_skb(skb);
++			goto end;
++		}
+ #define MAC_FCTRL_MOREFRAG 0x0400
+ 
+ #ifdef CONFIG_SUPPORT_4ADDR
+@@ -2418,6 +2430,12 @@ check_len_update:
+ 		}
+ #endif
+ 
++		/* 4-address frames: addr4 (and the TA copied below) ends at byte 30 */
++		if (unlikely(skb->len < hdr_len)) {
++			pr_warn_ratelimited("rwnx: rx frame %u < 802.11 hdr %u, drop\n", skb->len, hdr_len);
++			dev_kfree_skb(skb);
++			goto end;
++		}
+ 		frame_ctrl = (skb->data[1] << 8) | skb->data[0];
+ 		seq_num = ((skb->data[22] & 0xf0) >> 4) | (skb->data[23] << 4);
+ 		frag_num = (skb->data[22] & 0x0f);
+@@ -2426,11 +2444,23 @@ check_len_update:
+ 		if ((skb->data[0] & 0x0f) == 0x08) {
+ 			if ((skb->data[0] & 0x80) == 0x80) {//qos data
+ 				hdr_len += 2;
++				/* QoS control is at byte 24 (30 for 4-address frames) */
++				if (unlikely(skb->len < hdr_len)) {
++					pr_warn_ratelimited("rwnx: rx qos frame %u < %u, drop\n", skb->len, hdr_len);
++					dev_kfree_skb(skb);
++					goto end;
++				}
+ #ifdef CONFIG_SUPPORT_4ADDR
+ 				tid = b_4addr ? (skb->data[30] & 0x0F) : (skb->data[24] & 0x0F);
+ #else
+ 				tid = skb->data[24] & 0x0F;
+ #endif
++				/* TID 8-15 (TSPEC) would index preorder_ctrl[8]/txq tables out of range */
++				if (unlikely(tid >= NX_NB_TID_PER_STA)) {
++					pr_warn_ratelimited("rwnx: rx tid %u, drop\n", tid);
++					dev_kfree_skb(skb);
++					goto end;
++				}
+ 				is_qos = 1;
+ #ifdef CONFIG_SUPPORT_4ADDR
+ 				if (b_4addr) {
+@@ -2499,6 +2529,22 @@ check_len_update:
+ #endif
+ 
+             pull_len += (hdr_len + 8);
++			{	/* everything up to the ethertype must be in the frame */
++				u32 need = hdr_len + 8;
++				switch (hw_rxhdr->hwvect.decr_status) {
++				case RWNX_RX_HD_DECR_CCMP128: case RWNX_RX_HD_DECR_CCMP256:
++				case RWNX_RX_HD_DECR_GCMP128: case RWNX_RX_HD_DECR_GCMP256:
++				case RWNX_RX_HD_DECR_TKIP: need += 8; break;
++				case RWNX_RX_HD_DECR_WEP: need += 4; break;
++				case RWNX_RX_HD_DECR_WAPI: need += 18; break;
++				default: break;
++				}
++				if (unlikely(skb->len < need)) {
++					pr_warn_ratelimited("rwnx: rx frame %u < %u, drop\n", skb->len, need);
++					dev_kfree_skb(skb);
++					goto end;
++				}
++			}
+ 
+ 			switch (hw_rxhdr->hwvect.decr_status) {
+ 			case RWNX_RX_HD_DECR_CCMP128:

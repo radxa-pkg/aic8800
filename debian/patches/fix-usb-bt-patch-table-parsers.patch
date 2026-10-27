@@ -1,0 +1,150 @@
+Description: aic_load_fw usb: check lengths and allocations in the BT patch-table parsers
+ USB counterpart of "bsp: check lengths and allocations in the BT
+ patch-table parser", applied to both parsers in aicbluetooth.c
+ (aicbt_patch_table_alloc() and
+ rwnx_plat_bin_fw_patch_table_upload_android()): require the 16-byte
+ tag and each 24-byte entry header to fit in the file, require
+ len <= remaining / 8 for each payload (also rules out the len * 8
+ overflow), check vmalloc results, and free the partial table on error.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../aic8800/aic_load_fw/aicbluetooth.c        | 64 ++++++++++++++++++-
+ 1 file changed, 63 insertions(+), 1 deletion(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
+index 0412882..7e52647 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth.c
+@@ -1160,6 +1160,11 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(struct aic_usb_dev *usbdev,con
+ 
+ 	p = rawdata;
+ 
++	if (size < 16) {
++		printk("patch table too short\n");
++		ret = -1;
++		goto err;
++	}
+ 	if (memcmp(p, AICBT_PT_TAG, sizeof(AICBT_PT_TAG) < 16 ? sizeof(AICBT_PT_TAG) : 16)) {
+ 		printk("TAG err\n");
+ 		ret = -1;
+@@ -1169,7 +1174,17 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(struct aic_usb_dev *usbdev,con
+ 
+ 	while (p - rawdata < size) {
+ 		//printk("size = %d  p - rawdata = %d \r\n", size, p - rawdata);
++		/* each entry needs a 24-byte header that fits in the file */
++		if (size - (p - rawdata) < 24) {
++			printk("patch table: truncated entry header\n");
++			ret = -1;
++			goto err;
++		}
+ 		new = (struct aicbt_patch_table *)vmalloc(sizeof(struct aicbt_patch_table));
++		if (!new) {
++			ret = -ENOMEM;
++			goto err;
++		}
+ 		memset(new, 0, sizeof(struct aicbt_patch_table));
+ 		if (head == NULL) {
+ 			head = new;
+@@ -1180,6 +1195,10 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(struct aic_usb_dev *usbdev,con
+ 		}
+ 
+ 		cur->name = (char *)vmalloc(sizeof(char) * 16);
++		if (!cur->name) {
++			ret = -ENOMEM;
++			goto err;
++		}
+ 		memset(cur->name, 0, sizeof(char) * 16);
+ 		memcpy(cur->name, p, 16);
+ 		p += 16;
+@@ -1193,7 +1212,19 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(struct aic_usb_dev *usbdev,con
+ 		if((cur->type )  >= 1000 || cur->len == 0) {//Temp Workaround
+ 			cur->len = 0;
+ 		}else{
++			/* payload must fit in the remaining file (also rules out len*8 overflow) */
++			if (cur->len > (uint32_t)(size - (p - rawdata)) / 8) {
++				printk("patch table: entry len %u exceeds file\n", cur->len);
++				cur->len = 0;
++				ret = -1;
++				goto err;
++			}
+ 			cur->data = (uint32_t *)vmalloc(sizeof(uint8_t) * cur->len * 8);
++			if (!cur->data) {
++				cur->len = 0;
++				ret = -ENOMEM;
++				goto err;
++			}
+ 			memset(cur->data, 0, sizeof(uint8_t) * cur->len * 8);
+ 			memcpy(cur->data, p, cur->len * 8);
+ 			p += cur->len * 8;
+@@ -1515,6 +1546,11 @@ int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char
+ 
+ 	p = rawdata;
+ 
++	if (size < 16) {
++		printk("patch table too short\n");
++		ret = -1;
++		goto err;
++	}
+ 	if (memcmp(p, AICBT_PT_TAG, sizeof(AICBT_PT_TAG) < 16 ? sizeof(AICBT_PT_TAG) : 16)) {
+ 		printk("TAG err\n");
+ 		ret = -1;
+@@ -1524,7 +1560,17 @@ int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char
+ 
+ 	while (p - rawdata < size) {
+ 		//printk("size = %d  p - rawdata = %d \r\n", size, p - rawdata);
++		/* each entry needs a 24-byte header that fits in the file */
++		if (size - (p - rawdata) < 24) {
++			printk("patch table: truncated entry header\n");
++			ret = -1;
++			goto err;
++		}
+ 		new = (struct aicbt_patch_table *)vmalloc(sizeof(struct aicbt_patch_table));
++		if (!new) {
++			ret = -ENOMEM;
++			goto err;
++		}
+ 		memset(new, 0, sizeof(struct aicbt_patch_table));
+ 		if (head == NULL) {
+ 			head = new;
+@@ -1535,6 +1581,10 @@ int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char
+ 		}
+ 
+ 		cur->name = (char *)vmalloc(sizeof(char) * 16);
++		if (!cur->name) {
++			ret = -ENOMEM;
++			goto err;
++		}
+ 		memset(cur->name, 0, sizeof(char) * 16);
+ 		memcpy(cur->name, p, 16);
+ 		p += 16;
+@@ -1548,7 +1598,19 @@ int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char
+ 		if((cur->type )  >= 1000 || cur->len == 0) {//Temp Workaround
+ 			cur->len = 0;
+ 		}else{
++			/* payload must fit in the remaining file (also rules out len*8 overflow) */
++			if (cur->len > (uint32_t)(size - (p - rawdata)) / 8) {
++				printk("patch table: entry len %u exceeds file\n", cur->len);
++				cur->len = 0;
++				ret = -1;
++				goto err;
++			}
+ 			cur->data = (uint32_t *)vmalloc(sizeof(uint8_t) * cur->len * 8);
++			if (!cur->data) {
++				cur->len = 0;
++				ret = -ENOMEM;
++				goto err;
++			}
+ 			memset(cur->data, 0, sizeof(uint8_t) * cur->len * 8);
+ 			memcpy(cur->data, p, cur->len * 8);
+ 			p += cur->len * 8;
+@@ -1561,7 +1623,7 @@ int rwnx_plat_bin_fw_patch_table_upload_android(struct aic_usb_dev *usbdev, char
+ 
+ 	return ret;
+ err:
+-	//aicbt_patch_table_free(&head);
++	aicbt_patch_table_free(head);
+ 
+ 	if (rawdata){
+ 		vfree(rawdata);

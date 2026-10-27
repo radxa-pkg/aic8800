@@ -1,0 +1,192 @@
+Description: fdrv/bsp sdio: validate rx aggregate and E2A message lengths
+ aicwf_process_rxframes() used lengths taken from the SDIO rx buffer
+ for memcpy/skb_pull without comparing them to skb->len. Require at
+ least the 4-byte header, drop aggregates whose length exceeds the
+ buffer, bound skb_pull, allocate config messages zero-padded to at
+ least sizeof(struct ipc_e2a_msg) (+1 NUL for firmware print strings),
+ clamp param_len to the bytes actually received and drop short
+ messages. In bsp, free the per-frame data skb that was leaked and
+ avoid reusing skb_inblock across buffers.
+ .
+ The CONFIG_PREALLOC_RX_SKB rx path is not covered by this change.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../aic8800/aic8800_bsp/aicsdio_txrxif.c      | 38 +++++++++++++++---
+ .../aic8800/aic8800_fdrv/aicwf_txrxif.c       | 39 ++++++++++++++++---
+ 2 files changed, 65 insertions(+), 12 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c
+index 84e6ca7..09c9a80 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c
+@@ -170,6 +170,8 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 		}
+ 		while (aicwf_another_ptk(skb)) {
+ 			data = skb->data;
++			if (skb->len < 4)
++				break;
+ 			pkt_len = (*skb->data | (*(skb->data + 1) << 8));
+ 
+ 			if ((skb->data[2] & SDIO_TYPE_CFG) != SDIO_TYPE_CFG) { // type : data
+@@ -180,6 +182,10 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				else
+ 					adjust_len = aggr_len;
+ 
++				if (aggr_len > skb->len) {
++					pr_warn_ratelimited("aicbsp: rx data len %u > buf %u, drop\n", aggr_len, skb->len);
++					break;
++				}
+ 				skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);//8 is for ccmp mic or wep icv
+ 				if (skb_inblock == NULL) {
+ 					txrx_err("no more space!\n");
+@@ -192,7 +198,9 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				#if 0
+ 				rwnx_rxdataind_aicwf(rx_priv->sdiodev->rwnx_hw, skb_inblock, (void *)rx_priv);
+ 				#endif
+-				skb_pull(skb, adjust_len);
++				dev_kfree_skb(skb_inblock); /* was leaked */
++				skb_inblock = NULL;
++				skb_pull(skb, min_t(u32, adjust_len, skb->len));
+ 			} else { //  type : config
+ 				aggr_len = pkt_len;
+ 
+@@ -201,27 +209,45 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				else
+ 					adjust_len = aggr_len;
+ 
+-			   skb_inblock = __dev_alloc_skb(aggr_len+4, GFP_KERNEL);
++			   if ((u32)aggr_len + 4 > skb->len) {
++				   pr_warn_ratelimited("aicbsp: rx cfg len %u > buf %u, drop\n", aggr_len, skb->len);
++				   break;
++			   }
++			   dev_kfree_skb(skb_inblock); /* free the previous one */
++			   skb_inblock = __dev_alloc_skb(max_t(u32, aggr_len + 4, 4 + sizeof(struct ipc_e2a_msg)), GFP_KERNEL);
+ 			   if (skb_inblock == NULL) {
+ 				   txrx_err("no more space!\n");
+ 				   aicwf_dev_skb_free(skb);
+ 				   return -EBADE;
+ 				}
+ 
+-				skb_put(skb_inblock, aggr_len+4);
++				skb_put_zero(skb_inblock, max_t(u32, aggr_len + 4, 4 + sizeof(struct ipc_e2a_msg)));
+ 				memcpy(skb_inblock->data, data, aggr_len+4);
+-				if ((*(skb_inblock->data + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP)
+-					rwnx_rx_handle_msg(rx_priv->sdiodev, (struct ipc_e2a_msg *)(skb_inblock->data + 4));
++				if ((*(skb_inblock->data + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP) {
++					struct ipc_e2a_msg *em = (struct ipc_e2a_msg *)(skb_inblock->data + 4);
++					const u32 hdr = offsetof(struct ipc_e2a_msg, param);
++					u32 room = aggr_len > hdr ? aggr_len - hdr : 0;
++					if (room > sizeof(em->param))
++						room = sizeof(em->param);
++					if (aggr_len >= hdr) {
++						if (em->param_len > room) {
++							pr_warn_ratelimited("aicbsp: e2a 0x%x param_len %u > %u, clamped\n", em->id, em->param_len, room);
++							em->param_len = room;
++						}
++						rwnx_rx_handle_msg(rx_priv->sdiodev, em);
++					}
++				}
+ 				#if 0
+ 				if ((*(skb_inblock->data + 2) & 0x7f) == SDIO_TYPE_CFG_DATA_CFM)
+ 					aicwf_sdio_host_tx_cfm_handler(&(rx_priv->sdiodev->rwnx_hw->sdio_env), (u32 *)(skb_inblock->data + 4));
+ 				#endif
+-				skb_pull(skb, adjust_len+4);
++				skb_pull(skb, min_t(u32, adjust_len + 4, skb->len));
+ 			}
+ 		}
+ 
+ 		/* skb_inblock no used currently, just free it! */
+ 		dev_kfree_skb(skb_inblock);
++		skb_inblock = NULL; /* avoid reuse/double free on the next skb */
+ 		dev_kfree_skb(skb);
+ 		atomic_dec(&rx_priv->rx_cnt);
+ 	}
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index 555a8de..b39e7e8 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -384,6 +384,8 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 		}
+ 		while (aicwf_another_ptk(skb)) {
+ 			data = skb->data;
++			if (skb->len < 4)
++				break;
+ 			pkt_len = (*skb->data | (*(skb->data + 1) << 8));
+ 
+ 			if ((skb->data[2] & SDIO_TYPE_CFG) != SDIO_TYPE_CFG) { // type : data
+@@ -394,17 +396,22 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				else
+ 					adjust_len = aggr_len;
+ 
++				/* firmware-supplied length must lie inside the received buffer */
++				if (aggr_len > skb->len) {
++					pr_warn_ratelimited("rwnx: rx data len %u > buf %u, drop\n", aggr_len, skb->len);
++					break;
++				}
+ 				skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);
+ 				if (skb_inblock == NULL) {
+ 					txrx_err("no more space! skip\n");
+-					skb_pull(skb, adjust_len);
++					skb_pull(skb, min_t(u32, adjust_len, skb->len));
+ 					continue;
+ 				}
+ 
+ 				skb_put(skb_inblock, aggr_len);
+ 				memcpy(skb_inblock->data, data, aggr_len);
+ 				rwnx_rxdataind_aicwf(rx_priv->sdiodev->rwnx_hw, skb_inblock, (void *)rx_priv);
+-				skb_pull(skb, adjust_len);
++				skb_pull(skb, min_t(u32, adjust_len, skb->len));
+ 			} else {
+ 				//  type : config
+ 				aggr_len = pkt_len;
+@@ -414,7 +421,13 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				else
+ 					adjust_len = aggr_len;
+ 
+-				msg = kmalloc(aggr_len+4, GFP_KERNEL);
++				/* bounds + zero padding so fixed-size handler structs stay in bounds,
++				 * +1 keeps FW print strings NUL-terminated */
++				if ((u32)aggr_len + 4 > skb->len) {
++					pr_warn_ratelimited("rwnx: rx cfg len %u > buf %u, drop\n", aggr_len, skb->len);
++					break;
++				}
++				msg = kzalloc(max_t(size_t, aggr_len + 4, 4 + sizeof(struct ipc_e2a_msg)) + 1, GFP_KERNEL);
+ 				if (msg == NULL) {
+ 					txrx_err("no more space for msg!\n");
+ 					aicwf_dev_skb_free(skb);
+@@ -422,8 +435,22 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				}
+ 
+ 				memcpy(msg, data, aggr_len + 4);
+-				if (((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP) && (rx_priv->sdiodev->bus_if->state != BUS_DOWN_ST))
+-					rwnx_rx_handle_msg(rx_priv->sdiodev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++				if (((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP) && (rx_priv->sdiodev->bus_if->state != BUS_DOWN_ST)) {
++					struct ipc_e2a_msg *em = (struct ipc_e2a_msg *)(msg + 4);
++					const u32 hdr = offsetof(struct ipc_e2a_msg, param);
++					u32 room = aggr_len > hdr ? aggr_len - hdr : 0;
++					if (room > sizeof(em->param))
++						room = sizeof(em->param);
++					if (aggr_len < hdr) {
++						pr_warn_ratelimited("rwnx: short e2a msg %u\n", aggr_len);
++					} else {
++						if (em->param_len > room) {
++							pr_warn_ratelimited("rwnx: e2a 0x%x param_len %u > %u, clamped\n", em->id, em->param_len, room);
++							em->param_len = room;
++						}
++						rwnx_rx_handle_msg(rx_priv->sdiodev->rwnx_hw, em);
++					}
++				}
+ 
+ 				if ((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_DATA_CFM)
+ 					aicwf_sdio_host_tx_cfm_handler(&(rx_priv->sdiodev->rwnx_hw->sdio_env), (u32 *)(msg + 4));
+@@ -431,7 +458,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				if ((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_PRINT)
+ 					rwnx_rx_handle_print(rx_priv->sdiodev->rwnx_hw, msg + 4, aggr_len);
+ 
+-				skb_pull(skb, adjust_len+4);
++				skb_pull(skb, min_t(u32, adjust_len + 4, skb->len));
+ 				kfree(msg);
+ 			}
+ 		}

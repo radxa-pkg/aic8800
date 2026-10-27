@@ -1,0 +1,254 @@
+Description: fdrv/bsp: range-check firmware-supplied message ids and vif/sta/chan indices
+ Message ids and vif/station/channel indices in firmware E2A messages
+ and rx descriptors are used as array indices without range checks.
+ Validate them against their table sizes before dispatch and drop
+ messages that fail; bound the handler-table lookup in fdrv and bsp;
+ check sta_idx/dst_idx and vlan_idx in the rx data path.
+ .
+ SM_CONNECT_IND only has its ap/ch/width indices checked when
+ status_code is 0, since the handler only uses them on success and a
+ failed connect must still be reported. SCANU_RESULT_IND also requires
+ ind->length to cover the probe response fixed fields
+ (offsetof(struct ieee80211_mgmt, u.probe_resp.variable)), which the
+ handler reads unconditionally.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../aic8800/aic8800_bsp/aic_bsp_driver.c      |  10 +-
+ .../driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c | 144 +++++++++++++++++-
+ .../driver/aic8800/aic8800_fdrv/rwnx_rx.c     |  13 +-
+ 3 files changed, 159 insertions(+), 8 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+index 194c0c2..9788152 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+@@ -472,8 +472,14 @@ static msg_cb_fct *msg_hdlrs[] = {
+ 
+ void rwnx_rx_handle_msg(struct aic_sdio_dev *sdiodev, struct ipc_e2a_msg *msg)
+ {
+-	sdiodev->cmd_mgr.msgind(&sdiodev->cmd_mgr, msg,
+-							msg_hdlrs[MSG_T(msg->id)][MSG_I(msg->id)]);
++	/* firmware-supplied id indexes the handler tables */
++	unsigned int t = MSG_T(msg->id), i = MSG_I(msg->id);
++	msg_cb_fct cb = NULL;
++
++	if (t == TASK_DBG && i < ARRAY_SIZE(dbg_hdlrs))
++		cb = dbg_hdlrs[i];
++	(void)msg_hdlrs;
++	sdiodev->cmd_mgr.msgind(&sdiodev->cmd_mgr, msg, cb);
+ }
+ 
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index 2a03bf4..9032acd 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -590,7 +590,7 @@ static inline int rwnx_rx_ps_change_ind(struct rwnx_hw *rwnx_hw,
+ 	struct mm_ps_change_ind *ind = (struct mm_ps_change_ind *)msg->param;
+ 	struct rwnx_sta *sta = &rwnx_hw->sta_table[ind->sta_idx];
+ 
+-	if (ind->sta_idx >= (NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX)) {
++	if (ind->sta_idx >= (NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX) || sta->vif_idx >= NX_VIRT_DEV_MAX || !rwnx_hw->vif_table[sta->vif_idx]) {
+ 		wiphy_err(rwnx_hw->wiphy, "Invalid sta index reported by fw %d\n",
+ 				  ind->sta_idx);
+ 		return 1;
+@@ -1579,12 +1579,150 @@ static msg_cb_fct *msg_hdlrs[] = {
+ /**
+  *
+  */
++/* number of entries in each per-task handler table (msg_hdlrs rows) */
++static const unsigned int msg_hdlrs_n[] = {
++	[TASK_MM]    = ARRAY_SIZE(mm_hdlrs),
++	[TASK_DBG]   = ARRAY_SIZE(dbg_hdlrs),
++#ifdef CONFIG_RWNX_FULLMAC
++	[TASK_TDLS]  = ARRAY_SIZE(tdls_hdlrs),
++	[TASK_SCANU] = ARRAY_SIZE(scan_hdlrs),
++	[TASK_ME]    = ARRAY_SIZE(me_hdlrs),
++	[TASK_SM]    = ARRAY_SIZE(sm_hdlrs),
++	[TASK_APM]   = ARRAY_SIZE(apm_hdlrs),
++	[TASK_MESH]  = ARRAY_SIZE(mesh_hdlrs),
++#endif
++};
++
++#define RWNX_VIF_MAX  NX_VIRT_DEV_MAX
++#define RWNX_STA_MAX  (NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX)
++#define RWNX_BAD(cond, fmt, ...) do { if (unlikely(cond)) { \
++	pr_warn_ratelimited("rwnx: drop fw msg 0x%x: " fmt "\n", msg->id, ##__VA_ARGS__); return false; } } while (0)
++#define RWNX_P(type) ((const struct type *)msg->param)
++#define RWNX_VIF_PRESENT(i) ((i) < RWNX_VIF_MAX && rwnx_hw->vif_table[(i)])
++
++/*
++ * central validation of firmware-supplied indices/lengths before any handler or
++ * confirmation copy runs. Out of range -> the message is dropped (rate-limited warning).
++ * msg->param_len has already been checked against the received SDIO buffer, and the buffer is
++ * zero-padded to sizeof(struct ipc_e2a_msg), so reading these fixed fields is in bounds.
++ */
++static bool rwnx_fw_msg_valid(struct rwnx_hw *rwnx_hw, const struct ipc_e2a_msg *msg)
++{
++	switch (msg->id) {
++	case MM_PS_CHANGE_IND:
++		RWNX_BAD(RWNX_P(mm_ps_change_ind)->sta_idx >= RWNX_STA_MAX, "sta_idx %u", RWNX_P(mm_ps_change_ind)->sta_idx);
++		RWNX_BAD(rwnx_hw->sta_table[RWNX_P(mm_ps_change_ind)->sta_idx].vif_idx >= RWNX_VIF_MAX, "sta vif");
++		break;
++	case MM_TRAFFIC_REQ_IND:
++		RWNX_BAD(RWNX_P(mm_traffic_req_ind)->sta_idx >= RWNX_STA_MAX, "sta_idx %u", RWNX_P(mm_traffic_req_ind)->sta_idx);
++		RWNX_BAD(!RWNX_VIF_PRESENT(rwnx_hw->sta_table[RWNX_P(mm_traffic_req_ind)->sta_idx].vif_idx), "sta vif");
++		break;
++	case MM_P2P_VIF_PS_CHANGE_IND:
++		RWNX_BAD(RWNX_P(mm_p2p_vif_ps_change_ind)->vif_index >= RWNX_VIF_MAX, "vif %u", RWNX_P(mm_p2p_vif_ps_change_ind)->vif_index);
++		break;
++	case MM_RSSI_STATUS_IND:
++		RWNX_BAD(RWNX_P(mm_rssi_status_ind)->vif_index >= RWNX_VIF_MAX, "vif %u", RWNX_P(mm_rssi_status_ind)->vif_index);
++		break;
++	case MM_PKTLOSS_IND:
++		RWNX_BAD(RWNX_P(mm_pktloss_ind)->vif_index >= RWNX_VIF_MAX, "vif %u", RWNX_P(mm_pktloss_ind)->vif_index);
++		break;
++	case MM_CSA_COUNTER_IND:
++		RWNX_BAD(RWNX_P(mm_csa_counter_ind)->vif_index >= RWNX_VIF_MAX, "vif");
++		break;
++	case MM_CSA_FINISH_IND:
++		RWNX_BAD(RWNX_P(mm_csa_finish_ind)->vif_index >= RWNX_VIF_MAX, "vif");
++		RWNX_BAD(RWNX_P(mm_csa_finish_ind)->chan_idx >= NX_CHAN_CTXT_CNT && RWNX_P(mm_csa_finish_ind)->chan_idx != RWNX_CH_NOT_SET, "chan");
++		break;
++	case MM_CSA_TRAFFIC_IND:
++		RWNX_BAD(RWNX_P(mm_csa_traffic_ind)->vif_index >= RWNX_VIF_MAX, "vif");
++		break;
++	case MM_CHANNEL_SWITCH_IND:
++		RWNX_BAD(RWNX_P(mm_channel_switch_ind)->chan_index >= NX_CHAN_CTXT_CNT &&
++		       RWNX_P(mm_channel_switch_ind)->chan_index != RWNX_CH_NOT_SET, "chan %u", RWNX_P(mm_channel_switch_ind)->chan_index);
++		break;
++	case MM_REMAIN_ON_CHANNEL_EXP_IND:
++		RWNX_BAD(RWNX_P(mm_remain_on_channel_exp_ind)->vif_index >= RWNX_VIF_MAX, "vif");
++		break;
++	case MM_P2P_NOA_UPD_IND:
++		RWNX_BAD(RWNX_P(mm_p2p_noa_upd_ind)->vif_index >= RWNX_VIF_MAX, "vif");
++		break;
++	case MM_APM_STALOSS_IND:
++		RWNX_BAD(RWNX_P(mm_apm_staloss_ind)->vif_idx >= RWNX_VIF_MAX, "vif");
++		break;
++	case ME_TKIP_MIC_FAILURE_IND:
++		RWNX_BAD(!RWNX_VIF_PRESENT(RWNX_P(me_tkip_mic_failure_ind)->vif_idx), "vif %u", RWNX_P(me_tkip_mic_failure_ind)->vif_idx);
++		break;
++	case ME_TX_CREDITS_UPDATE_IND:
++		RWNX_BAD(RWNX_P(me_tx_credits_update_ind)->sta_idx >= RWNX_STA_MAX, "sta");
++		RWNX_BAD(RWNX_P(me_tx_credits_update_ind)->tid >= NX_NB_TXQ_PER_STA, "tid");
++		break;
++	case SM_CONNECT_IND: {
++		const struct sm_connect_ind *ind = RWNX_P(sm_connect_ind);
++		RWNX_BAD(!RWNX_VIF_PRESENT(ind->vif_idx), "vif %u", ind->vif_idx);
++		/* the handler only uses ap/ch/width on success; a failed connect must still reach it */
++		if (ind->status_code == 0) {
++			RWNX_BAD(ind->ap_idx >= RWNX_STA_MAX, "ap_idx %u", ind->ap_idx);
++			RWNX_BAD(ind->ch_idx >= NX_CHAN_CTXT_CNT, "ch_idx %u", ind->ch_idx);
++			RWNX_BAD(ind->width > PHY_CHNL_BW_80P80, "width %u", ind->width);
++		}
++		RWNX_BAD((u32)ind->assoc_req_ie_len + ind->assoc_rsp_ie_len > sizeof(ind->assoc_ie_buf),
++		       "ie lens %u+%u", ind->assoc_req_ie_len, ind->assoc_rsp_ie_len);
++		break;
++	}
++	case SM_DISCONNECT_IND:
++		RWNX_BAD(!RWNX_VIF_PRESENT(RWNX_P(sm_disconnect_ind)->vif_idx), "vif %u", RWNX_P(sm_disconnect_ind)->vif_idx);
++		break;
++	case SM_EXTERNAL_AUTH_REQUIRED_IND:
++		RWNX_BAD(!RWNX_VIF_PRESENT(RWNX_P(sm_external_auth_required_ind)->vif_idx), "vif");
++		break;
++	case SCANU_RESULT_IND: {
++		const struct scanu_result_ind *ind = RWNX_P(scanu_result_ind);
++		RWNX_BAD(msg->param_len < offsetof(struct scanu_result_ind, payload) ||
++		       ind->length < offsetof(struct ieee80211_mgmt, u.probe_resp.variable) ||
++		       ind->length > msg->param_len - offsetof(struct scanu_result_ind, payload),
++		       "scan frame len %u > param %u", ind->length, msg->param_len);
++		RWNX_BAD(ind->sta_idx >= RWNX_STA_MAX && ind->sta_idx != 0xFF, "sta");
++		break;
++	}
++	case TDLS_CHAN_SWITCH_IND:
++		RWNX_BAD(RWNX_P(tdls_chan_switch_ind)->vif_index >= RWNX_VIF_MAX ||
++		       RWNX_P(tdls_chan_switch_ind)->chan_ctxt_index >= NX_CHAN_CTXT_CNT, "tdls idx");
++		break;
++	case TDLS_CHAN_SWITCH_BASE_IND:
++		RWNX_BAD(RWNX_P(tdls_chan_switch_base_ind)->vif_index >= RWNX_VIF_MAX ||
++		       RWNX_P(tdls_chan_switch_base_ind)->chan_ctxt_index >= NX_CHAN_CTXT_CNT, "tdls idx");
++		break;
++	case TDLS_PEER_PS_IND:
++		RWNX_BAD(RWNX_P(tdls_peer_ps_ind)->vif_index >= RWNX_VIF_MAX ||
++		       RWNX_P(tdls_peer_ps_ind)->sta_idx >= RWNX_STA_MAX, "tdls idx");
++		break;
++	case MESH_PATH_CREATE_CFM:
++	case MESH_PEER_UPDATE_IND:
++	case MESH_PATH_UPDATE_IND:
++	case MESH_PROXY_UPDATE_IND:
++		/* STA-only build: we never create a mesh vif, drop everything mesh */
++		RWNX_BAD(1, "mesh");
++		break;
++	default:
++		break;
++	}
++	return true;
++}
++
+ void rwnx_rx_handle_msg(struct rwnx_hw *rwnx_hw, struct ipc_e2a_msg *msg)
+ {
++	unsigned int t = MSG_T(msg->id), i = MSG_I(msg->id);
++	msg_cb_fct cb = NULL;
++
+ 	AICWFDBG(LOGDEBUG, "%s msg->id:0x%x \r\n", __func__, msg->id);
+ 
+-	rwnx_hw->cmd_mgr->msgind(rwnx_hw->cmd_mgr, msg,
+-							msg_hdlrs[MSG_T(msg->id)][MSG_I(msg->id)]);
++	/* the handler tables are indexed by a firmware-supplied id */
++	if (t < ARRAY_SIZE(msg_hdlrs) && msg_hdlrs[t] && t < ARRAY_SIZE(msg_hdlrs_n) && i < msg_hdlrs_n[t])
++		cb = msg_hdlrs[t][i];
++	if (!rwnx_fw_msg_valid(rwnx_hw, msg))
++		return;
++
++	rwnx_hw->cmd_mgr->msgind(rwnx_hw->cmd_mgr, msg, cb);
+ }
+ 
+ void rwnx_rx_handle_print(struct rwnx_hw *rwnx_hw, u8 *msg, u32 len)
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index 2161ffe..ee4eaa2 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -593,7 +593,7 @@ static bool rwnx_rx_data_skb(struct rwnx_hw *rwnx_hw, struct rwnx_vif *rwnx_vif,
+ 		} else {
+ 			/* unicast pkt for STA inside the BSS, no need to forward to upper
+ 			   layer simply resend on wireless interface */
+-			if (flags_dst_idx != RWNX_INVALID_STA) {
++			if (flags_dst_idx != RWNX_INVALID_STA && flags_dst_idx < NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX) {
+                 struct rwnx_sta *sta = &rwnx_hw->sta_table[flags_dst_idx];
+ 				if (sta->valid && (sta->vlan_idx == rwnx_vif->vif_index)) {
+ 					forward = false;
+@@ -2791,6 +2791,12 @@ check_len_update:
+ 				goto end;
+ 			}
+ 
++			if (hw_rxhdr->flags_sta_idx != RWNX_INVALID_STA &&
++			    hw_rxhdr->flags_sta_idx >= NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX) {
++				pr_warn_ratelimited("rwnx: drop rx frame, sta_idx %u\n", hw_rxhdr->flags_sta_idx);
++				dev_kfree_skb(skb);
++				goto end;
++			}
+ 			if (hw_rxhdr->flags_sta_idx != RWNX_INVALID_STA) {
+ 				struct rwnx_sta *sta;
+ 
+@@ -2798,7 +2804,8 @@ check_len_update:
+ 				rwnx_rx_statistic(rwnx_hw, hw_rxhdr, sta);
+ 
+ 				if (sta->vlan_idx != rwnx_vif->vif_index) {
+-					rwnx_vif = rwnx_hw->vif_table[sta->vlan_idx];
++					/* vlan_idx comes from firmware (connect ind) */
++					rwnx_vif = sta->vlan_idx < NX_VIRT_DEV_MAX + NX_REMOTE_STA_MAX ? rwnx_hw->vif_table[sta->vlan_idx] : NULL;
+ 					if (!rwnx_vif) {
+ 						dev_kfree_skb(skb);
+ 						goto end;
+@@ -2855,7 +2862,7 @@ check_len_update:
+ 				} else {
+ 					/* unicast pkt for STA inside the BSS, no need to forward to upper
+ 					   layer simply resend on wireless interface */
+-					if (hw_rxhdr->flags_dst_idx != RWNX_INVALID_STA) {
++					if (hw_rxhdr->flags_dst_idx != RWNX_INVALID_STA && hw_rxhdr->flags_dst_idx < NX_REMOTE_STA_MAX + NX_VIRT_DEV_MAX) {
+ 						struct rwnx_sta *sta = &rwnx_hw->sta_table[hw_rxhdr->flags_dst_idx];
+ 						if (sta->valid && (sta->vlan_idx == rwnx_vif->vif_index)) {
+ 							resend = true;

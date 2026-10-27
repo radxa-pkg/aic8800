@@ -1,0 +1,83 @@
+Description: bsp: check lengths and allocations in the BT patch-table parser
+ aicbt_patch_table_alloc() did not check that the 16-byte tag, each
+ 24-byte entry header and each entry payload fit in the file, len * 8
+ could overflow, and vmalloc results were not checked. Add the length
+ checks (len <= remaining / 8 also rules out the overflow), NULL checks,
+ and free the raw buffer on the error path. The info_len clamp in
+ aicbt_patch_info_unpack() is already present since SDK V5.0.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../aic8800/aic8800_bsp/aic_bsp_driver.c      | 28 +++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+index 9022ad2..e580133 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic_bsp_driver.c
+@@ -1368,6 +1368,10 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(const char *filename)
+ 	}
+ 
+ 	p = rawdata;
++	if (size < 16) {
++		printk("patch table too short\n");
++		goto err;
++	}
+ 	if (memcmp(p, AICBT_PT_TAG, sizeof(AICBT_PT_TAG) < 16 ? sizeof(AICBT_PT_TAG) : 16)) {
+ 		printk("TAG err\n");
+ 		goto err;
+@@ -1375,7 +1379,14 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(const char *filename)
+ 	p += 16;
+ 
+ 	while (p - rawdata < size) {
++		/* each entry needs a 24-byte header that fits in the file */
++		if (size - (p - rawdata) < 24) {
++			printk("patch table: truncated entry header\n");
++			goto err_raw;
++		}
+ 		new = (struct aicbt_patch_table *)vmalloc(sizeof(struct aicbt_patch_table));
++		if (!new)
++			goto err_raw;
+ 		memset(new, 0, sizeof(struct aicbt_patch_table));
+ 		if (head == NULL) {
+ 			head = new;
+@@ -1386,6 +1397,8 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(const char *filename)
+ 		}
+ 
+ 		cur->name = (char *)vmalloc(sizeof(char) * 16);
++		if (!cur->name)
++			goto err_raw;
+ 		memset(cur->name, 0, sizeof(char) * 16);
+ 		memcpy(cur->name, p, 16);
+ 		p += 16;
+@@ -1400,7 +1413,17 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(const char *filename)
+ 			cur->len = 0;
+ 		}else{
+ 			if(cur->len > 0){
++				/* payload must fit in the remaining file (also rules out len*8 overflow) */
++				if (cur->len > (uint32_t)(size - (p - rawdata)) / 8) {
++					printk("patch table: entry len %u exceeds file\n", cur->len);
++					cur->len = 0;
++					goto err_raw;
++				}
+ 				cur->data = (uint32_t *)vmalloc(sizeof(uint8_t) * cur->len * 8);
++				if (!cur->data) {
++					cur->len = 0;
++					goto err_raw;
++				}
+ 				memset(cur->data, 0, sizeof(uint8_t) * cur->len * 8);
+ 				memcpy(cur->data, p, cur->len * 8);
+ 				p += cur->len * 8;
+@@ -1412,6 +1435,11 @@ struct aicbt_patch_table *aicbt_patch_table_alloc(const char *filename)
+ #endif
+ 	return head;
+ 
++err_raw:
++#ifndef CONFIG_FIRMWARE_ARRAY
++	vfree(rawdata);
++	rawdata = NULL;
++#endif
+ err:
+ 	aicbt_patch_table_free(&head);
+ 	if (rawdata)

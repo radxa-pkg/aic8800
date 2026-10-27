@@ -1,0 +1,129 @@
+Description: fdrv/sdio: validate rx lengths in the CONFIG_PREALLOC_RX_SKB rx path
+ Follow-up to "fdrv/bsp sdio: validate rx aggregate and E2A message
+ lengths", which covered only the skb rx path. The prealloc path
+ (enabled by the top-level Makefile) advanced buffer->read by
+ firmware-supplied lengths without checking them against buffer->end.
+ Apply the same checks there: require the 4-byte header, drop
+ aggregates that do not fit in the remaining buffer, bound the read
+ pointer advance, zero-pad config messages to sizeof(struct ipc_e2a_msg)
+ (+1 NUL), clamp param_len to the bytes received, and stop (with a
+ one-time warning) instead of BUG_ON when the read pointer is
+ misaligned.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../aic8800/aic8800_fdrv/aicwf_txrxif.c       | 46 +++++++++++++++----
+ 1 file changed, 38 insertions(+), 8 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index b39e7e8..55a096f 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -248,11 +248,12 @@ static bool aicwf_another_ptk_1(struct rx_buff *buffer)
+     u8 *read = buffer->read;
+     u16 aggr_len = 0;
+ 
+-    BUG_ON((read - buffer->start)%4 != 0);
+-
+     if(read == NULL || read >= buffer->end) {
+         return false;
+     }
++    /* the read pointer is advanced by firmware-supplied lengths: stop instead of BUG_ON */
++    if (WARN_ON_ONCE((read - buffer->start) % 4 != 0) || buffer->end - read < 2)
++        return false;
+ 
+     aggr_len = (*read | (*(read + 1) << 8));
+     if(aggr_len == 0) {
+@@ -296,6 +297,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 	u8_l *msg = NULL;
+  #ifdef CONFIG_PREALLOC_RX_SKB
+ 	struct rx_buff *buffer = NULL;
++	u32 rem = 0;
+ 
+ 	while (1) {
+ 		spin_lock_irqsave(&rx_priv->rxqlock, flags);
+@@ -311,6 +313,10 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 		}
+ 		while (aicwf_another_ptk_1(buffer)) {
+ 			data = buffer->read;
++			/* bytes left in the prealloc buffer; firmware-supplied lengths must fit */
++			rem = buffer->end - data;
++			if (rem < 4)
++				break;
+ 			pkt_len = (*data | (*(data + 1) << 8));
+ 
+ 			if ((data[2] & SDIO_TYPE_CFG) != SDIO_TYPE_CFG) { // type : data
+@@ -321,17 +327,21 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				else
+ 					adjust_len = aggr_len;
+ 
++				if (aggr_len > rem) {
++					pr_warn_ratelimited("rwnx: rx data len %u > buf %u, drop\n", aggr_len, rem);
++					break;
++				}
+ 				skb_inblock = __dev_alloc_skb(aggr_len + CCMP_OR_WEP_INFO, GFP_KERNEL);
+ 				if (skb_inblock == NULL) {
+ 					txrx_err("no more space! skip\n");
+-					buffer->read = buffer->read + adjust_len;
++					buffer->read = buffer->read + min_t(u32, adjust_len, rem);
+ 					continue;
+ 				}
+ 
+ 				skb_put(skb_inblock, aggr_len);
+ 				memcpy(skb_inblock->data, data, aggr_len);
+ 				rwnx_rxdataind_aicwf(rx_priv->sdiodev->rwnx_hw, skb_inblock, (void *)rx_priv);
+-				buffer->read = buffer->read + adjust_len;
++				buffer->read = buffer->read + min_t(u32, adjust_len, rem);
+ 			} else {
+ 				//  type : config
+ 				aggr_len = pkt_len;
+@@ -341,7 +351,13 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				else
+ 					adjust_len = aggr_len;
+ 
+-				msg = kmalloc(aggr_len+4, GFP_KERNEL);
++				/* bounds + zero padding so fixed-size handler structs stay in bounds,
++				 * +1 keeps FW print strings NUL-terminated */
++				if ((u32)aggr_len + 4 > rem) {
++					pr_warn_ratelimited("rwnx: rx cfg len %u > buf %u, drop\n", aggr_len, rem);
++					break;
++				}
++				msg = kzalloc(max_t(size_t, aggr_len + 4, 4 + sizeof(struct ipc_e2a_msg)) + 1, GFP_KERNEL);
+ 				if (msg == NULL) {
+ 					txrx_err("no more space for msg!\n");
+ 					aicwf_prealloc_rxbuff_free(buffer, &rx_priv->rxbuff_lock);
+@@ -349,8 +365,22 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				}
+ 
+ 				memcpy(msg, data, aggr_len + 4);
+-				if (((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP) && (rx_priv->sdiodev->bus_if->state != BUS_DOWN_ST))
+-					rwnx_rx_handle_msg(rx_priv->sdiodev->rwnx_hw, (struct ipc_e2a_msg *)(msg + 4));
++				if (((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_CMD_RSP) && (rx_priv->sdiodev->bus_if->state != BUS_DOWN_ST)) {
++					struct ipc_e2a_msg *em = (struct ipc_e2a_msg *)(msg + 4);
++					const u32 hdr = offsetof(struct ipc_e2a_msg, param);
++					u32 room = aggr_len > hdr ? aggr_len - hdr : 0;
++					if (room > sizeof(em->param))
++						room = sizeof(em->param);
++					if (aggr_len < hdr) {
++						pr_warn_ratelimited("rwnx: short e2a msg %u\n", aggr_len);
++					} else {
++						if (em->param_len > room) {
++							pr_warn_ratelimited("rwnx: e2a 0x%x param_len %u > %u, clamped\n", em->id, em->param_len, room);
++							em->param_len = room;
++						}
++						rwnx_rx_handle_msg(rx_priv->sdiodev->rwnx_hw, em);
++					}
++				}
+ 
+ 				if ((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_DATA_CFM)
+ 					aicwf_sdio_host_tx_cfm_handler(&(rx_priv->sdiodev->rwnx_hw->sdio_env), (u32 *)(msg + 4));
+@@ -358,7 +388,7 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 				if ((*(msg + 2) & 0x7f) == SDIO_TYPE_CFG_PRINT)
+ 					rwnx_rx_handle_print(rx_priv->sdiodev->rwnx_hw, msg + 4, aggr_len);
+ 
+-				buffer->read = buffer->read + (adjust_len + 4);
++				buffer->read = buffer->read + min_t(u32, adjust_len + 4, rem);
+ 				kfree(msg);
+ 			}
+ 		}

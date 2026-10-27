@@ -1,0 +1,43 @@
+Description: fdrv: warn instead of BUG_ON(1) on unknown firmware frequency
+ rwnx_freq_to_idx() hits BUG_ON(1) when the firmware reports a
+ frequency that is not in the band tables, which panics the kernel.
+ Use WARN_ONCE and fall back to index 0 in the SDIO and USB drivers.
+ Same location as radxa-pkg/aic8800#92.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c | 4 +++-
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c | 4 +++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index d83194e..6e70833 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -50,7 +50,9 @@ static int rwnx_freq_to_idx(struct rwnx_hw *rwnx_hw, int freq)
+ 		}
+ 	}
+ 
+-	BUG_ON(1);
++	/* firmware-reported freq not in our band tables: warn and use index 0 instead of BUG_ON(1) (cf. radxa-pkg/aic8800#92) */
++	WARN_ONCE(1, "rwnx: unknown freq %d from firmware\n", freq);
++	idx = 0;
+ 
+ exit:
+ 	// Channel has been found, return the index
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index b437770..e89681a 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -52,7 +52,9 @@ static int rwnx_freq_to_idx(struct rwnx_hw *rwnx_hw, int freq)
+         }
+     }
+ 
+-    BUG_ON(1);
++    /* firmware-reported freq not in our band tables: warn and use index 0 instead of BUG_ON(1) (cf. radxa-pkg/aic8800#92) */
++    WARN_ONCE(1, "rwnx: unknown freq %d from firmware\n", freq);
++    idx = 0;
+ 
+ exit:
+     // Channel has been found, return the index

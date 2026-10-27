@@ -1,0 +1,40 @@
+Description: fdrv/sdio: range-check mesh message indices instead of dropping mesh messages
+ Follow-up to "fdrv/bsp: range-check firmware-supplied message ids and
+ vif/sta/chan indices": that change dropped all mesh messages, which
+ breaks mesh interfaces (and leaves MESH_PATH_CREATE_CFM unanswered).
+ Validate their vif/sta/next-hop indices instead. MESH_PATH_UPDATE_IND
+ only checks nhop_sta_idx when the update is not a delete, since the
+ handler ignores it for deletes.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c        | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+index f47df83..374a0f4 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_msg_rx.c
+@@ -1699,11 +1699,19 @@ static bool rwnx_fw_msg_valid(struct rwnx_hw *rwnx_hw, const struct ipc_e2a_msg
+ 		       RWNX_P(tdls_peer_ps_ind)->sta_idx >= RWNX_STA_MAX, "tdls idx");
+ 		break;
+ 	case MESH_PATH_CREATE_CFM:
++		RWNX_BAD(RWNX_P(mesh_path_create_cfm)->vif_idx >= RWNX_VIF_MAX, "vif");
++		break;
+ 	case MESH_PEER_UPDATE_IND:
++		RWNX_BAD(!RWNX_VIF_PRESENT(RWNX_P(mesh_peer_update_ind)->vif_idx) ||
++		       RWNX_P(mesh_peer_update_ind)->sta_idx >= RWNX_STA_MAX, "mesh idx");
++		break;
+ 	case MESH_PATH_UPDATE_IND:
++		RWNX_BAD(!RWNX_VIF_PRESENT(RWNX_P(mesh_path_update_ind)->vif_idx) ||
++		       (!RWNX_P(mesh_path_update_ind)->delete &&
++			RWNX_P(mesh_path_update_ind)->nhop_sta_idx >= RWNX_STA_MAX), "mesh idx");
++		break;
+ 	case MESH_PROXY_UPDATE_IND:
+-		/* STA-only build: we never create a mesh vif, drop everything mesh */
+-		RWNX_BAD(1, "mesh");
++		RWNX_BAD(!RWNX_VIF_PRESENT(RWNX_P(mesh_proxy_update_ind)->vif_idx), "vif");
+ 		break;
+ 	default:
+ 		break;

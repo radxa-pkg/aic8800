@@ -1,0 +1,150 @@
+Description: fdrv/aic_load_fw usb: limit confirmation copy to the caller's cfm buffer size
+ USB counterpart of "fdrv/bsp: limit confirmation copy to the caller's
+ cfm buffer size": record sizeof(*cfm) in struct rwnx_cmd at send time
+ in the USB fdrv (rwnx_msg_tx.c) and aic_load_fw (aicbluetooth_cmds.c)
+ and have cmd_mgr_msgind() copy at most that many bytes.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../drivers/aic8800/aic8800_fdrv/rwnx_cmds.c   |  9 +++++++--
+ .../drivers/aic8800/aic8800_fdrv/rwnx_cmds.h   |  1 +
+ .../drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c | 15 +++++++++++----
+ .../aic8800/aic_load_fw/aicbluetooth_cmds.c    | 18 ++++++++++++++----
+ .../aic8800/aic_load_fw/aicbluetooth_cmds.h    |  1 +
+ 5 files changed, 34 insertions(+), 10 deletions(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+index 8dbb88e..d2bb711 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+@@ -469,8 +469,13 @@ static int cmd_mgr_msgind(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd_e2amsg *
+                     msg->param_len = RWNX_CMD_E2AMSG_LEN_MAX;
+                 }
+ 
+-                if (cmd->e2a_msg && msg->param_len)
+-                    memcpy(cmd->e2a_msg, &msg->param, msg->param_len);
++				if (cmd->e2a_msg && msg->param_len) {
++					u16 copy_len = min_t(u16, msg->param_len, cmd->e2a_len);
++					if (msg->param_len > cmd->e2a_len)
++						pr_warn_ratelimited("rwnx: cfm 0x%x len %u > buffer %u, truncated\n",
++								    msg->id, msg->param_len, cmd->e2a_len);
++					memcpy(cmd->e2a_msg, &msg->param, copy_len);
++				}
+ 
+                 if (RWNX_CMD_WAIT_COMPLETE(cmd->flags))
+                     cmd_complete(cmd_mgr, cmd);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h
+index 1a60e3f..a7df86c 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h
+@@ -76,6 +76,7 @@ struct rwnx_cmd {
+     lmac_msg_id_t reqid;
+     struct rwnx_cmd_a2emsg *a2e_msg;
+     char *e2a_msg;
++	u16 e2a_len; /* size of the caller cfm buffer */
+     u32 tkn;
+     u16 flags;
+ 
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+index 6c54759..c98f806 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_msg_tx.c
+@@ -384,8 +384,13 @@ static void rwnx_msg_free(struct rwnx_hw *rwnx_hw, const void *msg_params)
+ 
+ 
+ 
+-static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+-                         int reqcfm, lmac_msg_id_t reqid, void *cfm)
++/* copy the confirmation into the caller's buffer, never more than its real size
++ * (recorded per command at send time from sizeof(*cfm)) */
++#define RWNX_CFM_SZ(c) __builtin_choose_expr(__builtin_types_compatible_p(typeof(c), void *), (size_t)0, sizeof(*(c)))
++#define rwnx_send_msg(h, p, r, i, c) rwnx_send_msg_sz(h, p, r, i, c, RWNX_CFM_SZ(c))
++#define rwnx_send_msg1(h, p, r, i, c, d) rwnx_send_msg1_sz(h, p, r, i, c, d, RWNX_CFM_SZ(c))
++static int rwnx_send_msg_sz(struct rwnx_hw *rwnx_hw, const void *msg_params,
++						 int reqcfm, lmac_msg_id_t reqid, void *cfm, size_t cfm_len)
+ {
+     struct lmac_msg *msg;
+     struct rwnx_cmd *cmd;
+@@ -444,6 +449,7 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+     cmd->reqid   = reqid;
+     cmd->a2e_msg = msg;
+     cmd->e2a_msg = cfm;
++	cmd->e2a_len = cfm ? (u16)min_t(size_t, cfm_len, 0xffff) : 0;
+     if (nonblock)
+         cmd->flags = RWNX_CMD_FLAG_NONBLOCK;
+     if (reqcfm)
+@@ -491,8 +497,8 @@ static int rwnx_send_msg(struct rwnx_hw *rwnx_hw, const void *msg_params,
+ }
+ 
+ 
+-static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+-                         int reqcfm, lmac_msg_id_t reqid, void *cfm, bool defer)
++static int rwnx_send_msg1_sz(struct rwnx_hw *rwnx_hw, const void *msg_params,
++						 int reqcfm, lmac_msg_id_t reqid, void *cfm, bool defer, size_t cfm_len)
+ {
+     struct lmac_msg *msg;
+     struct rwnx_cmd *cmd;
+@@ -521,6 +527,7 @@ static int rwnx_send_msg1(struct rwnx_hw *rwnx_hw, const void *msg_params,
+     cmd->reqid   = reqid;
+     cmd->a2e_msg = msg;
+     cmd->e2a_msg = cfm;
++	cmd->e2a_len = cfm ? (u16)min_t(size_t, cfm_len, 0xffff) : 0;
+     if (nonblock)
+         cmd->flags = RWNX_CMD_FLAG_NONBLOCK;
+     if (reqcfm)
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
+index 2a48e65..d6320b1 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.c
+@@ -157,8 +157,13 @@ static int cmd_mgr_msgind(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd_e2amsg *
+                     msg->param_len = RWNX_CMD_E2AMSG_LEN_MAX;
+                 }
+ 
+-                if (cmd->e2a_msg && msg->param_len)
+-                    memcpy(cmd->e2a_msg, &msg->param, msg->param_len);
++                if (cmd->e2a_msg && msg->param_len) {
++                    u16 copy_len = min_t(u16, msg->param_len, cmd->e2a_len);
++                    if (msg->param_len > cmd->e2a_len)
++                        pr_warn_ratelimited("aicbt: cfm 0x%x len %u > buffer %u, truncated\n",
++                                            msg->id, msg->param_len, cmd->e2a_len);
++                    memcpy(cmd->e2a_msg, &msg->param, copy_len);
++                }
+ 
+                 if (RWNX_CMD_WAIT_COMPLETE(cmd->flags))
+                     cmd_complete(cmd_mgr, cmd);
+@@ -297,8 +302,12 @@ static void rwnx_msg_free(struct lmac_msg *msg, const void *msg_params)
+ }
+ 
+ 
+-static int rwnx_send_msg(struct aic_usb_dev *usbdev, const void *msg_params,
+-                         int reqcfm, lmac_msg_id_t reqid, void *cfm)
++/* copy the confirmation into the caller's buffer, never more than its real size
++ * (recorded per command at send time from sizeof(*cfm)) */
++#define RWNX_CFM_SZ(c) __builtin_choose_expr(__builtin_types_compatible_p(typeof(c), void *), (size_t)0, sizeof(*(c)))
++#define rwnx_send_msg(h, p, r, i, c) rwnx_send_msg_sz(h, p, r, i, c, RWNX_CFM_SZ(c))
++static int rwnx_send_msg_sz(struct aic_usb_dev *usbdev, const void *msg_params,
++                         int reqcfm, lmac_msg_id_t reqid, void *cfm, size_t cfm_len)
+ {
+     struct lmac_msg *msg;
+     struct rwnx_cmd *cmd;
+@@ -319,6 +328,7 @@ static int rwnx_send_msg(struct aic_usb_dev *usbdev, const void *msg_params,
+     cmd->reqid   = reqid;
+     cmd->a2e_msg = msg;
+     cmd->e2a_msg = cfm;
++    cmd->e2a_len = cfm ? (u16)min_t(size_t, cfm_len, 0xffff) : 0;
+     if (nonblock)
+         cmd->flags = RWNX_CMD_FLAG_NONBLOCK;
+     if (reqcfm)
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.h b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.h
+index 3b54bf9..c943a0a 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aicbluetooth_cmds.h
+@@ -108,6 +108,7 @@ struct rwnx_cmd {
+     lmac_msg_id_t reqid;
+     struct rwnx_cmd_a2emsg *a2e_msg;
+     char *e2a_msg;
++    u16 e2a_len; /* size of the caller cfm buffer */
+     u32 tkn;
+     u16 flags;
+     struct completion complete;

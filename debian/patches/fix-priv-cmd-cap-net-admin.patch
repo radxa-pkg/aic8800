@@ -1,0 +1,60 @@
+Description: fdrv: restore CAP_NET_ADMIN check on private driver commands
+ The capable(CAP_NET_ADMIN) checks in android_priv_cmd() and
+ devipc_cust_msg() were commented out, so any local user could issue
+ private driver commands (RF test, country code, tx power, ...).
+ Restore them in the SDIO and USB drivers.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../driver_fw/driver/aic8800/aic8800_fdrv/aic_priv_cmd.c  | 8 ++++----
+ .../driver_fw/drivers/aic8800/aic8800_fdrv/aic_priv_cmd.c | 4 ++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aic_priv_cmd.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aic_priv_cmd.c
+index 69c0475..6bf747d 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aic_priv_cmd.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aic_priv_cmd.c
+@@ -1790,10 +1790,10 @@ int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
+ 	//net_os_wake_lock(net);
+ 
+ 
+-/*	if (!capable(CAP_NET_ADMIN)) {
++	if (!capable(CAP_NET_ADMIN)) {
+ 		ret = -EPERM;
+ 		goto exit;
+-	}*/
++	}
+ 	if (!ifr->ifr_data) {
+ 		ret = -EINVAL;
+ 		goto exit;
+@@ -2084,10 +2084,10 @@ int devipc_cust_msg(struct net_device *net, struct ifreq *ifr, int cmd)
+ 	//net_os_wake_lock(net);
+ 
+ 
+-/*	if (!capable(CAP_NET_ADMIN)) {
++	if (!capable(CAP_NET_ADMIN)) {
+ 		ret = -EPERM;
+ 		goto exit;
+-	}*/
++	}
+ 	if (!ifr->ifr_data) {
+ 		ret = -EINVAL;
+ 		goto exit;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aic_priv_cmd.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aic_priv_cmd.c
+index ce92d75..75f1a3d 100644
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aic_priv_cmd.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aic_priv_cmd.c
+@@ -1998,10 +1998,10 @@ int android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
+ 	//net_os_wake_lock(net);
+ 
+ 
+-/*	if (!capable(CAP_NET_ADMIN)) {
++	if (!capable(CAP_NET_ADMIN)) {
+ 		ret = -EPERM;
+ 		goto exit;
+-	}*/
++	}
+ 	if (!ifr->ifr_data) {
+ 		ret = -EINVAL;
+ 		goto exit;

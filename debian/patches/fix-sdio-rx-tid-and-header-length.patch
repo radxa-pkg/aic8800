@@ -1,0 +1,77 @@
+Description: fdrv/sdio: drop rx frames with TID >= NX_NB_TID_PER_STA and check 802.11 header length
+ The TID taken from the QoS control field of a received data frame
+ (0-15) indexes per-TID tables that have NX_NB_TID_PER_STA (8)
+ entries. Drop frames whose TID is out of range. Also check that the
+ rx descriptor and the 802.11 header up to the ethertype are present
+ before they are read.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../driver/aic8800/aic8800_fdrv/rwnx_rx.c     | 32 +++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+index 04964ff..2161ffe 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -2273,6 +2273,12 @@ u8 rwnx_rxdataind_aicwf(struct rwnx_hw *rwnx_hw, void *hostid, void *rx_priv)
+ 	struct rwnx_sta *cur_sta;
+ #endif
+ 
++	/* the SDIO layer guarantees skb->len == aggr_len >= RX_HWHRD_LEN; make it explicit */
++	if (unlikely(skb->len < msdu_offset + 2)) {
++		pr_warn_ratelimited("rwnx: rx frame %u < hdr %d, drop\n", skb->len, msdu_offset);
++		dev_kfree_skb(skb);
++		return 0;
++	}
+ 	hw_rxhdr = (struct hw_rxhdr *)skb->data;
+     
+ #ifdef AICWF_RX_REORDER
+@@ -2412,6 +2418,12 @@ check_len_update:
+ 							   &hw_rxhdr->hwvect.rx_vect1,
+ 							   &hw_rxhdr->hwvect.rx_vect2);
+ 		skb_pull(skb, msdu_offset + 2); //+2 since sdio allign 58->60
++		/* 802.11 header bytes are read below without checks */
++		if (unlikely(skb->len < 24)) {
++			pr_warn_ratelimited("rwnx: rx 802.11 frame %u too short, drop\n", skb->len);
++			dev_kfree_skb(skb);
++			goto end;
++		}
+ 
+ #define MAC_FCTRL_MOREFRAG 0x0400
+ 
+@@ -2435,6 +2447,12 @@ check_len_update:
+ #else
+ 				tid = skb->data[24] & 0x0F;
+ #endif
++				/* TID 8-15 (TSPEC) would index preorder_ctrl[8]/txq tables out of range */
++				if (unlikely(tid >= NX_NB_TID_PER_STA)) {
++					pr_warn_ratelimited("rwnx: rx tid %u, drop\n", tid);
++					dev_kfree_skb(skb);
++					goto end;
++				}
+ 				is_qos = 1;
+ #ifdef CONFIG_SUPPORT_4ADDR
+ 				if (b_4addr) {
+@@ -2503,6 +2521,20 @@ check_len_update:
+ #endif
+ 
+ 			pull_len += (hdr_len + 8);
++			{	/* everything up to the ethertype must be in the frame */
++				u32 need = hdr_len + 8;
++				switch (hw_rxhdr->hwvect.decr_status) {
++				case RWNX_RX_HD_DECR_CCMP128: case RWNX_RX_HD_DECR_TKIP: need += 8; break;
++				case RWNX_RX_HD_DECR_WEP: need += 4; break;
++				case RWNX_RX_HD_DECR_WAPI: need += 18; break;
++				default: break;
++				}
++				if (unlikely(skb->len < need)) {
++					pr_warn_ratelimited("rwnx: rx frame %u < %u, drop\n", skb->len, need);
++					dev_kfree_skb(skb);
++					goto end;
++				}
++			}
+ 
+ 			switch (hw_rxhdr->hwvect.decr_status) {
+ 			case RWNX_RX_HD_DECR_CCMP128:

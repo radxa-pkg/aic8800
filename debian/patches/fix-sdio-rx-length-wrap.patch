@@ -1,0 +1,59 @@
+Description: fdrv/bsp sdio: reject wrapped rx lengths and short headers
+ Store aggregate copy and advance lengths in u32. A u16 pkt_len near
+ the top of the range plus the rx hardware header wrapped to 0, so the
+ length check passed and the cursor did not move. Reject a one-byte
+ buffer before reading the 16-bit length.
+Author: N Oliver <3945917+PixnBits@users.noreply.github.com>
+Forwarded: no
+Last-Update: 2026-10-26
+---
+ .../driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c    | 5 +++--
+ .../driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c     | 5 +++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c
+index 09c9a80..e0ce37e 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio_txrxif.c
+@@ -134,7 +134,7 @@ static bool aicwf_another_ptk(struct sk_buff *skb)
+ 	u8 *data;
+ 	u16 aggr_len = 0;
+ 
+-	if (skb->data == NULL || skb->len == 0) {
++	if (skb->data == NULL || skb->len < 2) {
+ 		return false;
+ 	}
+ 	data = skb->data;
+@@ -153,7 +153,8 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ 	struct sk_buff *skb = NULL;
+ 	u16 pkt_len = 0;
+ 	struct sk_buff *skb_inblock = NULL;
+-	u16 aggr_len = 0, adjust_len = 0;
++	/* u32: pkt_len + RX_HWHRD_LEN and roundup() must not wrap a u16 to 0 */
++	u32 aggr_len = 0, adjust_len = 0;
+ 	u8 *data = NULL;
+ 
+ 	while (1) {
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index 55a096f..449760c 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -268,7 +268,7 @@ static bool aicwf_another_ptk(struct sk_buff *skb)
+ 	u8 *data;
+ 	u16 aggr_len = 0;
+ 
+-	if (skb->data == NULL || skb->len == 0) {
++	if (skb->data == NULL || skb->len < 2) {
+ 		return false;
+ 	}
+ 	data = skb->data;
+@@ -292,7 +292,8 @@ int aicwf_process_rxframes(struct aicwf_rx_priv *rx_priv)
+ #endif
+ 	u16 pkt_len = 0;
+ 	struct sk_buff *skb_inblock = NULL;
+-	u16 aggr_len = 0, adjust_len = 0;
++	/* u32: pkt_len + RX_HWHRD_LEN and roundup() must not wrap a u16 to 0 */
++	u32 aggr_len = 0, adjust_len = 0;
+ 	u8 *data = NULL;
+ 	u8_l *msg = NULL;
+  #ifdef CONFIG_PREALLOC_RX_SKB
