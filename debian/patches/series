@@ -44,3 +44,4 @@ fix-usb-state-read-never-resets.patch
 fix-usb-stall-watch-init-at-probe.patch
 fix-usb-cmd-mgr-quiesce.patch
 fix-usb-reset-port-entries.patch
+fix-usb-connect-time-jiffies64.patch
