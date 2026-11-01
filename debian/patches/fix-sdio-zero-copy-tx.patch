@@ -15,8 +15,12 @@ Description: sdio: transmit without copying frames
  - aicwf_adma_add(): the frame laid out as the copying path does (4-byte
    SDIO header, CRC8 on the D80 family, then descriptor and data, padded
    to 4 bytes); the header goes into the skb headroom, the linear part and
-   each page fragment are list entries; a frame that would not fit the
-   host's segments is linearized, and dropped if that fails.
+   each page fragment are list entries, the padding an entry of its own
+   from the zeroed fill buffer (a fragment may end with its page). A frame
+   that would not fit the list, which keeps an entry for the final fill,
+   sends the frames before it first, firmware credits counted as the
+   callers do; one that would not fit an empty list is linearized, and
+   dropped if that fails.
  - The fill buffer is allocated; the list is reset before the tx state is
    freed (it was reset after: a use-after-free).
  - NETIF_F_SG | NETIF_F_HW_CSUM: the driver computes the checksum
@@ -34,7 +38,7 @@ Author: Gleb Pesin <dormancygrace@gmail.com>
 Forwarded: not-needed
 ---
 diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
-index f1a337a..c5eeeda 100644
+index f1a337a..d6f7ff9 100644
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
 @@ -44,8 +44,7 @@ extern uint8_t scanning;
@@ -140,7 +144,7 @@ index f1a337a..c5eeeda 100644
  	//sdio_writesb(sdiodev->func, sdiodev->sdio_reg.wr_fifo_addr, tx_priv->sg_list[0].buf, tx_priv->sg_list[0].len);
  	/*for(i=0;i<1;i++){
  		sdio_writesb(sdiodev->func, sdiodev->sdio_reg.wr_fifo_addr, tx_priv->sg_list[i].buf, tx_priv->sg_list[i].len);
-@@ -1545,197 +1608,65 @@ int aicwf_sdio_txscatterpkt(struct aicwf_tx_priv *tx_priv)
+@@ -1545,197 +1608,66 @@ int aicwf_sdio_txscatterpkt(struct aicwf_tx_priv *tx_priv)
  
  }
  
@@ -176,9 +180,7 @@ index f1a337a..c5eeeda 100644
 -			//skb_put(pkt,align_len);
 -            sdio_len += align_len;
 -        }
-+	u32 len, curr_len;
-+	u8 *sdio_header;
- 
+-
 -		//AICWFDBG(LOGTRACE,"pkt_len %d  \n",pkt->len);
 -		start_ptr = skb_push(pkt, (SDIO_HEADER_LEN+SDIO_MGMT_FAKE_LEN));
 -		//AICWFDBG(LOGTRACE,"push_pkt_len %d  \n",pkt->len);
@@ -199,36 +201,10 @@ index f1a337a..c5eeeda 100644
 -        sdio_header[7] = 0;
 -
 -		curr_len = sdio_len + SDIO_HEADER_LEN;
-+	/* A frame whose fragments would not fit the list (which keeps one entry
-+	 * for the fill of aicwf_sdio_aggr_send) is linearized, before the header
-+	 * goes in, as that moves the head. */
-+	if (skb_is_nonlinear(pkt) &&
-+		(skb_has_frag_list(pkt) ||
-+		 tx_priv->aggr_segcnt + 2 + skb_shinfo(pkt)->nr_frags > tx_priv->max_segs) &&
-+		skb_linearize(pkt))
-+		return -ENOMEM;
-+	len = pkt->len;
-+	curr_len = round_up(len + 4, TX_ALIGNMENT);
-+	sdio_header = skb_push(pkt, 4);
-+	sdio_header[0] = len & 0xff;
-+	sdio_header[1] = (len >> 8) & 0x0f;
-+	sdio_header[2] = 0x01; //data
-+	if (tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
-+		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80N ||
-+		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80WN ||
-+		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2)
-+		sdio_header[3] = crc8_ponl_107(&sdio_header[0], 3); // crc8
-+	else
-+		sdio_header[3] = 0; //reserved
- 
+-
 -		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = start_ptr;
-+	/* The padding to 4 bytes (at most 3) is read past the data: from the
-+	 * skb's tailroom or shared info, or past the last fragment in its page.
-+	 * The firmware ignores it, as it ignores the copying path's zeros. */
-+	if (!skb_is_nonlinear(pkt)) {
-+		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_header;
- 		tx_priv->sg_list[tx_priv->aggr_segcnt].len = curr_len;
- 		tx_priv->free_buf[tx_priv->aggr_segcnt] = pkt;
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].len = curr_len;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] = pkt;
 -
 -		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
 -		//rwnx_data_dump("adj0",pkt->data,((pkt->len>32) ? 32 : pkt->len));
@@ -273,7 +249,7 @@ index f1a337a..c5eeeda 100644
 -		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
 -		//rwnx_data_dump("adj1",start_ptr,((curr_len>32) ? 32 : curr_len));
 -
- 		tx_priv->aggr_segcnt++;
+-		tx_priv->aggr_segcnt++;
 -		atomic_inc(&tx_priv->aggr_count);
 -
 -		tx_priv->len += curr_len + SDIO_HEADER_LEN + 3;
@@ -339,8 +315,51 @@ index f1a337a..c5eeeda 100644
 -		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_tx_buf_dummy[tx_priv->aggr_segcnt];
 -        tx_priv->sg_list[tx_priv->aggr_segcnt].len = SDIO_HEADER_LEN + 1;
 -		tx_priv->free_buf[tx_priv->aggr_segcnt] =NULL;
--
--		tx_priv->aggr_segcnt++;
++	u32 len = pkt->len;
++	u32 curr_len = round_up(len + 4, TX_ALIGNMENT);
++	u32 pad = curr_len - (len + 4);
++	struct skb_shared_info *shinfo;
++	u8 *sdio_header;
++	int entries, f;
+ 
++	/* The frame's entries: its linear part, a fragment each, and the padding
++	 * from zeroed memory of the driver's own (a fragment may end with its
++	 * page). One entry of the list stays for the fill of
++	 * aicwf_sdio_aggr_send. A frame that does not fit sends the frames before
++	 * it first, firmware credits counted as the callers do; one that does not
++	 * fit an empty list either is linearized. Both before the header goes in,
++	 * as linearizing moves the head. */
++	if (skb_has_frag_list(pkt) && skb_linearize(pkt))
++		return -ENOMEM;
++	entries = 1 + skb_shinfo(pkt)->nr_frags + (pad ? 1 : 0);
++	if (tx_priv->aggr_segcnt + entries + 1 > tx_priv->max_segs && atomic_read(&tx_priv->aggr_count) > 0) {
++		tx_priv->fw_avail_bufcnt -= atomic_read(&tx_priv->aggr_count);
++		aicwf_sdio_aggr_send(tx_priv);
++	}
++	if (tx_priv->aggr_segcnt + entries + 1 > tx_priv->max_segs && skb_linearize(pkt))
++		return -ENOMEM;
++	sdio_header = skb_push(pkt, 4);
++	sdio_header[0] = len & 0xff;
++	sdio_header[1] = (len >> 8) & 0x0f;
++	sdio_header[2] = 0x01; //data
++	if (tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
++		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80N ||
++		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80WN ||
++		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2)
++		sdio_header[3] = crc8_ponl_107(&sdio_header[0], 3); // crc8
++	else
++		sdio_header[3] = 0; //reserved
++
++	tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_header;
++	tx_priv->sg_list[tx_priv->aggr_segcnt].len = skb_headlen(pkt);
++	tx_priv->free_buf[tx_priv->aggr_segcnt] = NULL;
++	tx_priv->aggr_segcnt++;
++	shinfo = skb_shinfo(pkt);
++	for (f = 0; f < shinfo->nr_frags; f++) {
++		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = skb_frag_address(&shinfo->frags[f]);
++		tx_priv->sg_list[tx_priv->aggr_segcnt].len = skb_frag_size(&shinfo->frags[f]);
++		tx_priv->free_buf[tx_priv->aggr_segcnt] = NULL;
+ 		tx_priv->aggr_segcnt++;
 -
 -		sdio_header = start_ptr;
 -        sdio_header[0] = 0;
@@ -355,40 +374,30 @@ index f1a337a..c5eeeda 100644
 -
 -		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
 -		//rwnx_data_dump("adj3",start_ptr,((curr_len>32) ? 32 : curr_len));
-+	} else {
-+		struct skb_shared_info *shinfo = skb_shinfo(pkt);
-+		u32 pad = curr_len - (len + 4);
-+		int f;
- 
-+		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_header;
-+		tx_priv->sg_list[tx_priv->aggr_segcnt].len = skb_headlen(pkt);
+-
++	}
++	if (pad) {
++		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_tx_buf_fill;
++		tx_priv->sg_list[tx_priv->aggr_segcnt].len = pad;
 +		tx_priv->free_buf[tx_priv->aggr_segcnt] = NULL;
  		tx_priv->aggr_segcnt++;
 -		atomic_inc(&tx_priv->aggr_count);
 -
 -		tx_priv->len += curr_len + SDIO_HEADER_LEN + 1;
-+		for (f = 0; f < shinfo->nr_frags; f++) {
-+			const skb_frag_t *frag = &shinfo->frags[f];
-+
-+			tx_priv->sg_list[tx_priv->aggr_segcnt].buf = skb_frag_address(frag);
-+			tx_priv->sg_list[tx_priv->aggr_segcnt].len = skb_frag_size(frag) +
-+				(f == shinfo->nr_frags - 1 ? pad : 0);
-+			tx_priv->free_buf[tx_priv->aggr_segcnt] = NULL;
-+			tx_priv->aggr_segcnt++;
-+		}
-+		/* The frame's last entry owns it: freed when the list is reset. */
-+		tx_priv->free_buf[tx_priv->aggr_segcnt - 1] = pkt;
  	}
 -
 -	//AICWFDBG(LOGTRACE,"end aggrcnt %d segcnt %d len %d \n",atomic_read(&tx_priv->aggr_count),tx_priv->aggr_segcnt,tx_priv->len);
 -
++	/* The frame's last entry owns it, where the caller records how it was
++	 * made (copyd); freed when the list is reset. */
++	tx_priv->free_buf[tx_priv->aggr_segcnt - 1] = pkt;
 +	atomic_inc(&tx_priv->aggr_count);
 +	tx_priv->len += curr_len;
 +	return 0;
  }
  
  #endif
-@@ -2201,14 +2132,8 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
+@@ -2201,14 +2133,8 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
  int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
  {
  #ifdef CONFIG_SDIO_ADMA
@@ -403,7 +412,7 @@ index f1a337a..c5eeeda 100644
  	struct txdesc_api tmp_txdesc;
  	struct sk_buff *tmp_skb;
  
-@@ -2237,7 +2162,10 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+@@ -2237,7 +2163,10 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
  
  		//printk("cfm alloc %p \n",tmp_skb);
  		//printk("delay free %p \n",pkt);
@@ -415,7 +424,7 @@ index f1a337a..c5eeeda 100644
  		tx_priv->copyd[tx_priv->aggr_segcnt -1] = true;
  	}else{
  		headroom = txhdr->sw_hdr->headroom;
-@@ -2256,7 +2184,10 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+@@ -2256,7 +2185,10 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
  
  		//printk("alloc %p \n",pkt);
  
@@ -427,7 +436,7 @@ index f1a337a..c5eeeda 100644
  		tx_priv->copyd[tx_priv->aggr_segcnt -1] = false;
  	}
  	
-@@ -2288,7 +2219,7 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+@@ -2288,7 +2220,7 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
  	//payload
  	memcpy(tx_priv->tail, (u8 *)(long)&txhdr->sw_hdr->desc, sizeof(struct txdesc_api));
  	tx_priv->tail += sizeof(struct txdesc_api); //hostdesc
@@ -436,7 +445,7 @@ index f1a337a..c5eeeda 100644
  	tx_priv->tail += (pkt->len - txhdr->sw_hdr->headroom);
  
  	//word alignment
-@@ -2323,9 +2254,6 @@ void aicwf_sdio_aggr_send(struct aicwf_tx_priv *tx_priv)
+@@ -2323,9 +2255,6 @@ void aicwf_sdio_aggr_send(struct aicwf_tx_priv *tx_priv)
  {
  #ifdef CONFIG_SDIO_ADMA
  	int ret = 0;
