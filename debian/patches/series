@@ -44,3 +44,4 @@ fix-usb-cmd-mgr-quiesce.patch
 fix-usb-reset-port-entries.patch
 fix-usb-connect-time-jiffies64.patch
 fix-usb-stall-watch-cancel-at-quiesce.patch
+fix-usb-port-reboot-lifetime.patch
