@@ -30,3 +30,4 @@ fix-sdio-per-chip-firmware-path.patch
 fix-linux-7.3-build.patch
 fix-sprintf-fw-path-overlap.patch
 fix-usb-aic8800dc-mcu-variant.patch
+fix-sdio-zero-copy-tx.patch

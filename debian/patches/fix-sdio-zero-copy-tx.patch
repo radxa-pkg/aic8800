@@ -1,0 +1,562 @@
+Description: sdio: transmit without copying frames
+ Every SDIO data frame was copied twice on its way to the card: the driver
+ advertised no scatter-gather, so the stack segmented TCP by copying and
+ checksumming the payload, and the TX aggregation copied each frame again
+ into one buffer for a single CMD53. The vendor's CONFIG_SDIO_ADMA path
+ hands the frames to the host as a scatter list instead, but it was dead
+ code on mainline kernels: it calls sdio_write_sg() (only some vendor
+ kernels have it), its list type was commented out, its header and fill
+ buffers were module memory (not DMA-able), and its frame layout ("fake"
+ header bytes) is rejected by the AIC8801 firmware.
+ .
+ - aicwf_sdio_write_sg(): one CMD53 block write of a scatterlist through
+   mmc_wait_for_req(), with the R5 checks and limits of the core's helper;
+   named so that it does not clash with vendor kernels' sdio_write_sg().
+ - aicwf_adma_add(): the frame laid out as the copying path does (4-byte
+   SDIO header, CRC8 on the D80 family, then descriptor and data, padded
+   to 4 bytes); the header goes into the skb headroom, the linear part and
+   each page fragment are list entries; a frame that would not fit the
+   host's segments is linearized, and dropped if that fails.
+ - The fill buffer is allocated; the list is reset before the tx state is
+   freed (it was reset after: a use-after-free).
+ - NETIF_F_SG | NETIF_F_HW_CSUM: the driver computes the checksum
+   (skb_checksum_help), the chip has none; the copying path uses
+   skb_copy_bits() for fragmented frames.
+ .
+ CONFIG_SDIO_ADMA stays n by default; set it to y to use the scatter list.
+ Measured on a NanoKVM (SG2002, AIC8801 at 50 MHz SDIO, Linux 7.3) with this
+ tree: TCP transmit over Wi-Fi, CPU busy per Mbit/s, base 1.10 (4 runs),
+ with this patch and CONFIG_SDIO_ADMA=y 0.97 (6 runs, -12%) at 63-74
+ Mbit/s; no frame copy left in the profile. Also tested on an AIC8800D80
+ board. SHA-256 of 100 MB sent intact; association after driver reloads,
+ AP mode.
+Author: Gleb Pesin <dormancygrace@gmail.com>
+Forwarded: not-needed
+---
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
+index f1a337a..c5eeeda 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_sdio.c
+@@ -44,8 +44,7 @@ extern uint8_t scanning;
+ extern bool get_fdrv_no_reg_sdio(void);
+ 
+ #ifdef CONFIG_SDIO_ADMA
+-unsigned char sdio_tx_buf_fill[512];
+-unsigned char sdio_tx_buf_dummy[SDIO_TX_SLIST_MAX][8];
++unsigned char *sdio_tx_buf_fill;
+ #endif
+ 
+ #ifdef CONFIG_GPIO_WAKEUP
+@@ -1517,15 +1516,78 @@ int aicwf_sdio_txpkt(struct aic_sdio_dev *sdiodev, struct sk_buff *pkt)
+ }
+ 
+ #ifdef CONFIG_SDIO_ADMA
++#include <linux/mmc/card.h>
++#include <linux/mmc/core.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/sdio.h>
++
++/*
++ * One CMD53 block write of the buffers of list to the fixed address addr:
++ * the host's DMA reads each buffer, nothing is copied. len is their sum, a
++ * multiple of the block size; sg holds the scatterlist built from list.
++ * Vendor kernels add an sdio_write_sg() to the MMC core; mainline has none.
++ * The caller holds the host.
++ */
++static int aicwf_sdio_write_sg(struct sdio_func *func, unsigned int addr,
++			       struct tx_scatterlist *list, struct scatterlist *sg,
++			       int nents, unsigned int len)
++{
++	struct mmc_card *card = func->card;
++	struct mmc_host *host = card->host;
++	struct mmc_request mrq = {};
++	struct mmc_command cmd = {};
++	struct mmc_data data = {};
++	unsigned int blksz = func->cur_blksize;
++	unsigned int sum = 0;
++	int i, n = 0;
++
++	if (nents > SDIO_TX_SLIST_MAX || nents > host->max_segs || !card->cccr.multi_block)
++		return -EINVAL;
++	sg_init_table(sg, nents);
++	for (i = 0; i < nents; i++) {
++		if (!list[i].len)
++			continue;
++		sg_set_buf(&sg[n++], list[i].buf, list[i].len);
++		sum += list[i].len;
++	}
++	if (!n || sum != len || len % blksz || len / blksz > 511 ||
++		len / blksz > host->max_blk_count || len > host->max_req_size)
++		return -EINVAL;
++	sg_mark_end(&sg[n - 1]);
++
++	cmd.opcode = SD_IO_RW_EXTENDED;
++	cmd.arg = 0x80000000 | func->num << 28 | 0x08000000 | (addr & 0x1ffff) << 9 | len / blksz;
++	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
++	data.blksz = blksz;
++	data.blocks = len / blksz;
++	data.flags = MMC_DATA_WRITE;
++	data.sg = sg;
++	data.sg_len = n;
++	mrq.cmd = &cmd;
++	mrq.data = &data;
++	mmc_set_data_timeout(&data, card);
++	mmc_wait_for_req(host, &mrq);
++
++	if (cmd.error)
++		return cmd.error;
++	if (data.error)
++		return data.error;
++	if (!mmc_host_is_spi(host)) {
++		if (cmd.resp[0] & R5_ERROR)
++			return -EIO;
++		if (cmd.resp[0] & R5_FUNCTION_NUMBER)
++			return -EINVAL;
++		if (cmd.resp[0] & R5_OUT_OF_RANGE)
++			return -ERANGE;
++	}
++	return 0;
++}
++
+ int aicwf_sdio_txscatterpkt(struct aicwf_tx_priv *tx_priv)
+ {
+ 	int ret = 0;
+-	u8 *frame;
+-	u32 len = 0;
+ 	struct aicwf_bus *bus_if = dev_get_drvdata(tx_priv->sdiodev->dev);
+ 	struct aic_sdio_dev *sdiodev = tx_priv->sdiodev;
+-	int nents = tx_priv->aggr_segcnt;
+-	int i=0;
+ 
+ 	if (bus_if->state == BUS_DOWN_ST) {
+ 		sdio_dbg("tx bus is down!\n");
+@@ -1534,7 +1596,8 @@ int aicwf_sdio_txscatterpkt(struct aicwf_tx_priv *tx_priv)
+ 
+ 	//AICWFDBG(LOGTRACE,"%s aggr_segcnt %d len %d \n",__func__,tx_priv->aggr_segcnt, tx_priv->len);
+ 	sdio_claim_host(sdiodev->func);
+-	ret = sdio_write_sg(sdiodev->func, sdiodev->sdio_reg.wr_fifo_addr, &(tx_priv->sg_list[0]), tx_priv->aggr_segcnt, tx_priv->len);//&(tx_priv->sg_list[0])
++	ret = aicwf_sdio_write_sg(sdiodev->func, sdiodev->sdio_reg.wr_fifo_addr, tx_priv->sg_list, tx_priv->sg,
++				  tx_priv->aggr_segcnt, tx_priv->len);//&(tx_priv->sg_list[0])
+ 	//sdio_writesb(sdiodev->func, sdiodev->sdio_reg.wr_fifo_addr, tx_priv->sg_list[0].buf, tx_priv->sg_list[0].len);
+ 	/*for(i=0;i<1;i++){
+ 		sdio_writesb(sdiodev->func, sdiodev->sdio_reg.wr_fifo_addr, tx_priv->sg_list[i].buf, tx_priv->sg_list[i].len);
+@@ -1545,197 +1608,65 @@ int aicwf_sdio_txscatterpkt(struct aicwf_tx_priv *tx_priv)
+ 
+ }
+ 
+-void aicwf_adma_add(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
++int aicwf_adma_add(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+ {
+-	u8 adj_len = 0;
+-	u8 *sdio_header = NULL;
+-    u32 sdio_len = 0;
+-    u32 curr_len = 0;
+-    unsigned int align_len = 0;
+-	u8 *start_ptr = NULL;
+-
+-	adj_len = ALIGN4_ADJ_LEN((uint32_t)pkt->data);
+-	start_ptr = skb_push(pkt,adj_len);	//skb_push(pkt,adj_len)
+-	//ASSERT((adj_len==0)||(adj_len==2));        // mgmt-pkt or data-pkt
+-    //ASSERT((((uint32_t)start_ptr)&3) == 0);    // start_ptr addr word align
+-	if(!((adj_len==0)||(adj_len==2)))
+-		AICWFDBG(LOGTRACE,"adj_len false %u \n",adj_len);
+-
+-	if((((uint32_t)start_ptr)&3) != 0)
+-		AICWFDBG(LOGTRACE,"start_ptr %x \n",(((uint32_t)start_ptr)&3));
+-
+-	//AICWFDBG(LOGTRACE,"start adj_len %d aggrcnt %d segcnt %d len %d \n",adj_len,atomic_read(&tx_priv->aggr_count),tx_priv->aggr_segcnt,tx_priv->len);
+-
+-	if (adj_len==0) {
+-		sdio_len = pkt->len + SDIO_MGMT_FAKE_LEN;
+-		if (sdio_len & (TX_ALIGNMENT - 1)) {
+-            align_len = TX_ALIGNMENT - (sdio_len & (TX_ALIGNMENT - 1));
+-            //#ifdef CONFIG_SDIO_ADMA_ADJ
+-            //memset(pkt->data + sdio_len,0,align_len);
+-            //#endif
+-			//skb_put(pkt,align_len);
+-            sdio_len += align_len;
+-        }
++	u32 len, curr_len;
++	u8 *sdio_header;
+ 
+-		//AICWFDBG(LOGTRACE,"pkt_len %d  \n",pkt->len);
+-		start_ptr = skb_push(pkt, (SDIO_HEADER_LEN+SDIO_MGMT_FAKE_LEN));
+-		//AICWFDBG(LOGTRACE,"push_pkt_len %d  \n",pkt->len);
+-		sdio_header = start_ptr;
+-
+-		sdio_header[0] =((sdio_len) & 0xff);
+-        sdio_header[1] =(((sdio_len) >> 8)&0x0f);
+-        sdio_header[2] = 0x01; //data
+-        if (tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80)
+-            sdio_header[3] = crc8_ponl_107(&sdio_header[0], 3); // crc8
+-        else
+-            sdio_header[3] = 0; //reserved
+-
+-        // fill 4 byte 0x00, need to fasync with data-pkt.
+-        sdio_header[4] = 0;
+-        sdio_header[5] = 0;
+-        sdio_header[6] = 0;
+-        sdio_header[7] = 0;
+-
+-		curr_len = sdio_len + SDIO_HEADER_LEN;
++	/* A frame whose fragments would not fit the list (which keeps one entry
++	 * for the fill of aicwf_sdio_aggr_send) is linearized, before the header
++	 * goes in, as that moves the head. */
++	if (skb_is_nonlinear(pkt) &&
++		(skb_has_frag_list(pkt) ||
++		 tx_priv->aggr_segcnt + 2 + skb_shinfo(pkt)->nr_frags > tx_priv->max_segs) &&
++		skb_linearize(pkt))
++		return -ENOMEM;
++	len = pkt->len;
++	curr_len = round_up(len + 4, TX_ALIGNMENT);
++	sdio_header = skb_push(pkt, 4);
++	sdio_header[0] = len & 0xff;
++	sdio_header[1] = (len >> 8) & 0x0f;
++	sdio_header[2] = 0x01; //data
++	if (tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80 ||
++		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80N ||
++		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80WN ||
++		tx_priv->sdiodev->chipid == PRODUCT_ID_AIC8800D80X2)
++		sdio_header[3] = crc8_ponl_107(&sdio_header[0], 3); // crc8
++	else
++		sdio_header[3] = 0; //reserved
+ 
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = start_ptr;
++	/* The padding to 4 bytes (at most 3) is read past the data: from the
++	 * skb's tailroom or shared info, or past the last fragment in its page.
++	 * The firmware ignores it, as it ignores the copying path's zeros. */
++	if (!skb_is_nonlinear(pkt)) {
++		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_header;
+ 		tx_priv->sg_list[tx_priv->aggr_segcnt].len = curr_len;
+ 		tx_priv->free_buf[tx_priv->aggr_segcnt] = pkt;
+-
+-		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
+-		//rwnx_data_dump("adj0",pkt->data,((pkt->len>32) ? 32 : pkt->len));
+-
+-		tx_priv->aggr_segcnt++;
+-		atomic_inc(&tx_priv->aggr_count);
+-		tx_priv->len += curr_len;
+-	}else if (adj_len==1) {
+-		sdio_len = pkt->len + 3;
+-		if (sdio_len & (TX_ALIGNMENT - 1)) {
+-            align_len = TX_ALIGNMENT - (sdio_len & (TX_ALIGNMENT - 1));
+-            //#ifdef CONFIG_SDIO_ADMA_ADJ
+-            //memset(pkt->data + sdio_len,0,align_len);
+-            //#endif
+-            //skb_put(pkt,align_len);
+-            sdio_len += align_len;
+-        }
+-
+-		sdio_tx_buf_dummy[tx_priv->aggr_segcnt][0] = ((sdio_len) & 0xff);
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][1] = (((sdio_len) >> 8)&0x0f);
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][2] = 0x01; // data
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][3] = 0;
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][4] = 0;
+-		sdio_tx_buf_dummy[tx_priv->aggr_segcnt][5] = 0;
+-		sdio_tx_buf_dummy[tx_priv->aggr_segcnt][6] = 0;
+-
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_tx_buf_dummy[tx_priv->aggr_segcnt];
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].len = SDIO_HEADER_LEN + 3;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] =NULL;
+-
+-		tx_priv->aggr_segcnt++;
+-
+-		sdio_header = start_ptr;
+-        sdio_header[0] = 0;
+-
+-		curr_len = sdio_len - 3;
+-
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = start_ptr;
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].len = curr_len;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] = pkt;
+-
+-		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
+-		//rwnx_data_dump("adj1",start_ptr,((curr_len>32) ? 32 : curr_len));
+-
+ 		tx_priv->aggr_segcnt++;
+-		atomic_inc(&tx_priv->aggr_count);
+-
+-		tx_priv->len += curr_len + SDIO_HEADER_LEN + 3;
+-
+-	}else if (adj_len==2) { // adj_len==2
+-		sdio_len = pkt->len + SDIO_DATA_FAKE_LEN;//adj_len +
+-		if (sdio_len & (TX_ALIGNMENT - 1)) {
+-            align_len = TX_ALIGNMENT - (sdio_len & (TX_ALIGNMENT - 1));
+-            //#ifdef CONFIG_SDIO_ADMA_ADJ
+-            //memset(pkt->data + sdio_len,0,align_len);
+-            //#endif
+-            //skb_put(pkt,align_len);
+-            sdio_len += align_len;
+-        }
+-
+-		sdio_tx_buf_dummy[tx_priv->aggr_segcnt][0] = ((sdio_len) & 0xff);
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][1] = (((sdio_len) >> 8)&0x0f);
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][2] = 0x01; // data
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][3] = 0;
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][4] = 0;
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][5] = 0;
+-
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_tx_buf_dummy[tx_priv->aggr_segcnt];
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].len = SDIO_HEADER_LEN + SDIO_DATA_FAKE_LEN;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] =NULL;
+-
+-        tx_priv->aggr_segcnt++;
+-
+-		sdio_header = start_ptr;
+-        sdio_header[0] = 0;
+-        sdio_header[1] = 0;
+-
+-		curr_len = sdio_len - SDIO_DATA_FAKE_LEN;
+-
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].buf = start_ptr;
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].len = curr_len;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] = pkt;
+-
+-		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
+-		//rwnx_data_dump("adj2",start_ptr,((curr_len>32) ? 32 : curr_len));
+-
+-		tx_priv->aggr_segcnt++;
+-		atomic_inc(&tx_priv->aggr_count);
+-
+-		tx_priv->len += curr_len + SDIO_HEADER_LEN + SDIO_DATA_FAKE_LEN;
+-	}else if (adj_len==3) {
+-		sdio_len = pkt->len + 1;
+-		if (sdio_len & (TX_ALIGNMENT - 1)) {
+-            align_len = TX_ALIGNMENT - (sdio_len & (TX_ALIGNMENT - 1));
+-            //#ifdef CONFIG_SDIO_ADMA_ADJ
+-            //memset(pkt->data + sdio_len,0,align_len);
+-            //#endif
+-            //skb_put(pkt,align_len);
+-            sdio_len += align_len;
+-        }
+-
+-		sdio_tx_buf_dummy[tx_priv->aggr_segcnt][0] = ((sdio_len) & 0xff);
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][1] = (((sdio_len) >> 8)&0x0f);
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][2] = 0x01; // data
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][3] = 0;
+-        sdio_tx_buf_dummy[tx_priv->aggr_segcnt][4] = 0;
+-
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_tx_buf_dummy[tx_priv->aggr_segcnt];
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].len = SDIO_HEADER_LEN + 1;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] =NULL;
+-
+-		tx_priv->aggr_segcnt++;
+-
+-		sdio_header = start_ptr;
+-        sdio_header[0] = 0;
+-        sdio_header[1] = 0;
+-		sdio_header[2] = 0;
+-
+-		curr_len = sdio_len - 1;
+-
+-		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = start_ptr;
+-        tx_priv->sg_list[tx_priv->aggr_segcnt].len = curr_len;
+-		tx_priv->free_buf[tx_priv->aggr_segcnt] = pkt;
+-
+-		//AICWFDBG(LOGTRACE,"curr_len %d \n",curr_len);
+-		//rwnx_data_dump("adj3",start_ptr,((curr_len>32) ? 32 : curr_len));
++	} else {
++		struct skb_shared_info *shinfo = skb_shinfo(pkt);
++		u32 pad = curr_len - (len + 4);
++		int f;
+ 
++		tx_priv->sg_list[tx_priv->aggr_segcnt].buf = sdio_header;
++		tx_priv->sg_list[tx_priv->aggr_segcnt].len = skb_headlen(pkt);
++		tx_priv->free_buf[tx_priv->aggr_segcnt] = NULL;
+ 		tx_priv->aggr_segcnt++;
+-		atomic_inc(&tx_priv->aggr_count);
+-
+-		tx_priv->len += curr_len + SDIO_HEADER_LEN + 1;
++		for (f = 0; f < shinfo->nr_frags; f++) {
++			const skb_frag_t *frag = &shinfo->frags[f];
++
++			tx_priv->sg_list[tx_priv->aggr_segcnt].buf = skb_frag_address(frag);
++			tx_priv->sg_list[tx_priv->aggr_segcnt].len = skb_frag_size(frag) +
++				(f == shinfo->nr_frags - 1 ? pad : 0);
++			tx_priv->free_buf[tx_priv->aggr_segcnt] = NULL;
++			tx_priv->aggr_segcnt++;
++		}
++		/* The frame's last entry owns it: freed when the list is reset. */
++		tx_priv->free_buf[tx_priv->aggr_segcnt - 1] = pkt;
+ 	}
+-
+-	//AICWFDBG(LOGTRACE,"end aggrcnt %d segcnt %d len %d \n",atomic_read(&tx_priv->aggr_count),tx_priv->aggr_segcnt,tx_priv->len);
+-
++	atomic_inc(&tx_priv->aggr_count);
++	tx_priv->len += curr_len;
++	return 0;
+ }
+ 
+ #endif
+@@ -2201,14 +2132,8 @@ int aicwf_sdio_send(struct aicwf_tx_priv *tx_priv, u8 txnow)
+ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+ {
+ #ifdef CONFIG_SDIO_ADMA
+-	u8 adj_len = 0;
+ 	struct rwnx_txhdr *txhdr = (struct rwnx_txhdr *)pkt->data;
+-	u8 *sdio_header = NULL;
+-	u32 sdio_len = 0;
+-	u32 curr_len = 0;
+-	int align_len = 0;
+ 	int headroom;
+-	u32 pkt_len = 0;
+ 	struct txdesc_api tmp_txdesc;
+ 	struct sk_buff *tmp_skb;
+ 
+@@ -2237,7 +2162,10 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+ 
+ 		//printk("cfm alloc %p \n",tmp_skb);
+ 		//printk("delay free %p \n",pkt);
+-		aicwf_adma_add(tx_priv, tmp_skb);
++		if (aicwf_adma_add(tx_priv, tmp_skb)) {
++			kfree_skb(tmp_skb);
++			return -ENOMEM;
++		}
+ 		tx_priv->copyd[tx_priv->aggr_segcnt -1] = true;
+ 	}else{
+ 		headroom = txhdr->sw_hdr->headroom;
+@@ -2256,7 +2184,10 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+ 
+ 		//printk("alloc %p \n",pkt);
+ 
+-		aicwf_adma_add(tx_priv, pkt);
++		if (aicwf_adma_add(tx_priv, pkt)) {
++			kfree_skb(pkt);
++			return -ENOMEM;
++		}
+ 		tx_priv->copyd[tx_priv->aggr_segcnt -1] = false;
+ 	}
+ 	
+@@ -2288,7 +2219,7 @@ int aicwf_sdio_aggr(struct aicwf_tx_priv *tx_priv, struct sk_buff *pkt)
+ 	//payload
+ 	memcpy(tx_priv->tail, (u8 *)(long)&txhdr->sw_hdr->desc, sizeof(struct txdesc_api));
+ 	tx_priv->tail += sizeof(struct txdesc_api); //hostdesc
+-	memcpy(tx_priv->tail, (u8 *)((u8 *)txhdr + txhdr->sw_hdr->headroom), pkt->len-txhdr->sw_hdr->headroom);
++	skb_copy_bits(pkt, txhdr->sw_hdr->headroom, tx_priv->tail, pkt->len - txhdr->sw_hdr->headroom);
+ 	tx_priv->tail += (pkt->len - txhdr->sw_hdr->headroom);
+ 
+ 	//word alignment
+@@ -2323,9 +2254,6 @@ void aicwf_sdio_aggr_send(struct aicwf_tx_priv *tx_priv)
+ {
+ #ifdef CONFIG_SDIO_ADMA
+ 	int ret = 0;
+-	int i=0;
+-	int nents = tx_priv->aggr_segcnt;
+-	//struct sk_buff *scatter_buf;
+ 
+ 	if(tx_priv->len & (TXPKT_BLOCKSIZE-1))
+ 	{
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+index 555a8de..a1e5311 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.c
+@@ -221,6 +221,15 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg)
+ #ifdef CONFIG_SDIO_ADMA
+ 	tx_priv->aggr_segcnt = 0;
+ 	tx_priv->len = 0;
++	tx_priv->max_segs = min_t(int, SDIO_TX_SLIST_MAX, tx_priv->sdiodev->func->card->host->max_segs);
++	if (!sdio_tx_buf_fill)
++		sdio_tx_buf_fill = kzalloc(TXPKT_BLOCKSIZE, GFP_KERNEL);
++	if (!sdio_tx_buf_fill) {
++		txrx_err("Alloc tx fill failed!\n");
++		dev_kfree_skb(tx_priv->aggr_buf);
++		kfree(tx_priv);
++		return NULL;
++	}
+ #endif
+ 
+ 	return tx_priv;
+@@ -228,6 +237,12 @@ struct aicwf_tx_priv *aicwf_tx_init(void *arg)
+ 
+ void aicwf_tx_deinit(struct aicwf_tx_priv *tx_priv)
+ {
++#ifdef CONFIG_SDIO_ADMA
++	if (tx_priv)
++		aicwf_sdio_aggrbuf_reset(tx_priv);
++	kfree(sdio_tx_buf_fill);
++	sdio_tx_buf_fill = NULL;
++#endif
+ 	if (tx_priv && tx_priv->aggr_buf) {
+ #ifdef  CONFIG_RESV_MEM_SUPPORT
+ 		aicbsp_resv_mem_kfree_skb(tx_priv->aggr_buf, AIC_RESV_MEM_TXDATA);
+@@ -236,9 +251,6 @@ void aicwf_tx_deinit(struct aicwf_tx_priv *tx_priv)
+ #endif
+ 		kfree(tx_priv);
+ 	}
+-#ifdef CONFIG_SDIO_ADMA
+-	aicwf_sdio_aggrbuf_reset(tx_priv);
+-#endif
+ }
+ 
+ #ifdef AICWF_SDIO_SUPPORT
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.h b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.h
+index 0774c16..9207e7c 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.h
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aicwf_txrxif.h
+@@ -104,6 +104,10 @@ struct aicwf_bus {
+ };
+ 
+ #ifdef CONFIG_SDIO_ADMA
++#include <linux/mmc/card.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/sdio_func.h>
++#include <linux/scatterlist.h>
+ #define SDIO_HEADER_LEN	4
+ #define SDIO_DATA_FAKE_LEN	2
+ #define SDIO_MGMT_FAKE_LEN	4
+@@ -111,10 +115,14 @@ struct aicwf_bus {
+ 
+ #define SDIO_TX_SLIST_MAX   136
+ 
+-/*struct tx_scatterlist {
++struct tx_scatterlist {
+ 	const void *buf;
+ 	unsigned int len;
+-};*/
++};
++
++/* The zeros that end an aggregate; allocated, as module memory is not
++ * in the linear map that DMA needs. */
++extern unsigned char *sdio_tx_buf_fill;
+ #endif
+ 
+ struct aicwf_tx_priv {
+@@ -145,6 +153,8 @@ struct aicwf_tx_priv {
+ 
+ #ifdef CONFIG_SDIO_ADMA
+ 	struct tx_scatterlist sg_list[SDIO_TX_SLIST_MAX];
++	struct scatterlist sg[SDIO_TX_SLIST_MAX];
++	int max_segs;
+ 	void *free_buf[SDIO_TX_SLIST_MAX];
+ 	bool copyd[SDIO_TX_SLIST_MAX];
+ 	u32 aggr_segcnt;
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index f57638b..3e05cea 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -1552,7 +1552,11 @@ static void rwnx_netdev_setup(struct net_device *dev)
+ 												+ sizeof(rfc1042_header) + 2));
+ #endif /* CONFIG_RWNX_AMSDUS_TX */
+ 
+-	dev->hw_features = 0;
++	/* Fragments go to the SDIO host as they are (aicwf_adma_add) or are
++	 * copied with skb_copy_bits(); the checksum, which the chip does not
++	 * compute, in rwnx_start_xmit. */
++	dev->hw_features = NETIF_F_SG | NETIF_F_HW_CSUM;
++	dev->features |= dev->hw_features;
+ }
+ 
+ /*********************************************************************
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c
+index d8354ad..b4b5be9 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_tx.c
+@@ -1426,6 +1426,8 @@ netdev_tx_t rwnx_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	struct msg_buf *msgbuf = NULL;
+ #endif
+ 
++	if (skb->ip_summed == CHECKSUM_PARTIAL && skb_checksum_help(skb))
++		goto free;
+ 	if(skb->len <= sizeof(struct ethhdr)) {
+ 	   AICWFDBG(LOGINFO, "len (%d) too short, skip \n", skb->len);
+ 	   return NETDEV_TX_OK;
