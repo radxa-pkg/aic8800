@@ -1,0 +1,131 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Fri, 23 Oct 2026 00:00:00 +0100
+Subject: [PATCH] usb: drop a timed-out command and reset the device
+
+One missed confirm left the command on the queue, queue_sz never decremented and
+the command manager "crashed" for good: every later command failed until the
+module was reloaded (shenmintao/aic8800d80#43). The timed-out command is now taken off the queue and
+completed with -ETIMEDOUT, and the USB device is reset, so the driver probes
+again and loads the firmware afresh. The commands refused while it is down ask
+for the reset again, at most every 30 s.
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c |  1 +
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h |  1 +
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c | 38 ++++++++++++++++++++----
+ 3 files changed, 34 insertions(+), 6 deletions(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -2444,6 +2444,7 @@ static int aicwf_usb_probe(struct usb_interface *intf, const struct usb_device_i
+ 
+ 
+     usb_dev->udev = usb;
++    usb_dev->intf = intf;
+     usb_dev->dev = &usb->dev;
+     usb_set_intfdata(intf, usb_dev);
+ 
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.h
+@@ -148,6 +148,7 @@ struct aic_usb_dev {
+     struct rwnx_hw *rwnx_hw;
+     struct aicwf_bus *bus_if;
+     struct usb_device *udev;
++    struct usb_interface *intf;
+     struct device *dev;
+     struct aicwf_rx_priv* rx_priv;
+     enum aicwf_usb_state state;
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+@@ -39,6 +39,24 @@ static void cmd_dump(const struct rwnx_cmd *cmd)
+            cmd->reqid, cmd->reqid != (lmac_msg_id_t)-1 ? RWNX_ID2STR(cmd->reqid) : "none");
+ }
+ 
++#define RESET_INTERVAL	(30 * HZ)
++
++/* The firmware stopped answering: reset the USB device, so the driver probes again and loads the firmware afresh.
++ * At most once per RESET_INTERVAL; the commands refused meanwhile ask again. */
++static void cmd_mgr_reset_device(struct rwnx_cmd_mgr *cmd_mgr)
++{
++#ifdef AICWF_USB_SUPPORT
++    struct aic_usb_dev *usbdev = container_of(cmd_mgr, struct aic_usb_dev, cmd_mgr);
++    static unsigned long last;
++
++    if (!usbdev->intf || (last && time_before(jiffies, last + RESET_INTERVAL)))
++        return;
++    last = jiffies;
++    printk(KERN_CRIT "aic8800: firmware not answering: resetting the device to load it afresh\n");
++    usb_queue_reset_device(usbdev->intf);
++#endif
++}
++
+ /**
+  *
+  */
+@@ -79,6 +97,7 @@ int cmd_mgr_queue_force_defer(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd
+         printk(KERN_CRIT"cmd queue crashed\n");
+         cmd->result = -EPIPE;
+         spin_unlock_bh(&cmd_mgr->lock);
++        cmd_mgr_reset_device(cmd_mgr);
+         return -EPIPE;
+     }
+ 
+@@ -144,6 +163,7 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
+ 				AICWFDBG(LOGERROR, "cmd queue crashed\n");
+ 				cmd->result = -EPIPE;
+ 				spin_unlock_bh(&cmd_mgr->lock);
++				cmd_mgr_reset_device(cmd_mgr);
+ 				return -EPIPE;
+ 			}
+             empty = list_empty(&cmd_mgr->cmds);
+@@ -164,6 +184,7 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
+ 				printk(KERN_CRIT"cmd queue crashed\n");
+ 				cmd->result = -EPIPE;
+ 				spin_unlock_bh(&cmd_mgr->lock);
++				cmd_mgr_reset_device(cmd_mgr);
+ 				return -EPIPE;
+ 		}
+ 	}
+@@ -268,14 +289,18 @@ static int cmd_mgr_queue(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd)
+ 
+             cmd_dump(cmd);
+             spin_lock_bh(&cmd_mgr->lock);
+-            
+             cmd_mgr->state = RWNX_CMD_MGR_STATE_CRASHED;
++            list_del(&cmd->list);
++            cmd_mgr->queue_sz--;
++            if (cmd_mgr->queue_sz == 0)
++                rwnx_wakeup_unlock(usbdev->rwnx_hw->ws_tx);
+             if (!(cmd->flags & RWNX_CMD_FLAG_DONE)) {
+                 cmd->result = -ETIMEDOUT;
+                 cmd_complete(cmd_mgr, cmd);
+             }
+ 			ret = -ETIMEDOUT;
+             spin_unlock_bh(&cmd_mgr->lock);
++            cmd_mgr_reset_device(cmd_mgr);
+         }
+ 		else{
+ 			spin_lock_bh(&cmd_mgr->lock);
+@@ -388,13 +413,14 @@ void cmd_mgr_task_process(struct work_struct *work)
+                 printk(KERN_CRIT"%s cmd timed-out cmd_mgr->queue_sz:%d\n", __func__, cmd_mgr->queue_sz);
+                 cmd_dump(next);
+                 spin_lock_bh(&cmd_mgr->lock);
+-                //AIDEN  workaround  
+                 cmd_mgr->state = RWNX_CMD_MGR_STATE_CRASHED;
+-                if (!(next->flags & RWNX_CMD_FLAG_DONE)) {
+-                    next->result = -ETIMEDOUT;
+-                    cmd_complete(cmd_mgr, next);
+-                }
++                list_del(&next->list);
++                cmd_mgr->queue_sz--;
++                if (cmd_mgr->queue_sz == 0)
++                    rwnx_wakeup_unlock(usbdev->rwnx_hw->ws_tx);
+                 spin_unlock_bh(&cmd_mgr->lock);
++                rwnx_cmd_free(next);
++                cmd_mgr_reset_device(cmd_mgr);
+             } else {
+ 				spin_lock_bh(&cmd_mgr->lock);
+ 				list_del(&next->list);

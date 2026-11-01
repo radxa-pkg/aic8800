@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Wed, 28 Oct 2026 00:00:00 +0000
+Subject: [PATCH] usb: cancel the stall watch again once no connect can start it
+
+aicwf_bus_deinit() cancels the stall watch first, but the wiphy is
+unregistered only later, in rwnx_cfg80211_deinit(). A connect in flight
+between the two (an unload or a reset during a join) can have its
+SM_CONNECT_CFM come after the cancel and start the watch again; its tick
+then runs on a usbdev that is freed by then.
+
+rwnx_cmd_mgr_quiesce() runs once wiphy_unregister() has returned, when no
+connect can start, and still before the platform goes; it now cancels the
+watch too. The cancel in aicwf_bus_deinit() stays: it stops the watch's
+reads before the URBs are cancelled.
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+@@ -907,6 +907,10 @@ void rwnx_cmd_mgr_quiesce(struct rwnx_cmd_mgr *cmd_mgr)
+ {
+     if (!cmd_mgr || !cmd_mgr->cmd_wq)
+         return;
++#ifdef AICWF_USB_SUPPORT
++    /* Again, as aicwf_bus_deinit() did: a connect confirmed since may have started it. None can start now. */
++    aicwf_join_watch_cancel(container_of(cmd_mgr, struct aic_usb_dev, cmd_mgr));
++#endif
+     spin_lock_bh(&cmd_mgr->lock);
+     cmd_mgr->state = RWNX_CMD_MGR_STATE_DEINIT;
+     spin_unlock_bh(&cmd_mgr->lock);
