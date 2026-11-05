@@ -1,0 +1,175 @@
+--- a/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -2462,9 +2462,17 @@ static int rwnx_cfg80211_add_key(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION)
+ 																int link_id,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++								 u8 key_index, enum nl80211_key_type key_type,
++								 const u8 *mac_addr,
++#else
+ 								 u8 key_index, bool pairwise, const u8 *mac_addr,
++#endif
+ 								 struct key_params *params)
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++	bool pairwise = key_type == NL80211_KEYTYPE_PAIRWISE;
++#endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+ 	struct net_device *netdev = wdev->netdev;
+ #endif
+@@ -2584,7 +2592,12 @@ static int rwnx_cfg80211_get_key(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION)
+ 																int link_id,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++								 u8 key_index, enum nl80211_key_type key_type,
++								 const u8 *mac_addr,
++#else
+ 								 u8 key_index, bool pairwise, const u8 *mac_addr,
++#endif
+ 								 void *cookie,
+ 								 void (*callback)(void *cookie, struct key_params*))
+ {
+@@ -2608,7 +2621,12 @@ static int rwnx_cfg80211_del_key(struct
+ 																int link_id,
+ #endif
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++								 u8 key_index, enum nl80211_key_type key_type,
++								 const u8 *mac_addr)
++#else
+ 								 u8 key_index, bool pairwise, const u8 *mac_addr)
++#endif
+ {
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+ 	struct net_device *netdev = wdev->netdev;
+@@ -2753,7 +2771,11 @@ static int rwnx_cfg80211_connect(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION)
+ 									0,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++		sme->key_idx, NL80211_KEYTYPE_GROUP, NULL, &key_params);
++#else
+ 		sme->key_idx, false, NULL, &key_params);
++#endif
+ 	}
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+ 	else if ((sme->auth_type == NL80211_AUTHTYPE_SAE) &&
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -2299,10 +2299,18 @@ bool key_flag = false;
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+ 																	 int link_id,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++									 u8 key_index, enum nl80211_key_type key_type,
++									 const u8 *mac_addr,
++#else
+ 									 u8 key_index, bool pairwise, const u8 *mac_addr,
++#endif
+ 									 struct key_params *params)
+ 
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++	bool pairwise = key_type == NL80211_KEYTYPE_PAIRWISE;
++#endif
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+ 	struct net_device *netdev = wdev->netdev;
+ #endif
+@@ -2422,7 +2430,12 @@ static int rwnx_cfg80211_get_key(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+                                                                  int link_id,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++								 u8 key_index, enum nl80211_key_type key_type,
++								 const u8 *mac_addr,
++#else
+ 								 u8 key_index, bool pairwise, const u8 *mac_addr,
++#endif
+ 								 void *cookie,
+ 								 void (*callback)(void *cookie, struct key_params*))
+ {
+@@ -2445,7 +2458,12 @@ static int rwnx_cfg80211_del_key(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+                                                                  int link_id,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++								 u8 key_index, enum nl80211_key_type key_type,
++								 const u8 *mac_addr)
++#else
+ 								 u8 key_index, bool pairwise, const u8 *mac_addr)
++#endif
+ {
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+ 	struct net_device *netdev = wdev->netdev;
+@@ -2598,7 +2616,11 @@ static int rwnx_cfg80211_connect(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+                                 0,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++				sme->key_idx, NL80211_KEYTYPE_GROUP, NULL, &key_params);
++#else
+ 				sme->key_idx, false, NULL, &key_params);
++#endif
+ 	}
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+ 	else if ((sme->auth_type == NL80211_AUTHTYPE_SAE) &&
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -2950,9 +2950,17 @@ static int rwnx_cfg80211_add_key(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+                                                                  int link_id,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++                                 u8 key_index, enum nl80211_key_type key_type,
++                                 const u8 *mac_addr,
++#else
+                                  u8 key_index, bool pairwise, const u8 *mac_addr,
++#endif
+                                  struct key_params *params)
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++    bool pairwise = key_type == NL80211_KEYTYPE_PAIRWISE;
++#endif
+     struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+     struct rwnx_vif *vif = netdev_priv(wdev->netdev);
+@@ -3075,7 +3083,12 @@ static int rwnx_cfg80211_get_key(struct
+                                                                  int link_id,
+ #endif
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++                                 u8 key_index, enum nl80211_key_type key_type,
++                                 const u8 *mac_addr,
++#else
+                                  u8 key_index, bool pairwise, const u8 *mac_addr,
++#endif
+                                  void *cookie,
+                                  void (*callback)(void *cookie, struct key_params*))
+ {
+@@ -3099,7 +3112,12 @@ static int rwnx_cfg80211_del_key(struct
+                                                                  int link_id,
+ #endif
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++                                 u8 key_index, enum nl80211_key_type key_type,
++                                 const u8 *mac_addr)
++#else
+                                  u8 key_index, bool pairwise, const u8 *mac_addr)
++#endif
+ {
+     struct rwnx_hw *rwnx_hw = wiphy_priv(wiphy);
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0)
+@@ -3257,7 +3275,11 @@ static int rwnx_cfg80211_connect(struct
+ #if (LINUX_VERSION_CODE >= HIGH_KERNEL_VERSION2)
+                                 0,
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 4, 0)
++	sme->key_idx, NL80211_KEYTYPE_GROUP, NULL, &key_params);
++#else
+ 	sme->key_idx, false, NULL, &key_params);
++#endif
+     }
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 17, 0) || defined(CONFIG_WPA3_FOR_OLD_KERNEL)
+     else if ((sme->auth_type == NL80211_AUTHTYPE_SAE) &&
