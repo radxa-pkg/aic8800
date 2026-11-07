@@ -1,0 +1,81 @@
+diff --git a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+index f57638b..9f3b752 100644
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -23,6 +23,9 @@
+ #include <linux/ctype.h>
+ #include <linux/random.h>
+ #include <linux/vmalloc.h>
++#include <linux/jhash.h>
++#include <linux/of.h>
++#include <linux/of_net.h>
+ #include "rwnx_defs.h"
+ #include "rwnx_dini.h"
+ #include "rwnx_msg_tx.h"
+@@ -6009,6 +6012,54 @@ extern int get_adap_test(void);
+ extern void *aicwf_prealloc_txq_alloc(size_t size);
+ extern char default_ccode[];
+ 
++/*
++ * The vendor fallback MAC is 88:00:33:77 plus two random bytes, so it
++ * changes at each module load. Use a stable source if the board has one:
++ *
++ *  1. The device tree node of the SDIO function: "mac-address",
++ *     "local-mac-address" or an nvmem cell.
++ *  2. The "serial-number" property of the device tree root, which
++ *     U-Boot sets from its serial# variable. A hash of it replaces the
++ *     two random bytes.
++ *
++ * Return false if there is no stable source.
++ */
++static bool rwnx_get_stable_dflt_mac(struct device *dev, u8 *mac)
++{
++	struct device_node *root;
++	const char *serial;
++	bool found = false;
++	u32 hash;
++
++	if (dev && dev->of_node) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
++		if (!of_get_mac_address(dev->of_node, mac))
++			return true;
++#else
++		const void *addr = of_get_mac_address(dev->of_node);
++
++		if (!IS_ERR_OR_NULL(addr)) {
++			ether_addr_copy(mac, addr);
++			return true;
++		}
++#endif
++	}
++
++	root = of_find_node_by_path("/");
++	if (!root)
++		return false;
++
++	if (!of_property_read_string(root, "serial-number", &serial) && *serial) {
++		hash = jhash(serial, strlen(serial), 0);
++		mac[4] = hash & 0xff;
++		mac[5] = (hash >> 8) & 0xff;
++		found = true;
++	}
++	of_node_put(root);
++
++	return found;
++}
++
+ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
+ {
+ 	struct rwnx_hw *rwnx_hw;
+@@ -6035,7 +6086,10 @@ int rwnx_cfg80211_init(struct rwnx_plat *rwnx_plat, void **platform_data)
+ 	memset(fw_path, 0, 200);
+ 	aicbsp_get_feature(&feature, fw_path);
+ 
+-	get_random_bytes(&dflt_mac[4], 2);
++	if (rwnx_get_stable_dflt_mac(rwnx_platform_get_dev(rwnx_plat), dflt_mac))
++		AICWFDBG(LOGINFO, "%s: stable fallback MAC %pM\n", __func__, dflt_mac);
++	else
++		get_random_bytes(&dflt_mac[4], 2);
+ #ifdef CONFIG_POWER_LIMIT
+ 	memcpy(country_code, default_ccode, 4);
+ #endif
