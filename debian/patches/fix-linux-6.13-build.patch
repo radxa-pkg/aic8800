@@ -24,8 +24,8 @@ Index: aic8800/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
   * configured at firmware level.
   */
  static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
-+											 struct net_device *,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 101))
++											 struct net_device *dev,
 +#endif
  											 struct cfg80211_chan_def *chandef)
  {
@@ -34,7 +34,7 @@ Index: aic8800/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
  
  int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
                                               struct cfg80211_chan_def *chandef){
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 101))
 +    return rwnx_cfg80211_set_monitor_channel(wiphy, NULL, chandef);
 +#else
      return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
@@ -46,7 +46,7 @@ Index: aic8800/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
  
  	if (rwnx_vif->vif_index == rwnx_hw->monitor_vif) {
  		//retrieve channel from firmware
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 101))
 +		rwnx_cfg80211_set_monitor_channel(wiphy, NULL, NULL);
 +#else
  		rwnx_cfg80211_set_monitor_channel(wiphy, NULL);
@@ -79,8 +79,8 @@ Index: aic8800/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
   * configured at firmware level.
   */
  static int rwnx_cfg80211_set_monitor_channel(struct wiphy *wiphy,
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
-+											 struct net_device *,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 101))
++											 struct net_device *dev,
 +#endif
  											 struct cfg80211_chan_def *chandef)
  {
@@ -89,7 +89,7 @@ Index: aic8800/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
  
  int rwnx_cfg80211_set_monitor_channel_(struct wiphy *wiphy,
                                               struct cfg80211_chan_def *chandef){
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 101))
 +    return rwnx_cfg80211_set_monitor_channel(wiphy, NULL, chandef);
 +#else
      return rwnx_cfg80211_set_monitor_channel(wiphy, chandef);
@@ -101,7 +101,7 @@ Index: aic8800/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
  
  	if (rwnx_vif->vif_index == rwnx_hw->monitor_vif) {
  		//retrieve channel from firmware
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION (6, 13, 0)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 101))
 +		rwnx_cfg80211_set_monitor_channel(wiphy, NULL, NULL);
 +#else
  		rwnx_cfg80211_set_monitor_channel(wiphy, NULL);
