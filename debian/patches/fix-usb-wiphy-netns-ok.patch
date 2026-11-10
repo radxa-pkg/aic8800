@@ -13,16 +13,31 @@ extension (CONFIG_BR_SUPPORT) looks its bridge up by name in init_net,
 and band steering (CONFIG_BAND_STEERING) keeps its netlink socket
 there. So the flag is set only when neither is built in.
 
+An interface added after the move ('iw phy <phy> interface add ...')
+is created in the wiphy's namespace, as cfg80211 asks of
+add_virtual_intf: rwnx_interface_add() sets the netdev's namespace
+before registering it, as mac80211 does. While the wiphy is in
+init_net this changes nothing.
+
 The same change, with the gate by Shen Mintao, is merged in
 shenmintao/aic8800d80 as 2e305e8 and 051b623 (#114).
 ---
- src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -9226,6 +9226,11 @@
+@@ -1921,6 +1921,8 @@
+     vif->ndev = ndev;
+     vif->drv_vif_index = vif_idx;
+     SET_NETDEV_DEV(ndev, wiphy_dev(vif->wdev.wiphy));
++    /* An interface added after the wiphy moved to another namespace belongs there, as cfg80211 asks. */
++    dev_net_set(ndev, wiphy_net(rwnx_hw->wiphy));
+     vif->wdev.netdev = ndev;
+     vif->wdev.iftype = type;
+     vif->up = false;
+@@ -9248,6 +9250,11 @@
          WIPHY_FLAG_4ADDR_STATION |
          WIPHY_FLAG_4ADDR_AP;
  
