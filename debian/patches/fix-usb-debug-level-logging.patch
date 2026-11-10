@@ -17,7 +17,10 @@ Now:
   and the number of entries written; a failure at LOGERROR, as before.
 - 4-address frames dropped by a build without CONFIG_SUPPORT_4ADDR: counted
   per device and said at LOGINFO, the first at once and then at most once a
-  minute; each frame and its dump at LOGDEBUG.
+  minute; each frame and its dump at LOGDEBUG. Both receive threads reach
+  the count (with CONFIG_USB_MSG_IN_EP, the default), so it is atomic and
+  the minute is claimed with cmpxchg: one summary a minute, never a zero
+  count.
 
 Both by aicwf_dbg_level, so neither needs a rebuild or dynamic debug:
 0x2 (INFO) for the summaries, 0x8 (DEBUG) for the detail, e.g.
@@ -29,9 +32,9 @@ The same change is merged in shenmintao/aic8800d80 (#115).
 ---
  src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c |  7 ++++++-
  src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.c   |  7 ++++++-
- src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h             |  4 ++++
- src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c               | 13 +++++++++++--
- 4 files changed, 27 insertions(+), 4 deletions(-)
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h             |  6 ++++++
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c               | 18 ++++++++++++++++--
+ 4 files changed, 34 insertions(+), 4 deletions(-)
 
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800d80n.c
@@ -85,12 +88,14 @@ diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_compat_8800dc.
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h
-@@ -935,6 +935,10 @@ struct rwnx_hw {
+@@ -935,6 +935,12 @@ struct rwnx_hw {
  	ktime_t last_time;
  	char last_alpha2[3];
  
-+	/* 4-address frames dropped (a build without CONFIG_SUPPORT_4ADDR): counted, and said at most once a minute. */
-+	unsigned int fouraddr_dropped;
++	/* 4-address frames dropped (a build without CONFIG_SUPPORT_4ADDR): counted, and said at most once a minute.
++	 * Both receive threads reach the count (with CONFIG_USB_MSG_IN_EP), so it is atomic and the minute is claimed
++	 * by cmpxchg. */
++	atomic_t fouraddr_dropped;
 +	unsigned long fouraddr_said;
 +
  };
@@ -99,18 +104,23 @@ diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_defs.h b/src/US
 diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
 --- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
 +++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_rx.c
-@@ -2427,8 +2427,17 @@ check_len_update:
+@@ -2427,8 +2427,22 @@ check_len_update:
  
  #ifndef CONFIG_SUPPORT_4ADDR
  		if (hw_rxhdr->flags_is_4addr) {
 -					dev_err(rwnx_hw->dev, "4addr Frame received (%d), skb->len:%u\n", hw_rxhdr->flags_vif_idx, skb->len);
 -					print_hex_dump(KERN_ERR,"4addr ",DUMP_PREFIX_NONE, 16, 1, skb->data, skb->len, false);
-+					rwnx_hw->fouraddr_dropped++;
-+					if (!rwnx_hw->fouraddr_said || time_after(jiffies, rwnx_hw->fouraddr_said + 60 * HZ)) {
++					unsigned long said = READ_ONCE(rwnx_hw->fouraddr_said);
++					unsigned long now = jiffies ? jiffies : 1;
++
++					atomic_inc(&rwnx_hw->fouraddr_dropped);
++					/* The thread that claims the minute says the count; the other keeps counting. */
++					if ((!said || time_after(now, said + 60 * HZ)) &&
++					    cmpxchg(&rwnx_hw->fouraddr_said, said, now) == said) {
++						unsigned int dropped = atomic_xchg(&rwnx_hw->fouraddr_dropped, 0);
++
 +						AICWFDBG(LOGINFO, "4addr frames dropped (this build has no CONFIG_SUPPORT_4ADDR): %u since the last count; "
-+							 "aicwf_dbg_level with 0x8 (debug) logs each one\n", rwnx_hw->fouraddr_dropped);
-+						rwnx_hw->fouraddr_dropped = 0;
-+						rwnx_hw->fouraddr_said = jiffies ? jiffies : 1;
++							 "aicwf_dbg_level with 0x8 (debug) logs each one\n", dropped);
 +					}
 +					if (aicwf_dbg_level & LOGDEBUG) {
 +						AICWFDBG(LOGDEBUG, "4addr Frame received (%d), skb->len:%u\n", hw_rxhdr->flags_vif_idx, skb->len);
