@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Fri, 23 Oct 2026 00:00:00 +0100
+Subject: [PATCH] usb: clear scan_request when sending the scan fails
+
+rwnx_cfg80211_scan() stores the request in rwnx_hw->scan_request before
+sending SCANU_START_REQ. When the send fails, the error goes back to
+cfg80211, which frees the request, but scan_request still points at it.
+A late SCANU_START_CFM (or the next scan's completion) then calls
+cfg80211_scan_done() on freed memory.
+
+Seen on an AIC8800DC (Luckfox Lyra Zero W) with a command timeout
+injected during a scan: the kernel panicked in cfg80211_scan_done(),
+caught twice on the serial console.
+
+The same change is merged in shenmintao/aic8800d80 as d910a71 (#116).
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -2930,8 +2930,10 @@
+ 	}
+ 
+     rwnx_hw->scan_request = request;
+-    if ((error = rwnx_send_scanu_req(rwnx_hw, rwnx_vif, request)))
++    if ((error = rwnx_send_scanu_req(rwnx_hw, rwnx_vif, request))) {
++        rwnx_hw->scan_request = NULL;
+         return error;
++    }
+ 
+     return 0;
+ }
