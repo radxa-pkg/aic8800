@@ -1,0 +1,155 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Wed, 28 Oct 2026 00:00:00 +0000
+Subject: [PATCH] usb: take a port's entry only at a reset, free after RESET_INTERVAL
+
+The reset's rate limit and the DC/DW reboot after a reset are kept per USB
+port in a table of eight entries. aicwf_reboot_chip_on_probe() looked its
+port up with the same function as the reset, which took an entry for any port
+without one, and entries were never given back. So every ordinary probe took
+an entry for good; once a dongle had been probed on eight ports, a reset on a
+ninth found none. The reset still went ahead, but without its rate limit or
+the reboot that must follow it.
+
+Now:
+
+- a probe only looks its port up (aicwf_port_find()), and never takes an
+  entry;
+- only a reset takes one (aicwf_port_take()), and an entry holds for
+  RESET_INTERVAL after its reset, which covers the rate limit and the probe
+  that follows within seconds. After that it is free again, so a reset whose
+  device never came back (unplugged meanwhile) does not keep its entry;
+- with every entry held (eight ports reset within RESET_INTERVAL) a reset is
+  refused, as the rate limit refuses one, and a command refused meanwhile
+  asks again once an entry is free. A reset never goes ahead without
+  somewhere to keep its reboot.
+
+The reset time is kept in 64-bit jiffies: in unsigned long jiffies on a
+32-bit host, a reset from about 25 days before (at HZ=1000) compares as
+being in the future, and the port's resets would be refused for as long
+again.
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c | 69 +++++++++++++++++++++++++++++++++++++++++++--------------------------
+ 1 file changed, 43 insertions(+), 26 deletions(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+@@ -41,36 +41,59 @@ static void cmd_dump(const struct rwnx_cmd *cmd)
+ }
+ 
+ #ifdef AICWF_USB_SUPPORT
+-/* Kept per USB port (bus and path) rather than per device: each reset brings a new usb_device. */
++#define RESET_INTERVAL	(30 * HZ)
++
++/* Kept per USB port (bus and path) rather than per device: each reset brings a new usb_device. An entry is taken only by
++ * a reset and holds for RESET_INTERVAL (the rate limit, and the reboot at the probe that follows), then is free again,
++ * so the table never fills with ports seen once. In 64-bit jiffies: unsigned long wraps on 32-bit hosts. */
+ struct aicwf_port {
+     int busnum;
+     char devpath[16];
+-    unsigned long last_reset;
++    u64 last_reset;
+     bool reboot_on_probe;
+ };
+ static struct aicwf_port aicwf_ports[8];
+ static DEFINE_SPINLOCK(aicwf_ports_lock);
+ 
+-/* The port's entry, claimed if it has none; NULL when every entry is taken. */
+-static struct aicwf_port *aicwf_port_of(struct usb_device *udev)
++static bool aicwf_port_held(const struct aicwf_port *port)
++{
++    return port->busnum && time_before64(get_jiffies_64(), port->last_reset + RESET_INTERVAL);
++}
++
++/* The entry of a port reset within RESET_INTERVAL; NULL for any other. Never takes an entry. */
++static struct aicwf_port *aicwf_port_find(struct usb_device *udev)
+ {
+-    struct aicwf_port *unused = NULL;
+     int i;
+ 
+     lockdep_assert_held(&aicwf_ports_lock);
+     for (i = 0; i < ARRAY_SIZE(aicwf_ports); i++) {
+         struct aicwf_port *port = &aicwf_ports[i];
+ 
+-        if (port->busnum == udev->bus->busnum && !strcmp(port->devpath, udev->devpath))
++        if (aicwf_port_held(port) && port->busnum == udev->bus->busnum && !strcmp(port->devpath, udev->devpath))
+             return port;
+-        if (!unused && !port->busnum)
+-            unused = port;
+     }
+-    if (unused) {
+-        unused->busnum = udev->bus->busnum;
+-        strscpy(unused->devpath, udev->devpath, sizeof(unused->devpath));
++    return NULL;
++}
++
++/* A free entry taken for udev's port, which has none; NULL when every entry holds (8 ports reset within
++ * RESET_INTERVAL). */
++static struct aicwf_port *aicwf_port_take(struct usb_device *udev)
++{
++    int i;
++
++    lockdep_assert_held(&aicwf_ports_lock);
++    for (i = 0; i < ARRAY_SIZE(aicwf_ports); i++) {
++        struct aicwf_port *port = &aicwf_ports[i];
++
++        if (aicwf_port_held(port))
++            continue;
++        port->busnum = udev->bus->busnum;
++        strscpy(port->devpath, udev->devpath, sizeof(port->devpath));
++        port->last_reset = get_jiffies_64();
++        port->reboot_on_probe = true;
++        return port;
+     }
+-    return unused;
++    return NULL;
+ }
+ 
+ /* True once after cmd_mgr_reset_device() reset the device at udev's port. */
+@@ -80,7 +103,7 @@ bool aicwf_reboot_chip_on_probe(struct usb_device *udev)
+     bool reboot = false;
+ 
+     spin_lock_bh(&aicwf_ports_lock);
+-    port = aicwf_port_of(udev);
++    port = aicwf_port_find(udev);
+     if (port) {
+         reboot = port->reboot_on_probe;
+         port->reboot_on_probe = false;
+@@ -282,29 +305,23 @@ static long cmd_mgr_wait(struct aic_usb_dev *usbdev, struct rwnx_cmd *cmd, unsig
+     return ret;
+ }
+ 
+-#define RESET_INTERVAL	(30 * HZ)
+-
+ /* The firmware stopped answering: reset the USB device, so the driver probes again and loads the firmware afresh.
+- * At most once per RESET_INTERVAL on each port; the commands refused meanwhile ask again. */
++ * At most once per RESET_INTERVAL on each port, and only with an entry to keep the reboot that must follow; the
++ * commands refused meanwhile ask again. */
+ static void cmd_mgr_reset_device(struct rwnx_cmd_mgr *cmd_mgr)
+ {
+ #ifdef AICWF_USB_SUPPORT
+     struct aic_usb_dev *usbdev = container_of(cmd_mgr, struct aic_usb_dev, cmd_mgr);
+-    struct aicwf_port *port;
++    struct aicwf_port *port = NULL;
+ 
+     if (!usbdev->intf || cmd_mgr->state == RWNX_CMD_MGR_STATE_DEINIT)
+         return;
+     spin_lock_bh(&aicwf_ports_lock);
+-    port = aicwf_port_of(usbdev->udev);
+-    if (port && port->last_reset && time_before(jiffies, port->last_reset + RESET_INTERVAL)) {
+-        spin_unlock_bh(&aicwf_ports_lock);
+-        return;
+-    }
+-    if (port) {
+-        port->last_reset = jiffies;
+-        port->reboot_on_probe = true;
+-    }
++    if (!aicwf_port_find(usbdev->udev))
++        port = aicwf_port_take(usbdev->udev);
+     spin_unlock_bh(&aicwf_ports_lock);
++    if (!port)
++        return;
+     recoveries++;
+     recovered_at = (long)ktime_get_boottime_seconds();
+     printk(KERN_CRIT "aic8800: firmware not answering: resetting the device to load it afresh\n");

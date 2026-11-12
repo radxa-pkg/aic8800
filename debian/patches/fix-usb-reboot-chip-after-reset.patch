@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: NomDeTom <nomdetom@protonmail.com>
+Date: Fri, 23 Oct 2026 00:00:00 +0100
+Subject: [PATCH] usb: reboot the DC/DW chip after a reset for a stall
+
+A USB reset leaves the AIC8800DC powered. After a real stall the firmware
+loaded afresh hung at its first start (DBG_START_APP_REQ unanswered) and the
+probe failed, though the chip still answered debug memory reads. The probe
+after such a reset now asks the chip to reboot (HOST_START_APP_REBOOT) before
+starting anything; the device leaves the bus and comes back, and that probe
+starts it clean. A D80 dongle needs none of this: a USB reset already sends it
+back to its USB-drive mode.
+---
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c | 21 ++++++++++++++++++++-
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h |  5 +++++
+ src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c | 11 +++++++++++
+ 3 files changed, 36 insertions(+), 1 deletion(-)
+
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.c
+@@ -45,6 +45,7 @@ struct aicwf_port {
+     int busnum;
+     char devpath[16];
+     unsigned long last_reset;
++    bool reboot_on_probe;
+ };
+ static struct aicwf_port aicwf_ports[8];
+ static DEFINE_SPINLOCK(aicwf_ports_lock);
+@@ -70,6 +71,22 @@ static struct aicwf_port *aicwf_port_of(struct usb_device *udev)
+     }
+     return unused;
+ }
++
++/* True once after cmd_mgr_reset_device() reset the device at udev's port. */
++bool aicwf_reboot_chip_on_probe(struct usb_device *udev)
++{
++    struct aicwf_port *port;
++    bool reboot = false;
++
++    spin_lock_bh(&aicwf_ports_lock);
++    port = aicwf_port_of(udev);
++    if (port) {
++        reboot = port->reboot_on_probe;
++        port->reboot_on_probe = false;
++    }
++    spin_unlock_bh(&aicwf_ports_lock);
++    return reboot;
++}
+ #endif
+ 
+ #define RESET_INTERVAL	(30 * HZ)
+@@ -90,8 +107,10 @@ static void cmd_mgr_reset_device(struct rwnx_cmd_mgr *cmd_mgr)
+         spin_unlock_bh(&aicwf_ports_lock);
+         return;
+     }
+-    if (port)
++    if (port) {
+         port->last_reset = jiffies;
++        port->reboot_on_probe = true;
++    }
+     spin_unlock_bh(&aicwf_ports_lock);
+     printk(KERN_CRIT "aic8800: firmware not answering: resetting the device to load it afresh\n");
+     usb_queue_reset_device(usbdev->intf);
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_cmds.h
+@@ -118,4 +118,9 @@ int cmd_mgr_queue_force_defer(struct rwnx_cmd_mgr *cmd_mgr, struct rwnx_cmd *cmd
+ void aicwf_set_cmd_tx(void *dev, struct lmac_msg *msg, uint len);
+ void cmd_mgr_task_process(struct work_struct *work);
+ 
++#ifdef AICWF_USB_SUPPORT
++struct usb_device;
++bool aicwf_reboot_chip_on_probe(struct usb_device *udev);
++#endif
++
+ #endif /* _RWNX_CMDS_H_ */
+diff --git a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/rwnx_main.c
+@@ -8924,6 +8924,17 @@ static int start_from_bootrom(struct rwnx_hw *rwnx_hw)
+ 
+ int rwnx_ic_system_init(struct rwnx_hw *rwnx_hw){
+ 
++	/* A USB reset leaves the DC and DW powered, and the firmware loaded afresh can hang at its first start. After a
++	 * reset for a stall, reboot the chip first: it leaves the bus, and the next probe starts it clean. */
++#ifdef AICWF_USB_SUPPORT
++	if (aicwf_reboot_chip_on_probe(rwnx_hw->usbdev->udev) &&
++	    (rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DC || rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DW) &&
++	    !rwnx_send_reboot(rwnx_hw)) {
++		printk(KERN_CRIT "aic8800: rebooted the chip after the reset\n");
++		return -1;
++	}
++#endif
++
+ 	if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8801){
+ 		system_config(rwnx_hw);
+ 	}else if(rwnx_hw->usbdev->chipid == PRODUCT_ID_AIC8800DC ||
