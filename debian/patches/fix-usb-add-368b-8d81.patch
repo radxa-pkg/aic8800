@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Rafael Sales <rafael.sales@gmail.com>
+Date: Thu, 26 Nov 2026 00:00:00 -0300
+Subject: [PATCH] usb: support 368b:8d81 (AIC8800D80 under the V2 vendor ID)
+
+Some AIC8800D80 USB dongles enumerate as a69c:5721 (Zero-CD mass
+storage) and, after usb_modeswitch ejects the virtual disc, come back
+as 368b:8d81 with WiFi and Bluetooth interfaces. 0x368b is the
+already-defined USB_VENDOR_ID_AIC_V2, but aicwf_usb_id_table[] only
+lists PID 0x8d81 under USB_VENDOR_ID_AIC (0xa69c), so the driver never
+probes the device.
+
+Add a USB_DEVICE_AND_INTERFACE_INFO entry for USB_VENDOR_ID_AIC_V2 /
+USB_PRODUCT_ID_AIC8800D81, matching the vendor-specific interface like
+the sibling entries so the Bluetooth interface is left alone.
+
+aicwf_usb_chipmatch() matches on the PID only, so 0x8d81 already maps
+to PRODUCT_ID_AIC8800D81 and the existing aic8800D80 firmware set is
+used; no other change is needed.
+
+Tested on a ClockworkPi uConsole (Raspberry Pi CM4, arm64): with this
+entry the dongle probes and its wlan interface comes up on 7.1.4; the
+full patch series also builds against 7.3.1.
+
+Signed-off-by: Rafael Sales <rafael.sales@gmail.com>
+---
+ .../drivers/aic8800/aic8800_fdrv/aicwf_usb.c       |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
++++ b/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aicwf_usb.c
+@@ -2632,6 +2632,7 @@
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800DE, 0xff, 0xff, 0xff)},
+     {USB_DEVICE(USB_VENDOR_ID_AIC, USB_PRODUCT_ID_AIC8800DW)},
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D81X2, 0xff, 0xff, 0xff)},
++    {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D81, 0xff, 0xff, 0xff)},
+     {USB_DEVICE(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D89X2)},
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D80N, 0xff, 0xff, 0xff)},
+     {USB_DEVICE_AND_INTERFACE_INFO(USB_VENDOR_ID_AIC_V2, USB_PRODUCT_ID_AIC8800D80LN, 0xff, 0xff, 0xff)},
